@@ -18,29 +18,85 @@ const LeaveBalanceBar = ({ typeConfig, balance, year }) => {
   const currentYear = new Date().getFullYear();
   const isCurrentYear = year === currentYear;
 
-  // Pisahkan saldo tahun berjalan dan penangguhan
+  // Debug logging untuk melihat data balance yang diterima
+  if (typeConfig.name === "Cuti Tahunan") {
+    console.log(`🔍 LeaveBalanceBar Debug - ${typeConfig.name}:`, {
+      balance,
+      used_current: balance.used_current,
+      used_deferred: balance.used_deferred,
+      total: balance.total,
+      deferred: balance.deferred,
+      remaining: balance.remaining,
+    });
+  }
+
+  // FIXED: Gunakan data yang sudah dihitung dengan benar dari LeaveHistoryPage
+  // Pastikan menggunakan data yang benar untuk perhitungan saldo tahun berjalan
+  const totalCurrentYear = balance.total || 0;
+  const totalDeferred = balance.deferred || 0;
+  const totalAvailableBalance = totalCurrentYear + totalDeferred;
+
+  // Hitung total used dari balance.used atau fallback ke perhitungan manual
+  const totalUsedFromBalance =
+    balance.used || (balance.used_current || 0) + (balance.used_deferred || 0);
+
+  // Jika total sisa sudah benar (11), maka total used = total available - total remaining
+  const calculatedTotalUsed = totalAvailableBalance - (balance.remaining || 0);
+
+  // Gunakan perhitungan yang konsisten dengan total sisa yang benar
+  const actualTotalUsed =
+    calculatedTotalUsed > 0 ? calculatedTotalUsed : totalUsedFromBalance;
+
+  // Distribusi penggunaan: prioritas ke saldo penangguhan dulu, baru tahun berjalan
+  const usedDeferred = Math.min(actualTotalUsed, totalDeferred);
+  const usedCurrentYear = Math.max(0, actualTotalUsed - usedDeferred);
+
   const currentYearBalance = {
-    total: balance.total,
-    used: balance.used_current || 0, // Penggunaan dari tahun berjalan
-    remaining: Math.max(0, balance.total - (balance.used_current || 0)),
+    total: totalCurrentYear,
+    used: usedCurrentYear,
+    remaining: Math.max(0, totalCurrentYear - usedCurrentYear),
   };
 
+  // Debug logging untuk verifikasi
+  if (typeConfig.name === "Cuti Tahunan") {
+    console.log(`🔍 FIXED CALCULATION - ${typeConfig.name}:`, {
+      totalCurrentYear,
+      totalDeferred,
+      totalAvailableBalance,
+      actualTotalUsed,
+      usedCurrentYear,
+      usedDeferred,
+      currentYearRemaining: currentYearBalance.remaining,
+      originalBalance: balance,
+    });
+  }
+
   const deferredBalance =
-    balance.deferred > 0
+    totalDeferred > 0
       ? {
-          total: balance.deferred,
-          used: balance.used_deferred || 0, // Penggunaan dari saldo penangguhan
-          remaining: Math.max(
-            0,
-            balance.deferred - (balance.used_deferred || 0),
-          ),
+          total: totalDeferred,
+          used: usedDeferred, // Menggunakan perhitungan yang sudah diperbaiki
+          remaining: Math.max(0, totalDeferred - usedDeferred),
         }
       : null;
 
-  const totalUsed = balance.used || 0;
-  const totalAvailable = balance.total + (balance.deferred || 0);
+  // FIXED: Gunakan total used yang sudah dihitung dengan splitting logic yang diperbaiki
+  const totalUsed = actualTotalUsed;
+  const totalAvailable = totalAvailableBalance;
   const usagePercentage =
     totalAvailable > 0 ? (totalUsed / totalAvailable) * 100 : 0;
+
+  // Debug logging untuk perhitungan
+  if (typeConfig.name === "Cuti Tahunan") {
+    console.log(`🔍 LeaveBalanceBar Final Calculations - ${typeConfig.name}:`, {
+      currentYearBalance,
+      deferredBalance,
+      totalUsed,
+      totalAvailable,
+      usagePercentage,
+      expectedTotalRemaining: totalAvailable - totalUsed,
+    });
+  }
 
   // Progress bar color based on usage percentage
   const getProgressColor = () => {
@@ -58,7 +114,7 @@ const LeaveBalanceBar = ({ typeConfig, balance, year }) => {
           <AlertTriangle className="w-4 h-4 text-yellow-500" />
         )}
       </div>
-      
+
       {/* Progress Bar */}
       <div className="mb-3">
         <div className="flex justify-between text-xs mb-2">
@@ -67,7 +123,7 @@ const LeaveBalanceBar = ({ typeConfig, balance, year }) => {
             {totalUsed}/{totalAvailable}
           </span>
         </div>
-        
+
         {/* Simple Progress Bar */}
         <div className="w-full bg-slate-700 rounded-full h-2 overflow-hidden">
           <motion.div
@@ -114,7 +170,9 @@ const LeaveBalanceBar = ({ typeConfig, balance, year }) => {
         <div className="border-t border-slate-600 pt-2">
           <div className="flex justify-between text-xs font-medium">
             <span className="text-green-300">Total Sisa</span>
-            <span className="text-green-300">{balance.remaining} hari</span>
+            <span className="text-green-300">
+              {Math.max(0, totalAvailable - totalUsed)} hari
+            </span>
           </div>
         </div>
       </div>

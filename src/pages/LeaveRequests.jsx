@@ -302,12 +302,15 @@ const LeaveRequests = () => {
         requestToDelete.leave_quota_year ||
         new Date(requestToDelete.start_date).getFullYear();
 
-      const { error: rpcError } = await supabase.rpc("update_leave_balance", {
-        p_employee_id: requestToDelete.employee_id,
-        p_leave_type_id: requestToDelete.leave_type_id,
-        p_year: quotaYear,
-        p_days: -requestToDelete.days_requested,
-      });
+      const { error: rpcError } = await supabase.rpc(
+        "update_leave_balance_with_splitting",
+        {
+          p_employee_id: requestToDelete.employee_id,
+          p_leave_type_id: requestToDelete.leave_type_id,
+          p_requested_year: quotaYear,
+          p_days: -requestToDelete.days_requested,
+        },
+      );
       if (rpcError)
         console.error(`Gagal mengembalikan saldo cuti:`, rpcError.message);
 

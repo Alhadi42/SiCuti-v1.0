@@ -1,6 +1,15 @@
 import React, { useState, useEffect, useCallback, useMemo } from "react";
 import { motion } from "framer-motion";
-import { History, Download, Calendar, User, Clock, TrendingUp, FileText, RefreshCw } from "lucide-react";
+import {
+  History,
+  Download,
+  Calendar,
+  User,
+  Clock,
+  TrendingUp,
+  FileText,
+  RefreshCw,
+} from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/components/ui/use-toast";
@@ -247,7 +256,10 @@ const LeaveHistoryPage = () => {
         // Create a map of employee ID to deferral log object
         const deferralLogMap = new Map();
         (deferralsLogData || []).forEach((d) => {
-          deferralLogMap.set(d.employee_id, { id: d.id, days_deferred: d.days_deferred });
+          deferralLogMap.set(d.employee_id, {
+            id: d.id,
+            days_deferred: d.days_deferred,
+          });
         });
 
         // Process employee data with their leave balances
@@ -313,27 +325,37 @@ const LeaveHistoryPage = () => {
               total = ltConfig?.default_days || 0;
             }
 
-            // CRITICAL FIX: Calculate total used from actual leave requests
-            let totalUsed = 0;
-            if (empTypeRequests.length > 0) {
-              // Calculate from actual leave requests for accuracy
-              totalUsed = usedFromCurrentYear + usedFromDeferred;
-            } else {
-              // No leave requests found, so used should be 0
-              totalUsed = 0;
+            // CRITICAL FIX: Calculate total used from actual leave requests with splitting logic
+            let totalUsed = usedFromCurrentYear + usedFromDeferred;
 
-              // Log warning if database shows usage but no requests found
-              if (dbBalance?.used_days > 0) {
-                console.warn(
-                  `⚠️ BALANCE MISMATCH for ${emp.name} - ${leaveType.name}:`,
-                  {
-                    dbUsedDays: dbBalance.used_days,
-                    actualRequests: empTypeRequests.length,
-                    employee: emp.name,
-                    leaveType: leaveType.name,
-                  },
-                );
-              }
+            // Log detailed calculation for debugging
+            if (
+              emp.name &&
+              emp.name.toLowerCase().includes("aris") &&
+              leaveType.name === "Cuti Tahunan"
+            ) {
+              console.log(`🔍 ARIS HERMANTO - ${leaveType.name} Calculation:`);
+              console.log("Employee:", emp.name);
+              console.log("Total Days:", total);
+              console.log("Deferred Days:", deferred);
+              console.log("Used Current Year:", usedFromCurrentYear);
+              console.log("Used Deferred:", usedFromDeferred);
+              console.log("Total Used:", totalUsed);
+              console.log("Employee Type Requests:", empTypeRequests);
+              console.log("DB Balance:", dbBalance);
+            }
+
+            // Log warning if database shows usage but no requests found
+            if (empTypeRequests.length === 0 && dbBalance?.used_days > 0) {
+              console.warn(
+                `⚠️ BALANCE MISMATCH for ${emp.name} - ${leaveType.name}:`,
+                {
+                  dbUsedDays: dbBalance.used_days,
+                  actualRequests: empTypeRequests.length,
+                  employee: emp.name,
+                  leaveType: leaveType.name,
+                },
+              );
             }
 
             const remaining = Math.max(0, total + deferred - totalUsed);
@@ -341,8 +363,12 @@ const LeaveHistoryPage = () => {
             // Debug logging for specific employee and leave type
             if (
               emp.name &&
-              (emp.name.toLowerCase().includes("hany") || emp.name.toLowerCase().includes("perwitasari")) &&
-              (leaveType.name === "Cuti Sakit" || leaveType.name === "Cuti Alasan Penting" || leaveType.name === "Cuti Besar" || leaveType.name === "Cuti Melahirkan")
+              (emp.name.toLowerCase().includes("hany") ||
+                emp.name.toLowerCase().includes("perwitasari")) &&
+              (leaveType.name === "Cuti Sakit" ||
+                leaveType.name === "Cuti Alasan Penting" ||
+                leaveType.name === "Cuti Besar" ||
+                leaveType.name === "Cuti Melahirkan")
             ) {
               console.log(`🔍 DEBUG - Hany ${leaveType.name} Calculation:`);
               console.log("Employee Name:", emp.name);
@@ -524,7 +550,10 @@ const LeaveHistoryPage = () => {
 
   const handleDataChange = () => {
     console.log("Data changed - refreshing leave data...");
-    fetchLeaveData(true); // Force full refresh including total counts
+    // Force refresh dengan delay kecil untuk memastikan database sudah ter-update
+    setTimeout(() => {
+      fetchLeaveData(true); // Force full refresh including total counts
+    }, 500);
   };
 
   useEffect(() => {
@@ -590,78 +619,88 @@ const LeaveHistoryPage = () => {
         description: "Sedang mempersiapkan data untuk export...",
       });
 
-      console.log('🔍 Fetching leave requests data...');
-      
+      console.log("🔍 Fetching leave requests data...");
+
       // Fetch leave requests data
       const { data: leaveRequests, error: leaveRequestsError } = await supabase
-        .from('leave_requests')
-        .select(`
+        .from("leave_requests")
+        .select(
+          `
           *,
           employees (name, nip, department),
           leave_types (name)
-        `)
-        .order('created_at', { ascending: false });
+        `,
+        )
+        .order("created_at", { ascending: false });
 
       if (leaveRequestsError) throw leaveRequestsError;
 
-      console.log('📋 Leave requests data:', leaveRequests);
-      console.log('📊 Total leave requests:', leaveRequests?.length || 0);
+      console.log("📋 Leave requests data:", leaveRequests);
+      console.log("📊 Total leave requests:", leaveRequests?.length || 0);
 
-      console.log('🔍 Fetching deferrals data...');
-      
+      console.log("🔍 Fetching deferrals data...");
+
       // Fetch deferrals data
       const { data: deferrals, error: deferralsError } = await supabase
-        .from('leave_deferrals')
-        .select(`
+        .from("leave_deferrals")
+        .select(
+          `
           *,
           employees (name, nip, department)
-        `)
-        .order('created_at', { ascending: false });
+        `,
+        )
+        .order("created_at", { ascending: false });
 
       if (deferralsError) throw deferralsError;
 
-      console.log('📋 Deferrals data:', deferrals);
-      console.log('📊 Total deferrals:', deferrals?.length || 0);
+      console.log("📋 Deferrals data:", deferrals);
+      console.log("📊 Total deferrals:", deferrals?.length || 0);
 
       // Get unique employee IDs who have leave requests
-      const employeeIdsWithRequests = [...new Set(leaveRequests?.map(req => req.employee_id).filter(Boolean) || [])];
-      console.log('👥 Employee IDs with requests:', employeeIdsWithRequests);
+      const employeeIdsWithRequests = [
+        ...new Set(
+          leaveRequests?.map((req) => req.employee_id).filter(Boolean) || [],
+        ),
+      ];
+      console.log("👥 Employee IDs with requests:", employeeIdsWithRequests);
 
-      console.log('🔍 Fetching leave balances for employees with requests...');
-      
+      console.log("🔍 Fetching leave balances for employees with requests...");
+
       // Fetch leave balances only for employees who have leave requests
       const { data: leaveBalances, error: leaveBalancesError } = await supabase
-        .from('leave_balances')
-        .select(`
+        .from("leave_balances")
+        .select(
+          `
           *,
           employees (name, nip, department),
           leave_types (name)
-        `)
-        .in('employee_id', employeeIdsWithRequests)
-        .eq('year', parseInt(selectedYear))
-        .order('employees(name)', { ascending: true });
+        `,
+        )
+        .in("employee_id", employeeIdsWithRequests)
+        .eq("year", parseInt(selectedYear))
+        .order("employees(name)", { ascending: true });
 
       if (leaveBalancesError) throw leaveBalancesError;
 
-      console.log('📋 Leave balances data:', leaveBalances);
-      console.log('📊 Total leave balances:', leaveBalances?.length || 0);
+      console.log("📋 Leave balances data:", leaveBalances);
+      console.log("📊 Total leave balances:", leaveBalances?.length || 0);
 
       // Filter leaveBalances hanya untuk Cuti Tahunan
-      const cutiTahunanBalances = leaveBalances?.filter(
-        (b) => b.leave_types?.name === 'Cuti Tahunan'
-      ) || [];
+      const cutiTahunanBalances =
+        leaveBalances?.filter((b) => b.leave_types?.name === "Cuti Tahunan") ||
+        [];
 
       // Ambil leave_requests hanya untuk Cuti Tahunan
-      const cutiTahunanRequests = leaveRequests?.filter(
-        (r) => r.leave_types?.name === 'Cuti Tahunan'
-      ) || [];
+      const cutiTahunanRequests =
+        leaveRequests?.filter((r) => r.leave_types?.name === "Cuti Tahunan") ||
+        [];
 
       // Buat mapping saldo cuti tahunan per pegawai
       const saldoCutiTahunan = cutiTahunanBalances.map((balance) => {
         const employee_id = balance.employee_id;
-        const employee_name = balance.employees?.name || '';
-        const employee_nip = balance.employees?.nip || '';
-        const employee_department = balance.employees?.department || '';
+        const employee_name = balance.employees?.name || "";
+        const employee_nip = balance.employees?.nip || "";
+        const employee_department = balance.employees?.department || "";
         const year = balance.year;
         const jatah_tahun_berjalan = balance.total_days || 0;
         const jatah_penangguhan = balance.deferred_days || 0;
@@ -669,18 +708,20 @@ const LeaveHistoryPage = () => {
         // Digunakan tahun berjalan: leave_requests dengan leave_quota_year == year
         const digunakan_tahun_berjalan = cutiTahunanRequests
           .filter(
-            (r) => r.employee_id === employee_id && r.leave_quota_year === year
+            (r) => r.employee_id === employee_id && r.leave_quota_year === year,
           )
           .reduce((sum, r) => sum + (r.days_requested || r.days || 0), 0);
 
         // Digunakan penangguhan: leave_requests dengan leave_quota_year == year - 1
         const digunakan_penangguhan = cutiTahunanRequests
           .filter(
-            (r) => r.employee_id === employee_id && r.leave_quota_year === year - 1
+            (r) =>
+              r.employee_id === employee_id && r.leave_quota_year === year - 1,
           )
           .reduce((sum, r) => sum + (r.days_requested || r.days || 0), 0);
 
-        const sisa_tahun_berjalan = jatah_tahun_berjalan - digunakan_tahun_berjalan;
+        const sisa_tahun_berjalan =
+          jatah_tahun_berjalan - digunakan_tahun_berjalan;
         const sisa_penangguhan = jatah_penangguhan - digunakan_penangguhan;
 
         return {
@@ -701,51 +742,52 @@ const LeaveHistoryPage = () => {
       // Hanya tampilkan pegawai yang punya pengajuan cuti tahunan
       const saldoCutiTahunanFiltered = saldoCutiTahunan.filter((row) => {
         return (
-          row.digunakan_tahun_berjalan > 0 ||
-          row.digunakan_penangguhan > 0
+          row.digunakan_tahun_berjalan > 0 || row.digunakan_penangguhan > 0
         );
       });
 
       // Format data untuk export
-      const formattedLeaveRequests = leaveRequests?.map(request => ({
-        employee_id: request.employee_id,
-        employee_name: request.employees?.name || '',
-        employee_nip: request.employees?.nip || '',
-        employee_department: request.employees?.department || '',
-        leave_type: request.leave_types?.name || '',
-        start_date: request.start_date,
-        end_date: request.end_date,
-        days: request.days_requested || request.days,
-        leave_quota_year: request.leave_quota_year,
-        status: request.status,
-        reason: request.reason,
-        created_at: request.created_at,
-        notes: request.notes || ''
-      })) || [];
+      const formattedLeaveRequests =
+        leaveRequests?.map((request) => ({
+          employee_id: request.employee_id,
+          employee_name: request.employees?.name || "",
+          employee_nip: request.employees?.nip || "",
+          employee_department: request.employees?.department || "",
+          leave_type: request.leave_types?.name || "",
+          start_date: request.start_date,
+          end_date: request.end_date,
+          days: request.days_requested || request.days,
+          leave_quota_year: request.leave_quota_year,
+          status: request.status,
+          reason: request.reason,
+          created_at: request.created_at,
+          notes: request.notes || "",
+        })) || [];
 
-      const formattedDeferrals = deferrals?.map(deferral => ({
-        employee_id: deferral.employee_id,
-        employee_name: deferral.employees?.name || '',
-        employee_nip: deferral.employees?.nip || '',
-        employee_department: deferral.employees?.department || '',
-        year: deferral.year,
-        days_deferred: deferral.days_deferred,
-        google_drive_link: deferral.google_drive_link || '',
-        notes: deferral.notes || '',
-        created_at: deferral.created_at,
-        status: 'Aktif'
-      })) || [];
+      const formattedDeferrals =
+        deferrals?.map((deferral) => ({
+          employee_id: deferral.employee_id,
+          employee_name: deferral.employees?.name || "",
+          employee_nip: deferral.employees?.nip || "",
+          employee_department: deferral.employees?.department || "",
+          year: deferral.year,
+          days_deferred: deferral.days_deferred,
+          google_drive_link: deferral.google_drive_link || "",
+          notes: deferral.notes || "",
+          created_at: deferral.created_at,
+          status: "Aktif",
+        })) || [];
 
       // Untuk sheet Saldo Cuti, gunakan saldoCutiTahunanFiltered
       const exportData = {
         leaveRequests: formattedLeaveRequests,
         deferrals: formattedDeferrals,
-        leaveBalances: saldoCutiTahunanFiltered
+        leaveBalances: saldoCutiTahunanFiltered,
       };
 
-      console.log('📦 Final export data:', exportData);
+      console.log("📦 Final export data:", exportData);
 
-      const fileName = `Data_Cuti_${new Date().toISOString().split('T')[0]}.xlsx`;
+      const fileName = `Data_Cuti_${new Date().toISOString().split("T")[0]}.xlsx`;
 
       await exportToExcelWithMultipleSheets(exportData, fileName);
 
@@ -753,9 +795,8 @@ const LeaveHistoryPage = () => {
         title: "✅ Export Berhasil",
         description: `Data cuti berhasil diekspor ke file ${fileName}`,
       });
-
     } catch (error) {
-      console.error('Export error:', error);
+      console.error("Export error:", error);
       toast({
         variant: "destructive",
         title: "❌ Export Gagal",
@@ -801,6 +842,17 @@ const LeaveHistoryPage = () => {
             </p>
           </div>
           <div className="flex space-x-2 mt-4 sm:mt-0">
+            <Button
+              onClick={() => fetchLeaveData(true)}
+              variant="outline"
+              className="border-slate-600 text-slate-300 hover:text-white"
+              disabled={isLoadingData}
+            >
+              <RefreshCw
+                className={`w-4 h-4 mr-2 ${isLoadingData ? "animate-spin" : ""}`}
+              />
+              {isLoadingData ? "Memuat..." : "Refresh"}
+            </Button>
             <Button
               onClick={handleExportDataCuti}
               className="bg-gradient-to-r from-blue-500 to-purple-600 hover:from-blue-600 hover:to-purple-700"
@@ -909,7 +961,6 @@ const LeaveHistoryPage = () => {
         employee={selectedEmployee}
         onDataChange={handleDataChange}
       />
-
     </>
   );
 };

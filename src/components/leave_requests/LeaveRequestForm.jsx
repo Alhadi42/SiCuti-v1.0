@@ -13,7 +13,11 @@ import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/components/ui/use-toast";
 import { supabase } from "@/lib/supabaseClient";
 import { Loader2, Search, X } from "lucide-react";
-import { countWorkingDays, fetchNationalHolidays, fetchNationalHolidaysFromDB } from "@/utils/workingDays";
+import {
+  countWorkingDays,
+  fetchNationalHolidays,
+  fetchNationalHolidaysFromDB,
+} from "@/utils/workingDays";
 
 const LeaveRequestForm = ({
   employees,
@@ -64,7 +68,7 @@ const LeaveRequestForm = ({
 
       setIsSearching(true);
       try {
-        const safeQuery = query.replace(/,/g, '');
+        const safeQuery = query.replace(/,/g, "");
         const { data, error } = await supabase
           .from("employees")
           .select("*")
@@ -319,12 +323,17 @@ const LeaveRequestForm = ({
 
   // Fetch holidays from DB when year changes
   useEffect(() => {
-    const year = formData.start_date ? new Date(formData.start_date).getFullYear() : new Date().getFullYear();
+    const year = formData.start_date
+      ? new Date(formData.start_date).getFullYear()
+      : new Date().getFullYear();
     setHolidaysYear(year);
     fetchNationalHolidaysFromDB(year)
       .then(setHolidays)
       .catch((err) => {
-        console.warn("Gagal mengambil hari libur nasional dari DB:", err.message);
+        console.warn(
+          "Gagal mengambil hari libur nasional dari DB:",
+          err.message,
+        );
         setHolidays(new Set());
       });
   }, [formData.start_date]);
@@ -437,31 +446,45 @@ const LeaveRequestForm = ({
         // Adjust balance if key data changed
         const oldDays = initialData.days_requested;
         const newDays = days_requested;
-        const oldYear = initialData.leave_quota_year || new Date(initialData.start_date).getFullYear();
-        const newYear = dataToSubmit.leave_quota_year || new Date(dataToSubmit.start_date).getFullYear();
+        const oldYear =
+          initialData.leave_quota_year ||
+          new Date(initialData.start_date).getFullYear();
+        const newYear =
+          dataToSubmit.leave_quota_year ||
+          new Date(dataToSubmit.start_date).getFullYear();
         const oldType = initialData.leave_type_id;
         const newType = dataToSubmit.leave_type_id;
 
         if (oldDays !== newDays || oldYear !== newYear || oldType !== newType) {
-          // Revert old balance
-          const { error: revertError } = await supabase.rpc("update_leave_balance", {
-            p_employee_id: dataToSubmit.employee_id,
-            p_leave_type_id: oldType,
-            p_year: oldYear,
-            p_days: -oldDays,
-          });
-          if (revertError) console.error("Gagal mengembalikan saldo lama:", revertError.message);
+          // Revert old balance using smart splitting
+          const { error: revertError } = await supabase.rpc(
+            "update_leave_balance_with_splitting",
+            {
+              p_employee_id: dataToSubmit.employee_id,
+              p_leave_type_id: oldType,
+              p_requested_year: oldYear,
+              p_days: -oldDays,
+            },
+          );
+          if (revertError)
+            console.error(
+              "Gagal mengembalikan saldo lama:",
+              revertError.message,
+            );
 
-          // Apply new balance
-          const { error: applyError } = await supabase.rpc("update_leave_balance", {
-            p_employee_id: dataToSubmit.employee_id,
-            p_leave_type_id: newType,
-            p_year: newYear,
-            p_days: newDays,
-          });
-          if (applyError) console.error("Gagal menerapkan saldo baru:", applyError.message);
+          // Apply new balance using smart splitting
+          const { error: applyError } = await supabase.rpc(
+            "update_leave_balance_with_splitting",
+            {
+              p_employee_id: dataToSubmit.employee_id,
+              p_leave_type_id: newType,
+              p_requested_year: newYear,
+              p_days: newDays,
+            },
+          );
+          if (applyError)
+            console.error("Gagal menerapkan saldo baru:", applyError.message);
         }
-
       } else {
         // CREATE MODE: Insert new request and update balance
         const { error: insertError } = await supabase
@@ -470,16 +493,19 @@ const LeaveRequestForm = ({
         error = insertError;
         if (error) throw error;
 
-        // Gunakan leave_quota_year untuk menentukan tahun saldo cuti yang digunakan
+        // Use smart splitting function for balance update
         const quotaYear =
           parseInt(formData.leave_quota_year) ||
           new Date(dataToSubmit.start_date).getFullYear();
-        const { error: rpcError } = await supabase.rpc("update_leave_balance", {
-          p_employee_id: dataToSubmit.employee_id,
-          p_leave_type_id: dataToSubmit.leave_type_id,
-          p_year: quotaYear,
-          p_days: days_requested,
-        });
+        const { error: rpcError } = await supabase.rpc(
+          "update_leave_balance_with_splitting",
+          {
+            p_employee_id: dataToSubmit.employee_id,
+            p_leave_type_id: dataToSubmit.leave_type_id,
+            p_requested_year: quotaYear,
+            p_days: days_requested,
+          },
+        );
         if (rpcError)
           console.error(`Gagal memperbarui saldo cuti:`, rpcError.message);
       }
