@@ -590,6 +590,7 @@ function SuratKeterangan() {
           leaveRequest.end_date || leaveRequest.tanggal_selesai,
         ),
         tanggal_formulir_pengajuan: formatDateLong(
+          leaveRequest.application_form_date ||
           leaveRequest.created_at ||
             leaveRequest.tanggal_pengajuan ||
             new Date().toISOString(),
@@ -639,6 +640,7 @@ function SuratKeterangan() {
       tanggal_mulai: formatDate(leaveRequest.tanggal_mulai),
       tanggal_selesai: formatDate(leaveRequest.tanggal_selesai),
       tanggal_formulir_pengajuan: formatDateLong(
+        leaveRequest.application_form_date ||
         leaveRequest.created_at ||
           leaveRequest.tanggal_pengajuan ||
           new Date().toISOString(),
@@ -686,10 +688,23 @@ function SuratKeterangan() {
         }
       });
 
+      // List of variables that should be preserved (not replaced) for external applications
+      const preservedVariables = [
+        'nomor_naskah',
+        'ttd_pengirim'
+      ];
+
       // Clean up any remaining variables that weren't in the data
       // Only if the result is a string (double check)
       if (typeof result === "string") {
-        result = result.replace(/\\{\\{[^}]+\\}\\}/g, "");
+        // Replace all unmatched variables except preserved ones
+        result = result.replace(/\\{\\{([^}]+)\\}\\}/g, (match, variableName) => {
+          if (preservedVariables.includes(variableName.trim())) {
+            console.log(`Preserving variable for external application: {${variableName}}`);
+            return match; // Keep the original variable
+          }
+          return ""; // Remove other unmatched variables
+        });
       }
 
       return result;

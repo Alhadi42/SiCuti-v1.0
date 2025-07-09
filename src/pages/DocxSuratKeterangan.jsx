@@ -687,6 +687,7 @@ function DocxSuratKeterangan() {
           leaveRequest.end_date || leaveRequest.tanggal_selesai,
         ),
         tanggal_formulir_pengajuan: formatDateLong(
+          leaveRequest.application_form_date ||
           leaveRequest.created_at ||
             leaveRequest.tanggal_pengajuan ||
             new Date().toISOString(),
@@ -761,6 +762,7 @@ function DocxSuratKeterangan() {
       tanggal_selesai: formatDate(sampleEndDate),
       tanggal_cuti: formatTanggalCuti(sampleStartDate, sampleEndDate),
       tanggal_formulir_pengajuan: formatDateLong(
+        leaveRequest.application_form_date ||
         leaveRequest.created_at ||
           leaveRequest.tanggal_pengajuan ||
           new Date().toISOString(),

@@ -187,6 +187,12 @@ export const replaceDocxVariables = async (docxData, variables) => {
     let text = result.value;
     console.log("Original text extracted:", text.substring(0, 500) + "...");
 
+    // List of variables that should be preserved (not replaced) for external applications
+    const preservedVariables = [
+      'nomor_naskah',
+      'ttd_pengirim'
+    ];
+
     // Replace variables in the text
     Object.entries(variables).forEach(([key, value]) => {
       if (value !== null && value !== undefined) {
@@ -221,6 +227,15 @@ export const replaceDocxVariables = async (docxData, variables) => {
           text = text.replace(pattern, stringValue);
         });
       }
+    });
+
+    // Clean up any remaining unmatched variables except preserved ones
+    text = text.replace(/\{\{([^}]+)\}\}/g, (match, variableName) => {
+      if (preservedVariables.includes(variableName.trim())) {
+        console.log(`Preserving variable for external application in text replacement: {${variableName}}`);
+        return match; // Keep the original variable
+      }
+      return ""; // Remove other unmatched variables
     });
 
     console.log("Text after replacement:", text.substring(0, 500) + "...");
@@ -307,8 +322,22 @@ export const processDocxTemplate = async (
 
       const zip = new PizZip(arrayBuffer);
 
+      // List of variables that should be preserved (not replaced) for external applications
+      const preservedVariables = [
+        'nomor_naskah',
+        'ttd_pengirim'
+      ];
+
       const nullGetter = (part) => {
-        console.warn(`Template variable not found in data: {${part.value}}`);
+        const variableName = part.value;
+        
+        // Check if this variable should be preserved
+        if (preservedVariables.includes(variableName)) {
+          console.log(`Preserving variable for external application: {${variableName}}`);
+          return `{${variableName}}`; // Return the original variable format
+        }
+        
+        console.warn(`Template variable not found in data: {${variableName}}`);
         return "";
       };
 
@@ -601,6 +630,12 @@ export const generateDocxPreview = async (docxData, variables = {}) => {
 
     let html = result.value;
 
+    // List of variables that should be preserved (not replaced) for external applications
+    const preservedVariables = [
+      'nomor_naskah',
+      'ttd_pengirim'
+    ];
+
     // Replace variables in the HTML
     Object.entries(variables).forEach(([key, value]) => {
       if (value !== null && value !== undefined) {
@@ -633,6 +668,15 @@ export const generateDocxPreview = async (docxData, variables = {}) => {
           html = html.replace(pattern, stringValue);
         });
       }
+    });
+
+    // Clean up any remaining unmatched variables except preserved ones
+    html = html.replace(/\{\{([^}]+)\}\}/g, (match, variableName) => {
+      if (preservedVariables.includes(variableName.trim())) {
+        console.log(`Preserving variable for external application in preview: {${variableName}}`);
+        return match; // Keep the original variable
+      }
+      return ""; // Remove other unmatched variables
     });
 
     // Add CSS styling for better preview
