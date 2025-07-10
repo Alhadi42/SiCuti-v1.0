@@ -550,7 +550,13 @@ function DocxSuratKeterangan() {
     // Helper function to format dates consistently
     const formatDate = (dateString) => {
       if (!dateString) return "";
-      return formatDateLong(dateString);
+      try {
+        const options = { day: "2-digit", month: "long", year: "numeric" };
+        return new Date(dateString).toLocaleDateString("id-ID", options);
+      } catch (error) {
+        console.error("Error formatting date:", error);
+        return "";
+      }
     };
 
     // Helper function to format date range for tanggal_cuti
@@ -702,7 +708,17 @@ function DocxSuratKeterangan() {
         nip_atasan: leaveRequest.nip_atasan || signatory?.nip || "NIP Atasan",
         jabatan_atasan:
           leaveRequest.jabatan_atasan || signatory?.jabatan || "Jabatan Atasan",
-        tanggal_surat: formatDate(leaveRequest.leave_letter_date || new Date()),
+        tanggal_surat: (() => {
+          console.log("=== TANGGAL SURAT DEBUG ===");
+          console.log("leaveRequest.leave_letter_date:", leaveRequest.leave_letter_date);
+          console.log("leaveRequest.created_at:", leaveRequest.created_at);
+          console.log("Raw leave request data:", leaveRequest);
+          
+          const result = formatDate(leaveRequest.leave_letter_date || leaveRequest.created_at || new Date());
+          console.log("Final tanggal_surat result:", result);
+          console.log("=== END TANGGAL SURAT DEBUG ===");
+          return result;
+        })(),
         kota: leaveRequest.kota || "...",
         tahun: (leaveRequest.tanggal_surat
           ? new Date(leaveRequest.tanggal_surat)
@@ -777,7 +793,17 @@ function DocxSuratKeterangan() {
       nip_atasan: leaveRequest.nip_atasan || signatory?.nip || "NIP Atasan",
       jabatan_atasan:
         leaveRequest.jabatan_atasan || signatory?.jabatan || "Jabatan Atasan",
-      tanggal_surat: formatDate(leaveRequest.leave_letter_date || new Date()),
+      tanggal_surat: (() => {
+        console.log("=== TANGGAL SURAT DEBUG (FORM DATA) ===");
+        console.log("leaveRequest.leave_letter_date:", leaveRequest.leave_letter_date);
+        console.log("leaveRequest.created_at:", leaveRequest.created_at);
+        console.log("Raw leave request data:", leaveRequest);
+        
+        const result = formatDate(leaveRequest.leave_letter_date || leaveRequest.created_at || new Date());
+        console.log("Final tanggal_surat result:", result);
+        console.log("=== END TANGGAL SURAT DEBUG (FORM DATA) ===");
+        return result;
+      })(),
       tahun: new Date().getFullYear(),
       jatah_cuti_tahun:
         leaveRequest.leave_quota_year || new Date().getFullYear(),
@@ -898,10 +924,22 @@ function DocxSuratKeterangan() {
       `=== GENERATING BATCH DATA FOR ${employees.length} EMPLOYEES (max ${maxSlots} slots) ===`,
     );
 
+    // Helper function to format dates consistently for batch data
+    const formatDate = (dateString) => {
+      if (!dateString) return "";
+      try {
+        const options = { day: "2-digit", month: "long", year: "numeric" };
+        return new Date(dateString).toLocaleDateString("id-ID", options);
+      } catch (error) {
+        console.error("Error formatting date:", error);
+        return "";
+      }
+    };
+
     const batchData = {
       // Common template data (from first employee for consistency)
       nomor_surat: ".../.../...",
-      tanggal_surat: formatDateLong(new Date().toISOString()),
+      tanggal_surat: "", // Will be filled from first employee data
       kota: "Jakarta",
       tahun: new Date().getFullYear(),
       // Signatory info (from first employee)
@@ -917,12 +955,24 @@ function DocxSuratKeterangan() {
       batchData.nip_atasan = firstEmployeeData.nip_atasan || "";
       batchData.jabatan_atasan = firstEmployeeData.jabatan_atasan || "";
       batchData.nomor_surat = firstEmployeeData.nomor_surat || ".../.../...";
+      batchData.tanggal_surat = (() => {
+        console.log("=== BATCH TANGGAL SURAT DEBUG ===");
+        console.log("firstEmployeeData.tanggal_surat:", firstEmployeeData.tanggal_surat);
+        console.log("firstEmployeeData raw:", firstEmployeeData);
+        console.log("employees[0] raw:", employees[0]);
+        
+        const result = firstEmployeeData.tanggal_surat || formatDate(new Date().toISOString());
+        console.log("Final batch tanggal_surat result:", result);
+        console.log("=== END BATCH TANGGAL SURAT DEBUG ===");
+        return result;
+      })();
 
       console.log("Common data from first employee:", {
         nama_atasan: batchData.nama_atasan,
         nip_atasan: batchData.nip_atasan,
         jabatan_atasan: batchData.jabatan_atasan,
         nomor_surat: batchData.nomor_surat,
+        tanggal_surat: batchData.tanggal_surat,
       });
     }
 

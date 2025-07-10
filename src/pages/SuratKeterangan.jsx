@@ -528,7 +528,7 @@ function SuratKeterangan() {
     nama_atasan: "Nama Atasan",
     nip_atasan: "987654321098765432",
     jabatan_atasan: "Kepala Bagian",
-    tanggal_surat: formatDateLong(new Date().toISOString()),
+    tanggal_surat: formatDate(new Date().toISOString()),
     kota: "Kota",
     tahun: new Date().getFullYear().toString(),
     durasi_hari: "5",
@@ -543,7 +543,13 @@ function SuratKeterangan() {
     // Helper function to format dates consistently
     const formatDate = (dateString) => {
       if (!dateString) return "";
-      return formatDateLong(dateString);
+      try {
+        const options = { day: "2-digit", month: "long", year: "numeric" };
+        return new Date(dateString).toLocaleDateString("id-ID", options);
+      } catch (error) {
+        console.error("Error formatting date:", error);
+        return "";
+      }
     };
 
     // Handle API response format (from Supabase)
@@ -602,7 +608,7 @@ function SuratKeterangan() {
         nama_atasan: leaveRequest.nama_atasan || "...",
         nip_atasan: leaveRequest.nip_atasan || "...",
         jabatan_atasan: leaveRequest.jabatan_atasan || "...",
-        tanggal_surat: formatDate(leaveRequest.leave_letter_date || new Date()),
+        tanggal_surat: formatDate(leaveRequest.leave_letter_date || leaveRequest.created_at || new Date()),
         kota: leaveRequest.kota || "...",
         tahun: (leaveRequest.tanggal_surat
           ? new Date(leaveRequest.tanggal_surat)
@@ -648,7 +654,7 @@ function SuratKeterangan() {
       lama_cuti: totalDays,
       alamat_selama_cuti:
         leaveRequest.alamat_selama_cuti || "Alamat tidak tersedia",
-      tanggal_surat: formatDate(leaveRequest.leave_letter_date || new Date()),
+      tanggal_surat: formatDate(leaveRequest.leave_letter_date || leaveRequest.created_at || new Date()),
       tahun: new Date().getFullYear(),
       bulan: new Date().toLocaleString("id-ID", { month: "long" }),
     };
