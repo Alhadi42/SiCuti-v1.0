@@ -12,12 +12,20 @@ import {
 import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/components/ui/use-toast";
 import { supabase } from "@/lib/supabaseClient";
-import { Loader2, Search, X } from "lucide-react";
+import { Loader2, Search, X, Edit } from "lucide-react";
 import {
   countWorkingDays,
   fetchNationalHolidays,
   fetchNationalHolidaysFromDB,
 } from "@/utils/workingDays";
+import EmployeeForm from "@/components/employees/EmployeeForm";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+} from "@/components/ui/dialog";
 
 const LeaveRequestForm = ({
   employees,
@@ -58,6 +66,9 @@ const LeaveRequestForm = ({
   const [hasNewColumns, setHasNewColumns] = useState(true); // True after migration
   const [holidays, setHolidays] = useState(new Set());
   const [holidaysYear, setHolidaysYear] = useState(new Date().getFullYear());
+  const [isEditEmployeeModalOpen, setIsEditEmployeeModalOpen] = useState(false);
+  const [editingEmployee, setEditingEmployee] = useState(null);
+  const [departments, setDepartments] = useState([]);
 
   const fetchEmployees = useCallback(
     async (query) => {
@@ -338,6 +349,90 @@ const LeaveRequestForm = ({
       });
   }, [formData.start_date]);
 
+  // Fetch departments for EmployeeForm
+  useEffect(() => {
+    const fetchDepartments = async () => {
+      try {
+        const { data, error } = await supabase
+          .from("employees")
+          .select("department")
+          .not("department", "is", null);
+
+        if (error) throw error;
+
+        const uniqueDepartments = [...new Set(data.map(emp => emp.department))]
+          .filter(Boolean)
+          .map(name => ({ id: name, name }));
+
+        setDepartments(uniqueDepartments);
+      } catch (error) {
+        console.error("Error fetching departments:", error);
+      }
+    };
+
+    fetchDepartments();
+  }, []);
+
+  const handleQuickEditEmployee = async () => {
+    if (!formData.employee_id) return;
+
+    try {
+      const { data: employee, error } = await supabase
+        .from("employees")
+        .select("*")
+        .eq("id", formData.employee_id)
+        .single();
+
+      if (error) throw error;
+
+      setEditingEmployee(employee);
+      setIsEditEmployeeModalOpen(true);
+    } catch (error) {
+      console.error("Error fetching employee for edit:", error);
+      toast({
+        variant: "destructive",
+        title: "Gagal memuat data pegawai",
+        description: error.message,
+      });
+    }
+  };
+
+  const handleEmployeeEditSuccess = async () => {
+    // Refresh employee data in form
+    if (formData.employee_id) {
+      try {
+        const { data: employee, error } = await supabase
+          .from("employees")
+          .select("*")
+          .eq("id", formData.employee_id)
+          .single();
+
+        if (error) throw error;
+
+        if (employee) {
+          setFormData((prev) => ({
+            ...prev,
+            employee_name: employee.name,
+            employee_nip: employee.nip || "",
+            employee_rank: employee.rank_group || "",
+            employee_position: employee.position_name || "",
+            employee_department: employee.department || "",
+          }));
+        }
+      } catch (error) {
+        console.error("Error refreshing employee data:", error);
+      }
+    }
+
+    setIsEditEmployeeModalOpen(false);
+    setEditingEmployee(null);
+    
+    toast({
+      title: "✅ Data Pegawai Diperbarui",
+      description: "Data pegawai berhasil diperbarui dan form cuti telah di-refresh.",
+    });
+  };
+
   const calculateDaysRequested = (start, end) => {
     if (!start || !end) return 0;
     return countWorkingDays(start, end, holidays);
@@ -614,6 +709,23 @@ const LeaveRequestForm = ({
           {/* Employee Details */}
           {formData.employee_id && (
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3 p-4 mt-4 bg-slate-800/50 rounded-md border border-slate-700/50">
+              {/* Header dengan tombol Quick Edit */}
+              <div className="md:col-span-2 lg:col-span-3 flex justify-between items-center mb-2">
+                <Label className="text-sm font-medium text-slate-300">
+                  Informasi Pegawai
+                </Label>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={handleQuickEditEmployee}
+                  className="text-xs border-slate-600 text-slate-300 hover:text-white hover:border-slate-500"
+                >
+                  <Edit className="w-3 h-3 mr-1" />
+                  Quick Edit
+                </Button>
+              </div>
+              
               <div>
                 <Label className="text-xs font-medium text-slate-400">
                   NIP
@@ -1003,6 +1115,28 @@ const LeaveRequestForm = ({
           </Button>
         </div>
       </div>
+
+      {/* Quick Edit Employee Modal */}
+      <Dialog open={isEditEmployeeModalOpen} onOpenChange={setIsEditEmployeeModalOpen}>
+        <DialogContent className="sm:max-w-[600px] bg-slate-800 text-slate-300 border-slate-700">
+          <DialogHeader>
+            <DialogTitle className="text-white">Quick Edit Data Pegawai</DialogTitle>
+            <DialogDescription className="text-slate-400">
+              Update informasi pegawai yang dipilih. Perubahan akan langsung ter-refresh di form cuti.
+            </DialogDescription>
+          </DialogHeader>
+          <EmployeeForm
+            employee={editingEmployee}
+            onFormSubmit={handleEmployeeEditSuccess}
+            onCancel={() => {
+              setIsEditEmployeeModalOpen(false);
+              setEditingEmployee(null);
+            }}
+            departments={departments}
+            isLoadingDepartments={false}
+          />
+        </DialogContent>
+      </Dialog>
     </form>
   );
 };

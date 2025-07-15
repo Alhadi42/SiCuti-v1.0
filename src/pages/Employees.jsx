@@ -294,8 +294,8 @@ const Employees = () => {
             </DialogDescription>
           </DialogHeader>
           <EmployeeForm
-            initialData={editingEmployee}
-            onSubmitSuccess={onFormSubmitSuccess}
+            employee={editingEmployee}
+            onFormSubmit={onFormSubmitSuccess}
             onCancel={() => setIsFormModalOpen(false)}
             departments={unitPenempatanOptions || []}
             positionTypes={positionTypes || []}
