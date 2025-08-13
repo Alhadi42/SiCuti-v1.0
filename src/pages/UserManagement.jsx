@@ -124,8 +124,15 @@ const UserManagement = () => {
       toast({ title: "Error", description: "Gagal mengambil data user dari database." });
       return;
     }
-    setUsers(data || []);
-    setFilteredUsers(data || []);
+
+    // Map database fields to frontend format
+    const mappedUsers = (data || []).map(user => ({
+      ...user,
+      unitKerja: user.unit_kerja // Map unit_kerja to unitKerja
+    }));
+
+    setUsers(mappedUsers);
+    setFilteredUsers(mappedUsers);
   };
 
   useEffect(() => {
