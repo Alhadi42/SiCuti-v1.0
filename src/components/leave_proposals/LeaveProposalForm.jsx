@@ -9,7 +9,7 @@ import { useToast } from "@/components/ui/use-toast";
 import { AuthManager } from "@/lib/auth";
 import { useEmployeeData } from "@/hooks/useEmployeeData";
 import { useLeaveTypes } from "@/hooks/useLeaveTypes";
-import { AutocompleteInput } from "@/components/ui/AutocompleteInput";
+import AutocompleteInput from "@/components/ui/AutocompleteInput";
 import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { CalendarIcon, Plus, Trash2, Users } from "lucide-react";
