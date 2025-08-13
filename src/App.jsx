@@ -12,6 +12,7 @@ import Employees from "@/pages/Employees";
 import UserManagement from "@/pages/UserManagement";
 import LeaveRequests from "@/pages/LeaveRequests";
 import LeaveProposals from "@/pages/LeaveProposals";
+import ProposalList from "@/pages/ProposalList";
 import LeaveHistoryPage from "@/pages/LeaveHistoryPage";
 import Reports from "@/pages/Reports";
 import DocxSuratKeterangan from "@/pages/DocxSuratKeterangan";
