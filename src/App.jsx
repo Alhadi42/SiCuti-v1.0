@@ -51,6 +51,10 @@ function App() {
                           element={<LeaveRequests />}
                         />
                         <Route
+                          path="/leave-proposals"
+                          element={<LeaveProposals />}
+                        />
+                        <Route
                           path="/leave-history"
                           element={<LeaveHistoryPage />}
                         />
