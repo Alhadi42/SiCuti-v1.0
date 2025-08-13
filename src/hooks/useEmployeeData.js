@@ -41,13 +41,30 @@ export const useEmployeeData = (
 
       // Apply unit-based filtering for departments
       const currentUser = AuthManager.getUserSession();
+
+      // DEBUG: Log user session data
+      console.log("🔍 DEBUG - User session data:", {
+        user: currentUser,
+        role: currentUser?.role,
+        unit_kerja: currentUser?.unit_kerja,
+        unitKerja: currentUser?.unitKerja,
+        name: currentUser?.name
+      });
+
       let filteredDepartments = departmentsData;
 
-      if (currentUser && currentUser.role === 'admin_unit' && currentUser.unitKerja) {
+      // Fix: Use unit_kerja instead of unitKerja (database field name)
+      const userUnit = currentUser?.unit_kerja || currentUser?.unitKerja;
+      if (currentUser && currentUser.role === 'admin_unit' && userUnit) {
+        console.log("🔍 DEBUG - Applying unit filter for admin_unit:", userUnit);
+        console.log("🔍 DEBUG - Available departments:", departmentsData.map(d => d.department_name));
+
         // Admin unit can only see their own unit
         filteredDepartments = departmentsData.filter(dept =>
-          dept.department_name === currentUser.unitKerja
+          dept.department_name === userUnit
         );
+
+        console.log("🔍 DEBUG - Filtered departments:", filteredDepartments.map(d => d.department_name));
       }
 
       // Map hasil ke format yang benar
