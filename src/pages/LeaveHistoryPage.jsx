@@ -15,6 +15,7 @@ import { Button } from "@/components/ui/button";
 import { useToast } from "@/components/ui/use-toast";
 import { supabase } from "@/lib/supabaseClient";
 import { AuthManager } from "@/lib/auth";
+import { checkSupabaseConnection } from "@/utils/supabaseHealthChecker";
 
 import { useLeaveTypes } from "@/hooks/useLeaveTypes";
 import { useDepartments } from "@/hooks/useDepartments";
@@ -743,7 +744,7 @@ const LeaveHistoryPage = () => {
   const handleExportDataCuti = async () => {
     try {
       toast({
-        title: "��� Export Data Cuti",
+        title: "📊 Export Data Cuti",
         description: "Sedang mempersiapkan data untuk export...",
       });
 
