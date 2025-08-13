@@ -131,6 +131,8 @@ const UserManagement = () => {
       unitKerja: user.unit_kerja // Map unit_kerja to unitKerja
     }));
 
+    console.log("Mapped users with unitKerja:", mappedUsers.map(u => ({ id: u.id, name: u.name, unitKerja: u.unitKerja, unit_kerja: u.unit_kerja })));
+
     setUsers(mappedUsers);
     setFilteredUsers(mappedUsers);
   };
