@@ -23,6 +23,7 @@ const menuItems = [
   { icon: Calendar, label: "Pengajuan Cuti", path: "/leave-requests" },
   { icon: Send, label: "Usulan Cuti", path: "/leave-proposals" },
   { icon: List, label: "Daftar Usulan", path: "/proposal-list" },
+  { icon: Layers, label: "Usulan per Unit", path: "/batch-leave-proposals" },
   { icon: History, label: "Riwayat Cuti", path: "/leave-history" },
   {
     type: "group",
