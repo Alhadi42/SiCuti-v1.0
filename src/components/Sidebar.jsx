@@ -64,6 +64,11 @@ const getMenuItemsByPermissions = (permissions = []) => {
     )
       return true;
     if (
+      item.label === "Usulan per Unit" &&
+      permissions.includes("batch_proposals_master")
+    )
+      return true;
+    if (
       item.label === "Riwayat Cuti" &&
       permissions.includes("leave_history_unit")
     )
