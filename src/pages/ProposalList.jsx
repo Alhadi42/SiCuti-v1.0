@@ -42,6 +42,8 @@ import {
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { format } from "date-fns";
 import { id } from "date-fns/locale";
+import { downloadLeaveProposalLetter, generateProposalSummary } from "@/utils/leaveProposalLetterGenerator";
+import { supabase } from "@/lib/supabaseClient";
 
 const ProposalList = () => {
   const { toast } = useToast();
