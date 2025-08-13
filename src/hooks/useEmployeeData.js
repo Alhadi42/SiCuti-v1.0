@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback } from "react";
 import { supabase } from "@/lib/supabaseClient";
 import { useToast } from "@/components/ui/use-toast";
 import { getSafeErrorMessage } from "@/utils/errorUtils";
+import { AuthManager } from "@/lib/auth";
 
 const EMPLOYEES_PER_PAGE = 50; // Increased from 15 to 50 for better visibility
 
