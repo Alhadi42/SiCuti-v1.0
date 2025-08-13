@@ -134,7 +134,8 @@ const LeaveRequests = () => {
       // Apply unit-based filtering for admin_unit users to data query
       if (currentUser && currentUser.role === 'admin_unit' && userUnit) {
         console.log("🔍 DEBUG LeaveRequests - Applying unit filter to data query:", userUnit);
-        dataQuery = dataQuery.eq("employees.department", userUnit);
+        // Use correct PostgREST syntax for filtering on joined table
+        dataQuery = dataQuery.eq("employees(department)", userUnit);
       }
 
       // Only apply pagination if not searching (for search, we need all data to filter client-side)
