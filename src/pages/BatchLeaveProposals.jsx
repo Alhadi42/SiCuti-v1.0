@@ -69,22 +69,29 @@ const BatchLeaveProposals = () => {
     try {
       console.log("🔍 Fetching batch proposals by unit...");
 
-      // Get all leave requests with employee department info
-      const { data: leaveRequests, error } = await supabase
-        .from("leave_requests")
-        .select(`
-          *,
-          employees:employee_id!inner (id, name, nip, department, position_name, rank_group),
-          leave_types!inner (id, name)
-        `)
-        .order("submitted_date", { ascending: false });
+      // Get all units from employees table first
+      const { data: allUnits, error: unitsError } = await supabase
+        .from("employees")
+        .select("department")
+        .not("department", "is", null);
 
-      if (error) {
-        console.error("Error fetching leave requests:", error);
-        throw error;
+      if (unitsError) {
+        console.error("Error fetching units:", unitsError);
+        throw unitsError;
       }
 
-      console.log("🔍 Raw leave requests:", leaveRequests?.length);
+      const uniqueUnits = [...new Set(allUnits.map(emp => emp.department))];
+      console.log("🔍 Total units in database:", uniqueUnits.length);
+
+      // For now, since we don't have actual "proposals" from admin units yet,
+      // we'll show empty state but still display the correct total units count
+      console.log("🔍 No actual proposals from admin units yet - showing empty state");
+
+      // Set empty proposals but with correct unit count
+      setUnitProposals([]);
+
+      // Store total units for statistics card
+      window.totalUnitsInDatabase = uniqueUnits.length;
 
       // Group by unit/department
       const unitGroups = {};
