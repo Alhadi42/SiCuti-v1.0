@@ -29,34 +29,6 @@ export const debugUserSession = () => {
   return user;
 };
 
-/**
- * Add debug button to DOM for testing
- */
-export const addDebugButton = () => {
-  if (document.getElementById('debug-user-btn')) return; // Already exists
-  
-  const button = document.createElement('button');
-  button.id = 'debug-user-btn';
-  button.innerHTML = '🔍 Debug User';
-  button.style.cssText = `
-    position: fixed;
-    top: 10px;
-    right: 10px;
-    z-index: 9999;
-    background: #ef4444;
-    color: white;
-    border: none;
-    padding: 8px 12px;
-    border-radius: 4px;
-    cursor: pointer;
-    font-size: 12px;
-  `;
-  
-  button.onclick = () => {
-    debugUserSession();
-  };
-  
-  document.body.appendChild(button);
-};
+// Debug button functionality removed for production
 
 // Debug button removed - no longer auto-created
