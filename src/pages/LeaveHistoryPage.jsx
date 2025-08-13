@@ -210,19 +210,51 @@ const LeaveHistoryPage = () => {
         query = query.range(0, LEAVE_HISTORY_PER_PAGE - 1);
 
         // Execute the query
-        console.log("Executing employees query with filters:", {
+        console.log("🔍 DEBUG LeaveHistory - Executing employees query with filters:", {
           search: debouncedSearchTerm,
           department: selectedUnitPenempatan,
+          userRole: currentUser.role,
+          userUnit: userUnit,
         });
 
-        const {
-          data: employeesData,
-          error: employeesError,
-          count,
-        } = await query;
+        let employeesData, employeesError, count;
+
+        try {
+          const result = await query;
+          employeesData = result.data;
+          employeesError = result.error;
+          count = result.count;
+
+          console.log("🔍 DEBUG LeaveHistory - Query result:", {
+            dataLength: employeesData?.length,
+            count: count,
+            hasError: !!employeesError
+          });
+        } catch (fetchError) {
+          console.error("❌ Fetch error in LeaveHistory:", fetchError);
+          console.error("❌ Error details:", {
+            message: fetchError.message,
+            stack: fetchError.stack,
+            name: fetchError.name
+          });
+
+          // Show user-friendly error
+          toast({
+            variant: "destructive",
+            title: "Network Error",
+            description: "Failed to fetch data. Please check your connection and try again.",
+          });
+          return;
+        }
 
         if (employeesError) {
-          console.error("Error fetching employees:", employeesError);
+          console.error("❌ Supabase error fetching employees:", employeesError);
+          console.error("❌ Error details:", {
+            message: employeesError.message,
+            details: employeesError.details,
+            hint: employeesError.hint,
+            code: employeesError.code
+          });
           throw employeesError;
         }
 
