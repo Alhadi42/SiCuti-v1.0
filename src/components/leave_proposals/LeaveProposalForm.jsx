@@ -153,16 +153,6 @@ const LeaveProposalForm = ({ onSubmit, onCancel }) => {
   };
 
   const handleSubmitProposal = async () => {
-    // Validation
-    if (!proposalTitle.trim()) {
-      toast({ title: "Error", description: "Judul usulan harus diisi", variant: "destructive" });
-      return;
-    }
-    if (selectedEmployees.length === 0) {
-      toast({ title: "Error", description: "Minimal satu pegawai harus ditambahkan", variant: "destructive" });
-      return;
-    }
-
     try {
       const proposalData = {
         title: proposalTitle,
@@ -171,7 +161,21 @@ const LeaveProposalForm = ({ onSubmit, onCancel }) => {
         proposer_unit: currentUser.unitKerja,
       };
 
-      await onSubmit(proposalData);
+      // Validate entire proposal
+      const validation = validateLeaveProposal(proposalData);
+      if (!validation.isValid) {
+        toast({
+          title: "Error",
+          description: validation.errors[0],
+          variant: "destructive"
+        });
+        return;
+      }
+
+      // Sanitize data
+      const sanitizedData = sanitizeProposalData(proposalData);
+
+      await onSubmit(sanitizedData);
       
       // Reset form
       setProposalTitle("");
