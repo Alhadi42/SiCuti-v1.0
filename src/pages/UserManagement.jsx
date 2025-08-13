@@ -67,7 +67,6 @@ const PermissionInfo = ({ role }) => {
             "Dashboard access",
             "Employee data (own unit only)",
             "Leave requests (own unit only)",
-            "Leave proposals creation (own unit only)",
             "Leave history (own unit only)"
           ]
         };
