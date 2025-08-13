@@ -140,12 +140,29 @@ const LeaveHistoryPage = () => {
 
       setIsLoadingData(true);
       try {
+        // Apply unit-based filtering for admin_unit users
+        const currentUser = AuthManager.getUserSession();
+
+        // DEBUG: Log user session for leave history
+        console.log("🔍 DEBUG LeaveHistory - User session:", {
+          role: currentUser?.role,
+          unit_kerja: currentUser?.unit_kerja,
+          unitKerja: currentUser?.unitKerja
+        });
+
         // Build the base query for employees
         let query = supabase
           .from("employees")
           .select("id, name, nip, department, position_name, rank_group", {
             count: "exact",
           });
+
+        // Apply unit-based filtering for admin_unit users
+        const userUnit = currentUser?.unit_kerja || currentUser?.unitKerja;
+        if (currentUser && currentUser.role === 'admin_unit' && userUnit) {
+          console.log("🔍 DEBUG LeaveHistory - Applying unit filter:", userUnit);
+          query = query.eq("department", userUnit);
+        }
 
         // Add search filter if search term exists
         if (debouncedSearchTerm) {
