@@ -39,7 +39,21 @@ export class AuthManager {
         return null;
       }
 
-      return JSON.parse(user);
+      const parsedUser = JSON.parse(user);
+
+      // DEBUG: Log user session data in development
+      if (import.meta.env.DEV && Math.random() < 0.1) { // Log 10% of the time to avoid spam
+        console.log("🔍 AuthManager.getUserSession():", {
+          id: parsedUser.id,
+          name: parsedUser.name,
+          role: parsedUser.role,
+          unit_kerja: parsedUser.unit_kerja,
+          unitKerja: parsedUser.unitKerja,
+          hasUnitData: !!(parsedUser.unit_kerja || parsedUser.unitKerja)
+        });
+      }
+
+      return parsedUser;
     } catch (error) {
       console.error("Failed to get user session:", error);
       this.clearSession();
@@ -131,8 +145,14 @@ export class AuthManager {
       // Remove sensitive data before storing
       const { password: _, ...safeUser } = user;
 
+      // Map database field names to frontend field names
+      const mappedUser = {
+        ...safeUser,
+        unitKerja: safeUser.unit_kerja || safeUser.unitKerja // Ensure unitKerja is available
+      };
+
       // Set session
-      this.setUserSession(safeUser);
+      this.setUserSession(mappedUser);
 
       return safeUser;
     } catch (error) {
@@ -172,7 +192,8 @@ export class AuthManager {
 
     // Admin unit can only access their own unit
     if (user.role === "admin_unit") {
-      return user.unit_kerja === unitName;
+      const userUnit = user.unit_kerja || user.unitKerja;
+      return userUnit === unitName;
     }
 
     // Employees can only access their own data

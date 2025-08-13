@@ -11,6 +11,7 @@ import {
   Building2,
   History,
   UserCheck,
+  Layers,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { AuthManager } from "@/lib/auth";
@@ -18,6 +19,7 @@ import { AuthManager } from "@/lib/auth";
 const menuItems = [
   { icon: Users, label: "Data Pegawai", path: "/employees" },
   { icon: Calendar, label: "Pengajuan Cuti", path: "/leave-requests" },
+  { icon: Layers, label: "Usulan per Unit", path: "/batch-leave-proposals" },
   { icon: History, label: "Riwayat Cuti", path: "/leave-history" },
   {
     type: "group",
@@ -45,6 +47,11 @@ const getMenuItemsByPermissions = (permissions = []) => {
     if (
       item.label === "Pengajuan Cuti" &&
       permissions.includes("leave_requests_unit")
+    )
+      return true;
+    if (
+      item.label === "Usulan per Unit" &&
+      permissions.includes("batch_proposals_master")
     )
       return true;
     if (

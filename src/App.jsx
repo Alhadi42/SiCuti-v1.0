@@ -11,6 +11,7 @@ import Layout from "@/components/Layout";
 import Employees from "@/pages/Employees";
 import UserManagement from "@/pages/UserManagement";
 import LeaveRequests from "@/pages/LeaveRequests";
+import BatchLeaveProposals from "@/pages/BatchLeaveProposals";
 import LeaveHistoryPage from "@/pages/LeaveHistoryPage";
 import Reports from "@/pages/Reports";
 import DocxSuratKeterangan from "@/pages/DocxSuratKeterangan";
@@ -21,6 +22,7 @@ import Login from "@/pages/Login";
 import ProtectedRoute from "@/components/ProtectedRoute";
 import ErrorBoundary from "@/components/ErrorBoundary";
 import ConnectionHealthChecker from "@/components/ConnectionHealthChecker";
+import "@/utils/removeDebugButton"; // Remove debug button
 
 function App() {
   return (
@@ -48,6 +50,10 @@ function App() {
                         <Route
                           path="/leave-requests"
                           element={<LeaveRequests />}
+                        />
+                        <Route
+                          path="/batch-leave-proposals"
+                          element={<BatchLeaveProposals />}
                         />
                         <Route
                           path="/leave-history"

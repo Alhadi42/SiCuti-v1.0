@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback } from "react";
 import { supabase } from "@/lib/supabaseClient";
 import { useToast } from "@/components/ui/use-toast";
 import { getSafeErrorMessage } from "@/utils/errorUtils";
+import { AuthManager } from "@/lib/auth";
 
 const EMPLOYEES_PER_PAGE = 50; // Increased from 15 to 50 for better visibility
 
@@ -38,18 +39,54 @@ export const useEmployeeData = (
 
       // console.log('Data from RPC get_distinct_departments:', departmentsData); // Hapus console.log
 
+      // Apply unit-based filtering for departments
+      const currentUser = AuthManager.getUserSession();
+
+      // DEBUG: Log user session data
+      console.log("🔍 DEBUG - User session data:", {
+        user: currentUser,
+        role: currentUser?.role,
+        unit_kerja: currentUser?.unit_kerja,
+        unitKerja: currentUser?.unitKerja,
+        name: currentUser?.name
+      });
+
+      let filteredDepartments = departmentsData;
+
+      // Fix: Use unit_kerja instead of unitKerja (database field name)
+      const userUnit = currentUser?.unit_kerja || currentUser?.unitKerja;
+      if (currentUser && currentUser.role === 'admin_unit' && userUnit) {
+        console.log("🔍 DEBUG - Applying unit filter for admin_unit:", userUnit);
+        console.log("🔍 DEBUG - Available departments:", departmentsData.map(d => d.department_name));
+
+        // Admin unit can only see their own unit
+        filteredDepartments = departmentsData.filter(dept =>
+          dept.department_name === userUnit
+        );
+
+        console.log("🔍 DEBUG - Filtered departments:", filteredDepartments.map(d => d.department_name));
+      }
+
       // Map hasil ke format yang benar
-      const uniqueDepartments = departmentsData.map((dept, index) => ({
+      const uniqueDepartments = filteredDepartments.map((dept, index) => ({
         id: index,
         name: dept.department_name,
       }));
 
       setUnitPenempatanOptions(uniqueDepartments);
 
-      // Get other filter data from employees table
-      const { data, error } = await supabase
+      // Get other filter data from employees table with unit filtering
+      let employeeQuery = supabase
         .from("employees")
         .select("position_type, asn_status, rank_group");
+
+      // Fix: Use unit_kerja instead of unitKerja
+      if (currentUser && currentUser.role === 'admin_unit' && userUnit) {
+        console.log("🔍 DEBUG - Applying unit filter to employee query:", userUnit);
+        employeeQuery = employeeQuery.eq("department", userUnit);
+      }
+
+      const { data, error } = await employeeQuery;
       if (error) throw error;
 
       const uniqueValues = (key) =>
@@ -90,6 +127,17 @@ export const useEmployeeData = (
             { count: "exact" },
           );
 
+        // Apply unit-based filtering for admin_unit users
+        const currentUser = AuthManager.getUserSession();
+
+        // Fix: Use unit_kerja instead of unitKerja (database field name)
+        const userUnit = currentUser?.unit_kerja || currentUser?.unitKerja;
+        if (currentUser && currentUser.role === 'admin_unit' && userUnit) {
+          console.log("🔍 DEBUG - Applying unit filter to main query:", userUnit);
+          // Admin unit can only see employees from their unit
+          query = query.eq("department", userUnit);
+        }
+
         // Apply all filters
         if (debouncedSearchTerm) {
           query = query.or(
@@ -128,6 +176,12 @@ export const useEmployeeData = (
           .range(from, to);
 
         if (error) throw error;
+
+        console.log("🔍 DEBUG - Query results:", {
+          totalCount: count,
+          returnedEmployees: data?.length,
+          sampleEmployees: data?.slice(0, 3).map(e => ({ name: e.name, department: e.department }))
+        });
 
         setDisplayedEmployees(data || []);
         setTotalFilteredEmployeeCount(count || 0);

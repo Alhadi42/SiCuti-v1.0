@@ -20,8 +20,14 @@ const AutocompleteInput = ({
 
   // Update input value when value prop changes
   useEffect(() => {
-    setInputValue(value || "");
-  }, [value]);
+    if (value) {
+      // Find the option that matches the value and use its label
+      const matchedOption = options.find(option => option.value === value);
+      setInputValue(matchedOption ? matchedOption.label : value);
+    } else {
+      setInputValue("");
+    }
+  }, [value, options]);
 
   // Filter options based on input
   useEffect(() => {
@@ -57,6 +63,7 @@ const AutocompleteInput = ({
 
   const handleSelect = (option) => {
     setInputValue(option.label);
+    onChange(option.value); // Call onChange with the value, not label
     onSelect(option);
     setIsFocused(false);
   };

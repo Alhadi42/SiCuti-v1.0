@@ -14,6 +14,8 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/components/ui/use-toast";
 import { supabase } from "@/lib/supabaseClient";
+import { AuthManager } from "@/lib/auth";
+import { checkSupabaseConnection } from "@/utils/supabaseHealthChecker";
 
 import { useLeaveTypes } from "@/hooks/useLeaveTypes";
 import { useDepartments } from "@/hooks/useDepartments";
@@ -139,12 +141,93 @@ const LeaveHistoryPage = () => {
 
       setIsLoadingData(true);
       try {
+        // Test Supabase connection first if debugging
+        if (import.meta.env.DEV) {
+          const connectionTest = await checkSupabaseConnection();
+          if (!connectionTest.success) {
+            throw new Error(`Supabase connection failed: ${connectionTest.error}`);
+          }
+        }
+
+        // Apply unit-based filtering for admin_unit users
+        const currentUser = AuthManager.getUserSession();
+
+        // DEBUG: Log user session for leave history
+        console.log("🔍 DEBUG LeaveHistory - User session:");
+        console.log("🔍 Raw user object:", currentUser);
+        console.log("🔍 User JSON:", JSON.stringify(currentUser, null, 2));
+        console.log("🔍 User session details:", {
+          hasUser: !!currentUser,
+          userId: currentUser?.id,
+          userName: currentUser?.name,
+          role: currentUser?.role,
+          unit_kerja: currentUser?.unit_kerja,
+          unitKerja: currentUser?.unitKerja,
+          permissions: currentUser?.permissions,
+          userType: typeof currentUser
+        });
+
+        // Safety check for user session
+        if (!currentUser) {
+          console.error("❌ No user session found in LeaveHistory");
+          toast({
+            variant: "destructive",
+            title: "Session Error",
+            description: "User session not found. Please login again.",
+          });
+          return;
+        }
+
         // Build the base query for employees
+        console.log("🔍 DEBUG LeaveHistory - Building query...");
+
+        // Test basic Supabase query first
+        console.log("🔍 Testing basic employees query...");
+        try {
+          const testQuery = await supabase
+            .from("employees")
+            .select("id")
+            .limit(1);
+
+          console.log("🔍 Basic query test result:", {
+            success: !testQuery.error,
+            error: testQuery.error,
+            dataLength: testQuery.data?.length
+          });
+
+          if (testQuery.error) {
+            console.error("❌ Basic query failed:", JSON.stringify(testQuery.error, null, 2));
+            throw new Error(`Basic query failed: ${testQuery.error.message}`);
+          }
+        } catch (basicTestError) {
+          console.error("❌ Basic query test failed:", basicTestError);
+          throw basicTestError;
+        }
+
         let query = supabase
           .from("employees")
           .select("id, name, nip, department, position_name, rank_group", {
             count: "exact",
           });
+
+        // Apply unit-based filtering for admin_unit users
+        const userUnit = currentUser?.unit_kerja || currentUser?.unitKerja;
+        console.log("🔍 DEBUG LeaveHistory - User unit:", userUnit);
+
+        if (currentUser.role === 'admin_unit' && userUnit) {
+          console.log("🔍 DEBUG LeaveHistory - Applying unit filter:", userUnit);
+          // Validate unit name before using it
+          if (userUnit.length > 0 && userUnit.length < 500) { // Reasonable length check
+            query = query.eq("department", userUnit);
+          } else {
+            console.error("❌ Invalid unit name:", userUnit);
+            throw new Error("Invalid unit name in user session");
+          }
+        } else if (currentUser.role === 'admin_unit') {
+          console.warn("⚠️ Admin unit user has no unit assigned");
+          // For admin_unit without unit, show no results instead of all results
+          query = query.eq("id", "00000000-0000-0000-0000-000000000000"); // Non-existent ID
+        }
 
         // Add search filter if search term exists
         if (debouncedSearchTerm) {
@@ -167,19 +250,55 @@ const LeaveHistoryPage = () => {
         query = query.range(0, LEAVE_HISTORY_PER_PAGE - 1);
 
         // Execute the query
-        console.log("Executing employees query with filters:", {
+        console.log("🔍 DEBUG LeaveHistory - Executing employees query with filters:", {
           search: debouncedSearchTerm,
           department: selectedUnitPenempatan,
+          userRole: currentUser.role,
+          userUnit: userUnit,
         });
 
-        const {
-          data: employeesData,
-          error: employeesError,
-          count,
-        } = await query;
+        let employeesData, employeesError, count;
+
+        try {
+          const result = await query;
+          employeesData = result.data;
+          employeesError = result.error;
+          count = result.count;
+
+          console.log("🔍 DEBUG LeaveHistory - Query result:", {
+            dataLength: employeesData?.length,
+            count: count,
+            hasError: !!employeesError
+          });
+        } catch (fetchError) {
+          console.error("❌ Fetch error in LeaveHistory:", fetchError);
+          console.error("❌ Error details:", {
+            message: fetchError.message,
+            stack: fetchError.stack,
+            name: fetchError.name
+          });
+
+          // Show user-friendly error
+          toast({
+            variant: "destructive",
+            title: "Network Error",
+            description: "Failed to fetch data. Please check your connection and try again.",
+          });
+          return;
+        }
 
         if (employeesError) {
-          console.error("Error fetching employees:", employeesError);
+          console.error("❌ Supabase error fetching employees:");
+          console.error("❌ Raw error:", employeesError);
+          console.error("❌ Error JSON:", JSON.stringify(employeesError, null, 2));
+          console.error("❌ Error details:", {
+            message: employeesError?.message || "No message",
+            details: employeesError?.details || "No details",
+            hint: employeesError?.hint || "No hint",
+            code: employeesError?.code || "No code",
+            statusCode: employeesError?.statusCode || "No status code",
+            status: employeesError?.status || "No status"
+          });
           throw employeesError;
         }
 
@@ -190,12 +309,53 @@ const LeaveHistoryPage = () => {
 
         // Get total employees count on initial load
         if (isInitialLoad || overallTotalEmployees === 0) {
-          const { count: totalCount, error: countError } = await supabase
-            .from("employees")
-            .select("*", { count: "exact", head: true });
+          console.log("🔍 DEBUG LeaveHistory - Fetching total count...");
 
-          if (countError) throw countError;
-          setOverallTotalEmployees(totalCount || 0);
+          try {
+            let totalCountQuery = supabase
+              .from("employees")
+              .select("*", { count: "exact", head: true });
+
+            // Apply unit filtering to total count for admin_unit users
+            if (currentUser.role === 'admin_unit' && userUnit) {
+              console.log("🔍 DEBUG LeaveHistory - Applying unit filter to total count:", userUnit);
+              totalCountQuery = totalCountQuery.eq("department", userUnit);
+            } else if (currentUser.role === 'admin_unit') {
+              // Admin unit without unit assigned - show 0 count
+              totalCountQuery = totalCountQuery.eq("id", "00000000-0000-0000-0000-000000000000");
+            }
+
+            const { count: totalCount, error: countError } = await totalCountQuery;
+
+            if (countError) {
+              console.error("❌ Error fetching total count:");
+              console.error("❌ Raw count error:", countError);
+              console.error("❌ Count error JSON:", JSON.stringify(countError, null, 2));
+              console.error("❌ Count error details:", {
+                message: countError?.message || "No message",
+                code: countError?.code || "No code",
+                details: countError?.details || "No details",
+                hint: countError?.hint || "No hint",
+                statusCode: countError?.statusCode || "No status code"
+              });
+              throw countError;
+            }
+
+            console.log("🔍 DEBUG LeaveHistory - Total count:", totalCount);
+            setOverallTotalEmployees(totalCount || 0);
+          } catch (countFetchError) {
+            console.error("❌ Failed to fetch total count:");
+            console.error("❌ Raw count fetch error:", countFetchError);
+            console.error("❌ Count fetch error JSON:", JSON.stringify(countFetchError, Object.getOwnPropertyNames(countFetchError), 2));
+            console.error("❌ Count fetch error details:", {
+              message: countFetchError?.message || "No message",
+              name: countFetchError?.name || "No name",
+              code: countFetchError?.code || "No code",
+              stack: countFetchError?.stack ? countFetchError.stack.substring(0, 200) + "..." : "No stack"
+            });
+            // Don't throw here, just log and continue with 0 count
+            setOverallTotalEmployees(0);
+          }
         }
 
         // Return early if no employees found
@@ -422,14 +582,48 @@ const LeaveHistoryPage = () => {
         // Update the state with processed data
         setEmployeesWithBalances(processedData);
       } catch (error) {
-        console.error("Error in fetchLeaveData:", error);
+        console.error("❌ Error in fetchLeaveData:");
+        console.error("❌ Raw error:", error);
+        console.error("❌ Error JSON:", JSON.stringify(error, Object.getOwnPropertyNames(error), 2));
+        console.error("❌ Error type:", typeof error);
+        console.error("❌ Error constructor:", error?.constructor?.name);
+        console.error("❌ Error details:", {
+          message: error?.message || "No message",
+          name: error?.name || "No name",
+          stack: error?.stack ? error.stack.substring(0, 500) + "..." : "No stack",
+          code: error?.code || "No code",
+          details: error?.details || "No details",
+          hint: error?.hint || "No hint",
+          statusCode: error?.statusCode || "No status code",
+          status: error?.status || "No status"
+        });
+
+        // Determine appropriate error message based on error type
+        let errorMessage = "Terjadi kesalahan saat mengambil data cuti. Silakan coba lagi.";
+        let errorTitle = "Gagal mengambil data cuti";
+
+        if (error?.message?.includes("fetch") || error?.name === "TypeError") {
+          errorMessage = "Gagal terhubung ke server. Periksa koneksi internet Anda.";
+          errorTitle = "Connection Error";
+        } else if (error?.message?.includes("permission") || error?.message?.includes("policy")) {
+          errorMessage = "Anda tidak memiliki izin untuk mengakses data ini.";
+          errorTitle = "Permission Error";
+        } else if (error?.code) {
+          errorMessage = `Database error (${error.code}): ${error.message}`;
+          errorTitle = "Database Error";
+        } else if (error?.message) {
+          errorMessage = error.message;
+        }
+
         toast({
           variant: "destructive",
-          title: "Gagal mengambil data cuti",
-          description:
-            error.message ||
-            "Terjadi kesalahan saat memuat data. Silakan coba lagi.",
+          title: errorTitle,
+          description: errorMessage,
         });
+
+        // Reset data on error
+        setEmployeesWithBalances([]);
+        setTotalEmployeesInFilter(0);
       } finally {
         setIsLoadingData(false);
       }
@@ -608,7 +802,7 @@ const LeaveHistoryPage = () => {
     toast({
       title: `🚀 ${feature}`,
       description:
-        "🚧 Fitur ini belum diimplementasikan—tapi jangan khawatir! Anda bisa memintanya di prompt berikutnya! 🚀",
+        "�� Fitur ini belum diimplementasikan—tapi jangan khawatir! Anda bisa memintanya di prompt berikutnya! 🚀",
     });
   };
 

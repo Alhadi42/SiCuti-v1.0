@@ -124,8 +124,17 @@ const UserManagement = () => {
       toast({ title: "Error", description: "Gagal mengambil data user dari database." });
       return;
     }
-    setUsers(data || []);
-    setFilteredUsers(data || []);
+
+    // Map database fields to frontend format
+    const mappedUsers = (data || []).map(user => ({
+      ...user,
+      unitKerja: user.unit_kerja // Map unit_kerja to unitKerja
+    }));
+
+    console.log("Mapped users with unitKerja:", mappedUsers.map(u => ({ id: u.id, name: u.name, unitKerja: u.unitKerja, unit_kerja: u.unit_kerja })));
+
+    setUsers(mappedUsers);
+    setFilteredUsers(mappedUsers);
   };
 
   useEffect(() => {
@@ -628,6 +637,8 @@ const AddUserDialog = ({ onAdd }) => {
 
 // Edit User Dialog Component
 const EditUserDialog = ({ user, onEdit, onClose }) => {
+  const { departments, isLoadingDepartments } = useDepartments();
+
   const [formData, setFormData] = useState({
     name: user.name,
     email: user.email,
@@ -637,6 +648,9 @@ const EditUserDialog = ({ user, onEdit, onClose }) => {
     unitKerja: user.unitKerja,
     status: user.status,
   });
+
+  console.log("EditUserDialog initialized with user:", { id: user.id, name: user.name, unitKerja: user.unitKerja });
+  console.log("Form data unitKerja:", formData.unitKerja);
 
   const handleSubmit = (e) => {
     e.preventDefault();
@@ -706,24 +720,13 @@ const EditUserDialog = ({ user, onEdit, onClose }) => {
       </div>
       <div>
         <Label htmlFor="edit-unitKerja" className="text-slate-300">Unit Kerja</Label>
-        <Select
+        <AutocompleteInput
           value={formData.unitKerja}
-          onValueChange={(value) => setFormData({ ...formData, unitKerja: value })}
-        >
-          <SelectTrigger id="edit-unitKerja" className="bg-slate-700 border-slate-600 text-white">
-            <SelectValue placeholder="Select Unit Kerja" />
-          </SelectTrigger>
-          <SelectContent className="bg-slate-700 border-slate-600">
-            <SelectItem value="All Units" className="text-white hover:bg-slate-600">All Units (Master Admin)</SelectItem>
-            <SelectItem value="IT Department" className="text-white hover:bg-slate-600">IT Department</SelectItem>
-            <SelectItem value="HR Department" className="text-white hover:bg-slate-600">HR Department</SelectItem>
-            <SelectItem value="Finance Department" className="text-white hover:bg-slate-600">Finance Department</SelectItem>
-            <SelectItem value="Marketing Department" className="text-white hover:bg-slate-600">Marketing Department</SelectItem>
-            <SelectItem value="Operations Department" className="text-white hover:bg-slate-600">Operations Department</SelectItem>
-            <SelectItem value="Legal Department" className="text-white hover:bg-slate-600">Legal Department</SelectItem>
-            <SelectItem value="Customer Service" className="text-white hover:bg-slate-600">Customer Service</SelectItem>
-          </SelectContent>
-        </Select>
+          onChange={(val) => setFormData({ ...formData, unitKerja: val })}
+          options={departments}
+          loading={isLoadingDepartments}
+          placeholder="Ketik nama unit..."
+        />
       </div>
       <div>
         <Label htmlFor="edit-status" className="text-slate-300">Status</Label>
@@ -752,4 +755,4 @@ const EditUserDialog = ({ user, onEdit, onClose }) => {
   );
 };
 
-export default UserManagement; 
+export default UserManagement;

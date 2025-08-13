@@ -37,6 +37,7 @@ import { format } from "date-fns";
 import { id } from "date-fns/locale";
 import { useDepartments } from "@/hooks/useDepartments";
 import { useLeaveTypes } from "@/hooks/useLeaveTypes";
+import { AuthManager } from "@/lib/auth";
 
 const LeaveRequests = () => {
   const { toast } = useToast();
@@ -71,6 +72,44 @@ const LeaveRequests = () => {
       let countQuery = supabase
         .from("leave_requests")
         .select("*", { count: "exact", head: true });
+
+      // Apply unit-based filtering for admin_unit users
+      const currentUser = AuthManager.getUserSession();
+
+      // DEBUG: Log user session for leave requests
+      console.log("🔍 DEBUG LeaveRequests - User session:", {
+        role: currentUser?.role,
+        unit_kerja: currentUser?.unit_kerja,
+        unitKerja: currentUser?.unitKerja
+      });
+
+      // Fix: Use unit_kerja instead of unitKerja
+      const userUnit = currentUser?.unit_kerja || currentUser?.unitKerja;
+      let employeeIdsFilter = null;
+
+      if (currentUser && currentUser.role === 'admin_unit' && userUnit) {
+        console.log("🔍 DEBUG LeaveRequests - Getting employees from unit:", userUnit);
+
+        // First get employee IDs from the user's unit
+        const { data: unitEmployees, error: empError } = await supabase
+          .from("employees")
+          .select("id")
+          .eq("department", userUnit);
+
+        if (empError) {
+          console.error("Error fetching unit employees:", empError);
+        } else {
+          employeeIdsFilter = unitEmployees.map(emp => emp.id);
+          console.log("🔍 DEBUG LeaveRequests - Employee IDs in unit:", employeeIdsFilter.length);
+
+          if (employeeIdsFilter.length > 0) {
+            countQuery = countQuery.in("employee_id", employeeIdsFilter);
+          } else {
+            // No employees in this unit, return empty result
+            countQuery = countQuery.eq("employee_id", "00000000-0000-0000-0000-000000000000"); // Non-existent ID
+          }
+        }
+      }
 
       // Apply filters to the count query
       // Note: For search across joined tables, we'll fetch all data and filter client-side
@@ -112,6 +151,17 @@ const LeaveRequests = () => {
         `,
         )
         .order("submitted_date", { ascending: false });
+
+      // Apply unit-based filtering for admin_unit users to data query
+      if (currentUser && currentUser.role === 'admin_unit' && employeeIdsFilter) {
+        console.log("🔍 DEBUG LeaveRequests - Applying employee IDs filter to data query:", employeeIdsFilter.length);
+        if (employeeIdsFilter.length > 0) {
+          dataQuery = dataQuery.in("employee_id", employeeIdsFilter);
+        } else {
+          // No employees in this unit, return empty result
+          dataQuery = dataQuery.eq("employee_id", "00000000-0000-0000-0000-000000000000"); // Non-existent ID
+        }
+      }
 
       // Only apply pagination if not searching (for search, we need all data to filter client-side)
       if (!debouncedSearchTerm) {
@@ -315,7 +365,7 @@ const LeaveRequests = () => {
         console.error(`Gagal mengembalikan saldo cuti:`, rpcError.message);
 
       toast({
-        title: "✅ Data Dihapus",
+        title: "��� Data Dihapus",
         description: "Data cuti berhasil dihapus dan saldo telah dikembalikan.",
       });
       fetchLeaveRequests();
