@@ -297,7 +297,16 @@ const LeaveHistoryPage = () => {
             const { count: totalCount, error: countError } = await totalCountQuery;
 
             if (countError) {
-              console.error("❌ Error fetching total count:", countError);
+              console.error("❌ Error fetching total count:");
+              console.error("❌ Raw count error:", countError);
+              console.error("❌ Count error JSON:", JSON.stringify(countError, null, 2));
+              console.error("❌ Count error details:", {
+                message: countError?.message || "No message",
+                code: countError?.code || "No code",
+                details: countError?.details || "No details",
+                hint: countError?.hint || "No hint",
+                statusCode: countError?.statusCode || "No status code"
+              });
               throw countError;
             }
 
