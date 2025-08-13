@@ -457,10 +457,22 @@ const ProposalList = () => {
                         {proposal.status === 'approved' && (
                           <Button
                             size="sm"
+                            onClick={() => handleGenerateLetter(proposal)}
                             className="bg-blue-600 hover:bg-blue-700 text-white"
                           >
                             <Download className="w-4 h-4 mr-1" />
-                            Surat
+                            Generate Surat
+                          </Button>
+                        )}
+                        {proposal.status === 'processed' && (
+                          <Button
+                            size="sm"
+                            onClick={() => handleGenerateLetter(proposal)}
+                            variant="outline"
+                            className="border-blue-600 text-blue-600 hover:bg-blue-600 hover:text-white"
+                          >
+                            <Download className="w-4 h-4 mr-1" />
+                            Download Ulang
                           </Button>
                         )}
                       </div>
