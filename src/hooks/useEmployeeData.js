@@ -39,18 +39,35 @@ export const useEmployeeData = (
 
       // console.log('Data from RPC get_distinct_departments:', departmentsData); // Hapus console.log
 
+      // Apply unit-based filtering for departments
+      const currentUser = AuthManager.getUserSession();
+      let filteredDepartments = departmentsData;
+
+      if (currentUser && currentUser.role === 'admin_unit' && currentUser.unitKerja) {
+        // Admin unit can only see their own unit
+        filteredDepartments = departmentsData.filter(dept =>
+          dept.department_name === currentUser.unitKerja
+        );
+      }
+
       // Map hasil ke format yang benar
-      const uniqueDepartments = departmentsData.map((dept, index) => ({
+      const uniqueDepartments = filteredDepartments.map((dept, index) => ({
         id: index,
         name: dept.department_name,
       }));
 
       setUnitPenempatanOptions(uniqueDepartments);
 
-      // Get other filter data from employees table
-      const { data, error } = await supabase
+      // Get other filter data from employees table with unit filtering
+      let employeeQuery = supabase
         .from("employees")
         .select("position_type, asn_status, rank_group");
+
+      if (currentUser && currentUser.role === 'admin_unit' && currentUser.unitKerja) {
+        employeeQuery = employeeQuery.eq("department", currentUser.unitKerja);
+      }
+
+      const { data, error } = await employeeQuery;
       if (error) throw error;
 
       const uniqueValues = (key) =>
