@@ -265,20 +265,36 @@ const LeaveHistoryPage = () => {
 
         // Get total employees count on initial load
         if (isInitialLoad || overallTotalEmployees === 0) {
-          let totalCountQuery = supabase
-            .from("employees")
-            .select("*", { count: "exact", head: true });
+          console.log("🔍 DEBUG LeaveHistory - Fetching total count...");
 
-          // Apply unit filtering to total count for admin_unit users
-          if (currentUser && currentUser.role === 'admin_unit' && userUnit) {
-            console.log("🔍 DEBUG LeaveHistory - Applying unit filter to total count:", userUnit);
-            totalCountQuery = totalCountQuery.eq("department", userUnit);
+          try {
+            let totalCountQuery = supabase
+              .from("employees")
+              .select("*", { count: "exact", head: true });
+
+            // Apply unit filtering to total count for admin_unit users
+            if (currentUser.role === 'admin_unit' && userUnit) {
+              console.log("🔍 DEBUG LeaveHistory - Applying unit filter to total count:", userUnit);
+              totalCountQuery = totalCountQuery.eq("department", userUnit);
+            } else if (currentUser.role === 'admin_unit') {
+              // Admin unit without unit assigned - show 0 count
+              totalCountQuery = totalCountQuery.eq("id", "00000000-0000-0000-0000-000000000000");
+            }
+
+            const { count: totalCount, error: countError } = await totalCountQuery;
+
+            if (countError) {
+              console.error("❌ Error fetching total count:", countError);
+              throw countError;
+            }
+
+            console.log("🔍 DEBUG LeaveHistory - Total count:", totalCount);
+            setOverallTotalEmployees(totalCount || 0);
+          } catch (countFetchError) {
+            console.error("❌ Failed to fetch total count:", countFetchError);
+            // Don't throw here, just log and continue with 0 count
+            setOverallTotalEmployees(0);
           }
-
-          const { count: totalCount, error: countError } = await totalCountQuery;
-
-          if (countError) throw countError;
-          setOverallTotalEmployees(totalCount || 0);
         }
 
         // Return early if no employees found
