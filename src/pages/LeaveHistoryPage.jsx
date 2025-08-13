@@ -257,12 +257,16 @@ const LeaveHistoryPage = () => {
         }
 
         if (employeesError) {
-          console.error("❌ Supabase error fetching employees:", employeesError);
+          console.error("❌ Supabase error fetching employees:");
+          console.error("❌ Raw error:", employeesError);
+          console.error("❌ Error JSON:", JSON.stringify(employeesError, null, 2));
           console.error("❌ Error details:", {
-            message: employeesError.message,
-            details: employeesError.details,
-            hint: employeesError.hint,
-            code: employeesError.code
+            message: employeesError?.message || "No message",
+            details: employeesError?.details || "No details",
+            hint: employeesError?.hint || "No hint",
+            code: employeesError?.code || "No code",
+            statusCode: employeesError?.statusCode || "No status code",
+            status: employeesError?.status || "No status"
           });
           throw employeesError;
         }
