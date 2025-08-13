@@ -557,6 +557,20 @@ const ProposalList = () => {
               )}
             </div>
           )}
+          {selectedProposal && selectedProposal.status === 'approved' && (
+            <div className="flex justify-end space-x-2 pt-4 border-t border-slate-600/50">
+              <Button
+                onClick={() => {
+                  setShowDetailDialog(false);
+                  handleGenerateLetter(selectedProposal);
+                }}
+                className="bg-blue-600 hover:bg-blue-700 text-white"
+              >
+                <Download className="w-4 h-4 mr-2" />
+                Generate & Download Surat
+              </Button>
+            </div>
+          )}
         </DialogContent>
       </Dialog>
 
