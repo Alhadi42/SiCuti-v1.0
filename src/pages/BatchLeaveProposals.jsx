@@ -148,35 +148,66 @@ const BatchLeaveProposals = () => {
 
   const handleAddToBatchLetter = async (unit) => {
     try {
-      // Here we would integrate with the existing letter generation system
-      // For now, let's show a success message and prepare data
-      
-      const letterData = {
-        unitName: unit.unitName,
-        requests: unit.requests,
-        totalEmployees: unit.totalEmployees,
-        totalDays: unit.totalDays,
-        dateRange: unit.dateRange
-      };
-
-      console.log("📄 Preparing batch letter for unit:", letterData);
-
-      // TODO: Integrate with existing letter generation system
-      // This could call the existing docx generation utilities
-      
       toast({
-        title: "Berhasil",
-        description: `${unit.totalRequests} usulan cuti dari ${unit.unitName} siap untuk dibuat surat`,
+        title: "Info",
+        description: "Sedang mempersiapkan surat batch...",
       });
 
-      // Navigate to letter creation page with pre-filled data
-      // or trigger letter generation modal
-      
+      // Transform leave requests to proposal format
+      const proposalItems = unit.requests.map(request => ({
+        employee_id: request.employee_id,
+        employee_name: request.employees?.name || "Nama tidak diketahui",
+        employee_nip: request.employees?.nip || "-",
+        employee_department: request.employees?.department || unit.unitName,
+        employee_position: request.employees?.position_name || "-",
+        leave_type_id: request.leave_type_id,
+        leave_type_name: request.leave_types?.name || "Jenis cuti tidak diketahui",
+        start_date: request.start_date,
+        end_date: request.end_date,
+        days_requested: request.days_requested || 0,
+        leave_quota_year: new Date(request.start_date).getFullYear(),
+        reason: request.reason || "",
+        address_during_leave: request.address_during_leave || "",
+      }));
+
+      // Prepare proposal data for letter generation
+      const proposalData = {
+        proposal: {
+          id: `batch-${unit.unitName.replace(/\s+/g, '-').toLowerCase()}-${Date.now()}`,
+          proposal_title: `Usulan Cuti Batch - ${unit.unitName}`,
+          proposer_name: "Master Admin",
+          proposer_unit: unit.unitName,
+          proposal_date: format(new Date(), "yyyy-MM-dd"),
+          total_employees: unit.totalEmployees,
+          status: "approved",
+          letter_number: `SRT/BATCH/${new Date().getFullYear()}/${Math.floor(Math.random() * 1000).toString().padStart(3, '0')}`,
+          letter_date: format(new Date(), "yyyy-MM-dd"),
+          notes: `Surat batch untuk ${unit.totalRequests} pengajuan cuti dari ${unit.unitName}`,
+        },
+        proposalItems: proposalItems,
+      };
+
+      console.log("📄 Generating batch letter for unit:", {
+        unitName: unit.unitName,
+        totalRequests: unit.totalRequests,
+        totalEmployees: unit.totalEmployees,
+        proposalItemsCount: proposalItems.length
+      });
+
+      // Generate and download the letter
+      const filename = `Usulan_Cuti_Batch_${unit.unitName.replace(/\s+/g, '_')}_${format(new Date(), "yyyy-MM-dd")}.docx`;
+      await downloadLeaveProposalLetter(proposalData, filename);
+
+      toast({
+        title: "Berhasil",
+        description: `Surat batch untuk ${unit.totalRequests} usulan cuti dari ${unit.unitName} berhasil dibuat dan diunduh`,
+      });
+
     } catch (error) {
-      console.error("Error preparing batch letter:", error);
+      console.error("Error generating batch letter:", error);
       toast({
         title: "Error",
-        description: "Gagal mempersiapkan surat batch",
+        description: "Gagal membuat surat batch: " + (error.message || "Unknown error"),
         variant: "destructive",
       });
     }
