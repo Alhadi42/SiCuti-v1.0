@@ -134,7 +134,7 @@ const ProposalList = () => {
   const handleSubmitApproval = async () => {
     try {
       const updateData = {};
-      
+
       if (approvalAction === 'approve') {
         updateData.letter_number = letterNumber;
         updateData.letter_date = letterDate;
@@ -144,12 +144,12 @@ const ProposalList = () => {
       }
 
       await updateProposalStatus(selectedProposal.id, approvalAction === 'approve' ? 'approved' : 'rejected', updateData);
-      
+
       setShowApprovalDialog(false);
       setSelectedProposal(null);
       setApprovalAction(null);
       setApprovalNotes("");
-      
+
       toast({
         title: "Success",
         description: `Usulan berhasil ${approvalAction === 'approve' ? 'disetujui' : 'ditolak'}`,
@@ -159,6 +159,53 @@ const ProposalList = () => {
       toast({
         title: "Error",
         description: "Gagal memperbarui status usulan",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const handleGenerateLetter = async (proposal) => {
+    try {
+      toast({
+        title: "Info",
+        description: "Sedang membuat surat usulan...",
+      });
+
+      // Fetch proposal items
+      const { data: proposalItems, error } = await supabase
+        .from("leave_proposal_items")
+        .select("*")
+        .eq("proposal_id", proposal.id)
+        .order("employee_name");
+
+      if (error) throw error;
+
+      if (!proposalItems || proposalItems.length === 0) {
+        throw new Error("Tidak ada data pegawai dalam usulan");
+      }
+
+      // Prepare data for letter generation
+      const proposalData = {
+        proposal: proposal,
+        proposalItems: proposalItems,
+      };
+
+      // Generate and download letter
+      const filename = `Usulan_Cuti_${proposal.proposer_unit}_${proposal.letter_number?.replace(/\//g, '_') || 'Draft'}.docx`;
+      await downloadLeaveProposalLetter(proposalData, filename);
+
+      // Update proposal status to processed
+      await updateProposalStatus(proposal.id, 'processed', {});
+
+      toast({
+        title: "Success",
+        description: "Surat usulan berhasil dibuat dan diunduh",
+      });
+    } catch (error) {
+      console.error("Error generating letter:", error);
+      toast({
+        title: "Error",
+        description: "Gagal membuat surat usulan: " + error.message,
         variant: "destructive",
       });
     }
