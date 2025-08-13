@@ -678,19 +678,19 @@ const ProposalList = () => {
       </Dialog>
 
       {/* Approval Dialog */}
-      <AlertDialog open={showApprovalDialog} onOpenChange={setShowApprovalDialog}>
-        <AlertDialogContent className="bg-slate-800 border-slate-700">
-          <AlertDialogHeader>
-            <AlertDialogTitle className="text-white">
+      <Dialog open={showApprovalDialog} onOpenChange={setShowApprovalDialog}>
+        <DialogContent className="bg-slate-800 border-slate-700">
+          <DialogHeader>
+            <DialogTitle className="text-white">
               {approvalAction === 'approve' ? 'Setujui Usulan' : 'Tolak Usulan'}
-            </AlertDialogTitle>
-            <AlertDialogDescription className="text-slate-400">
-              {approvalAction === 'approve' 
+            </DialogTitle>
+            <DialogDescription className="text-slate-400">
+              {approvalAction === 'approve'
                 ? 'Masukkan informasi surat untuk menyetujui usulan ini.'
                 : 'Masukkan alasan penolakan usulan ini.'
               }
-            </AlertDialogDescription>
-          </AlertDialogHeader>
+            </DialogDescription>
+          </DialogHeader>
           <div className="space-y-4 py-4">
             {approvalAction === 'approve' && (
               <>
@@ -731,23 +731,27 @@ const ProposalList = () => {
               />
             </div>
           </div>
-          <AlertDialogFooter>
-            <AlertDialogCancel className="bg-slate-700 border-slate-600 text-white hover:bg-slate-600">
+          <div className="flex justify-end space-x-2 pt-4">
+            <Button
+              variant="outline"
+              onClick={() => setShowApprovalDialog(false)}
+              className="bg-slate-700 border-slate-600 text-white hover:bg-slate-600"
+            >
               Batal
-            </AlertDialogCancel>
-            <AlertDialogAction
+            </Button>
+            <Button
               onClick={handleSubmitApproval}
               disabled={approvalAction === 'reject' && !approvalNotes.trim()}
-              className={approvalAction === 'approve' 
-                ? "bg-green-600 hover:bg-green-700 text-white" 
+              className={approvalAction === 'approve'
+                ? "bg-green-600 hover:bg-green-700 text-white"
                 : "bg-red-600 hover:bg-red-700 text-white"
               }
             >
               {approvalAction === 'approve' ? 'Setujui' : 'Tolak'}
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };
