@@ -234,7 +234,7 @@ const BatchLeaveProposals = () => {
                 </div>
                 <div className="ml-4">
                   <p className="text-slate-400 text-sm">Total Unit</p>
-                  <p className="text-2xl font-bold text-white">{unitProposals.length}</p>
+                  <p className="text-2xl font-bold text-white">{window.totalUnitsInDatabase || 0}</p>
                 </div>
               </div>
             </CardContent>
