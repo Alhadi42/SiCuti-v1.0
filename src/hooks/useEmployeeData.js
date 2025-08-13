@@ -129,9 +129,13 @@ export const useEmployeeData = (
 
         // Apply unit-based filtering for admin_unit users
         const currentUser = AuthManager.getUserSession();
-        if (currentUser && currentUser.role === 'admin_unit' && currentUser.unitKerja) {
+
+        // Fix: Use unit_kerja instead of unitKerja (database field name)
+        const userUnit = currentUser?.unit_kerja || currentUser?.unitKerja;
+        if (currentUser && currentUser.role === 'admin_unit' && userUnit) {
+          console.log("🔍 DEBUG - Applying unit filter to main query:", userUnit);
           // Admin unit can only see employees from their unit
-          query = query.eq("department", currentUser.unitKerja);
+          query = query.eq("department", userUnit);
         }
 
         // Apply all filters
