@@ -178,7 +178,8 @@ export class AuthManager {
 
     // Admin unit can only access their own unit
     if (user.role === "admin_unit") {
-      return user.unit_kerja === unitName;
+      const userUnit = user.unit_kerja || user.unitKerja;
+      return userUnit === unitName;
     }
 
     // Employees can only access their own data
