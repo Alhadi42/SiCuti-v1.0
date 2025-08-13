@@ -57,7 +57,11 @@ const ProposalList = () => {
   const [approvalNotes, setApprovalNotes] = useState("");
   const [letterNumber, setLetterNumber] = useState("");
   const [letterDate, setLetterDate] = useState(format(new Date(), "yyyy-MM-dd"));
-  
+
+  // Bulk actions
+  const [selectedProposals, setSelectedProposals] = useState([]);
+  const [showBulkActions, setShowBulkActions] = useState(false);
+
   // Filters
   const [statusFilter, setStatusFilter] = useState("all");
   const [unitFilter, setUnitFilter] = useState("all");
