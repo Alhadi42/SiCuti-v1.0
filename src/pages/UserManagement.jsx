@@ -628,6 +628,8 @@ const AddUserDialog = ({ onAdd }) => {
 
 // Edit User Dialog Component
 const EditUserDialog = ({ user, onEdit, onClose }) => {
+  const { departments, isLoadingDepartments } = useDepartments();
+
   const [formData, setFormData] = useState({
     name: user.name,
     email: user.email,
