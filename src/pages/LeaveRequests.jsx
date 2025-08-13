@@ -73,6 +73,12 @@ const LeaveRequests = () => {
         .from("leave_requests")
         .select("*", { count: "exact", head: true });
 
+      // Apply unit-based filtering for admin_unit users
+      const currentUser = AuthManager.getUserSession();
+      if (currentUser && currentUser.role === 'admin_unit' && currentUser.unitKerja) {
+        countQuery = countQuery.eq("employees.department", currentUser.unitKerja);
+      }
+
       // Apply filters to the count query
       // Note: For search across joined tables, we'll fetch all data and filter client-side
       // This is more reliable than complex Supabase OR queries across relations
