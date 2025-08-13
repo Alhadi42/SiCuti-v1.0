@@ -31,6 +31,7 @@ import {
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { format } from "date-fns";
 import { id } from "date-fns/locale";
+import { downloadLeaveProposalLetter } from "@/utils/leaveProposalLetterGenerator";
 
 const BatchLeaveProposals = () => {
   const { toast } = useToast();
