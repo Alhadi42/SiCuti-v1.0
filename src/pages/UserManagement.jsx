@@ -649,6 +649,9 @@ const EditUserDialog = ({ user, onEdit, onClose }) => {
     status: user.status,
   });
 
+  console.log("EditUserDialog initialized with user:", { id: user.id, name: user.name, unitKerja: user.unitKerja });
+  console.log("Form data unitKerja:", formData.unitKerja);
+
   const handleSubmit = (e) => {
     e.preventDefault();
     onEdit(formData);
