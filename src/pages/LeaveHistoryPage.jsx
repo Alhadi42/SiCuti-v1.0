@@ -147,10 +147,23 @@ const LeaveHistoryPage = () => {
         console.log("🔍 DEBUG LeaveHistory - User session:", {
           role: currentUser?.role,
           unit_kerja: currentUser?.unit_kerja,
-          unitKerja: currentUser?.unitKerja
+          unitKerja: currentUser?.unitKerja,
+          hasUser: !!currentUser
         });
 
+        // Safety check for user session
+        if (!currentUser) {
+          console.error("❌ No user session found in LeaveHistory");
+          toast({
+            variant: "destructive",
+            title: "Session Error",
+            description: "User session not found. Please login again.",
+          });
+          return;
+        }
+
         // Build the base query for employees
+        console.log("🔍 DEBUG LeaveHistory - Building query...");
         let query = supabase
           .from("employees")
           .select("id, name, nip, department, position_name, rank_group", {
@@ -159,9 +172,21 @@ const LeaveHistoryPage = () => {
 
         // Apply unit-based filtering for admin_unit users
         const userUnit = currentUser?.unit_kerja || currentUser?.unitKerja;
-        if (currentUser && currentUser.role === 'admin_unit' && userUnit) {
+        console.log("🔍 DEBUG LeaveHistory - User unit:", userUnit);
+
+        if (currentUser.role === 'admin_unit' && userUnit) {
           console.log("🔍 DEBUG LeaveHistory - Applying unit filter:", userUnit);
-          query = query.eq("department", userUnit);
+          // Validate unit name before using it
+          if (userUnit.length > 0 && userUnit.length < 500) { // Reasonable length check
+            query = query.eq("department", userUnit);
+          } else {
+            console.error("❌ Invalid unit name:", userUnit);
+            throw new Error("Invalid unit name in user session");
+          }
+        } else if (currentUser.role === 'admin_unit') {
+          console.warn("⚠️ Admin unit user has no unit assigned");
+          // For admin_unit without unit, show no results instead of all results
+          query = query.eq("id", "00000000-0000-0000-0000-000000000000"); // Non-existent ID
         }
 
         // Add search filter if search term exists
