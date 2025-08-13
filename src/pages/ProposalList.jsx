@@ -530,30 +530,71 @@ const ProposalList = () => {
                 </div>
               )}
 
-              {/* Employee List */}
+              {/* Proposal Summary */}
               {selectedProposal.leave_proposal_items && selectedProposal.leave_proposal_items.length > 0 && (
-                <div>
-                  <Label className="text-slate-300">Daftar Pegawai</Label>
-                  <div className="mt-2 space-y-2 max-h-48 overflow-y-auto">
-                    {selectedProposal.leave_proposal_items.map((item, index) => (
-                      <div key={index} className="p-3 bg-slate-700/50 rounded border border-slate-600/50">
-                        <div className="flex items-center justify-between">
-                          <div>
-                            <h4 className="text-white font-medium">{item.employee_name}</h4>
-                            <p className="text-slate-400 text-sm">{item.employee_nip}</p>
-                          </div>
-                          <div className="text-right">
-                            <Badge variant="outline">{item.leave_type_name}</Badge>
-                            <p className="text-slate-400 text-sm mt-1">{item.days_requested} hari</p>
-                          </div>
-                        </div>
-                        <div className="mt-2 text-sm text-slate-300">
-                          📅 {format(new Date(item.start_date), "dd MMM", { locale: id })} - {format(new Date(item.end_date), "dd MMM yyyy", { locale: id })}
-                        </div>
-                      </div>
-                    ))}
+                <>
+                  <div>
+                    <Label className="text-slate-300">Ringkasan Usulan</Label>
+                    <div className="mt-2 grid grid-cols-2 md:grid-cols-4 gap-4">
+                      {(() => {
+                        const summary = generateProposalSummary(selectedProposal.leave_proposal_items);
+                        return (
+                          <>
+                            <div className="p-3 bg-blue-500/20 rounded border border-blue-500/50">
+                              <p className="text-blue-400 text-sm">Total Pegawai</p>
+                              <p className="text-white font-bold text-lg">{summary.totalEmployees}</p>
+                            </div>
+                            <div className="p-3 bg-green-500/20 rounded border border-green-500/50">
+                              <p className="text-green-400 text-sm">Total Hari</p>
+                              <p className="text-white font-bold text-lg">{summary.totalDays}</p>
+                            </div>
+                            <div className="p-3 bg-purple-500/20 rounded border border-purple-500/50">
+                              <p className="text-purple-400 text-sm">Jenis Cuti</p>
+                              <p className="text-white font-bold text-lg">{Object.keys(summary.leaveTypes).length}</p>
+                            </div>
+                            <div className="p-3 bg-orange-500/20 rounded border border-orange-500/50">
+                              <p className="text-orange-400 text-sm">Rentang Tanggal</p>
+                              <p className="text-white font-bold text-xs">
+                                {summary.dateRange.earliest && summary.dateRange.latest &&
+                                  `${format(summary.dateRange.earliest, "dd/MM", { locale: id })} - ${format(summary.dateRange.latest, "dd/MM", { locale: id })}`
+                                }
+                              </p>
+                            </div>
+                          </>
+                        );
+                      })()}
+                    </div>
                   </div>
-                </div>
+
+                  {/* Employee List */}
+                  <div>
+                    <Label className="text-slate-300">Daftar Pegawai ({selectedProposal.leave_proposal_items.length})</Label>
+                    <div className="mt-2 space-y-2 max-h-48 overflow-y-auto">
+                      {selectedProposal.leave_proposal_items.map((item, index) => (
+                        <div key={index} className="p-3 bg-slate-700/50 rounded border border-slate-600/50">
+                          <div className="flex items-center justify-between">
+                            <div>
+                              <h4 className="text-white font-medium">{item.employee_name}</h4>
+                              <p className="text-slate-400 text-sm">{item.employee_nip} - {item.employee_position}</p>
+                            </div>
+                            <div className="text-right">
+                              <Badge variant="outline">{item.leave_type_name}</Badge>
+                              <p className="text-slate-400 text-sm mt-1">{item.days_requested} hari</p>
+                            </div>
+                          </div>
+                          <div className="mt-2 text-sm text-slate-300">
+                            📅 {format(new Date(item.start_date), "dd MMM", { locale: id })} - {format(new Date(item.end_date), "dd MMM yyyy", { locale: id })}
+                            {item.reason && (
+                              <div className="mt-1 text-slate-400">
+                                💬 {item.reason}
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                </>
               )}
             </div>
           )}
