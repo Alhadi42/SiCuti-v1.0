@@ -52,16 +52,6 @@ const getMenuItemsByPermissions = (permissions = []) => {
     )
       return true;
     if (
-      item.label === "Usulan Cuti" &&
-      permissions.includes("leave_proposals_unit")
-    )
-      return true;
-    if (
-      item.label === "Daftar Usulan" &&
-      permissions.includes("proposal_list_master")
-    )
-      return true;
-    if (
       item.label === "Usulan per Unit" &&
       permissions.includes("batch_proposals_master")
     )
