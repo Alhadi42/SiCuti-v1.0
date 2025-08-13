@@ -132,8 +132,9 @@ const LeaveRequests = () => {
         .order("submitted_date", { ascending: false });
 
       // Apply unit-based filtering for admin_unit users to data query
-      if (currentUser && currentUser.role === 'admin_unit' && currentUser.unitKerja) {
-        dataQuery = dataQuery.eq("employees.department", currentUser.unitKerja);
+      if (currentUser && currentUser.role === 'admin_unit' && userUnit) {
+        console.log("🔍 DEBUG LeaveRequests - Applying unit filter to data query:", userUnit);
+        dataQuery = dataQuery.eq("employees.department", userUnit);
       }
 
       // Only apply pagination if not searching (for search, we need all data to filter client-side)
