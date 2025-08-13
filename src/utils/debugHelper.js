@@ -59,9 +59,4 @@ export const addDebugButton = () => {
   document.body.appendChild(button);
 };
 
-// Auto add debug button in development
-if (import.meta.env.DEV) {
-  setTimeout(() => {
-    addDebugButton();
-  }, 2000);
-}
+// Debug button removed - no longer auto-created
