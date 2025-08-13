@@ -39,7 +39,21 @@ export class AuthManager {
         return null;
       }
 
-      return JSON.parse(user);
+      const parsedUser = JSON.parse(user);
+
+      // DEBUG: Log user session data in development
+      if (import.meta.env.DEV && Math.random() < 0.1) { // Log 10% of the time to avoid spam
+        console.log("🔍 AuthManager.getUserSession():", {
+          id: parsedUser.id,
+          name: parsedUser.name,
+          role: parsedUser.role,
+          unit_kerja: parsedUser.unit_kerja,
+          unitKerja: parsedUser.unitKerja,
+          hasUnitData: !!(parsedUser.unit_kerja || parsedUser.unitKerja)
+        });
+      }
+
+      return parsedUser;
     } catch (error) {
       console.error("Failed to get user session:", error);
       this.clearSession();
