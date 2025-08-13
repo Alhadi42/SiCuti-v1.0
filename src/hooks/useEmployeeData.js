@@ -177,6 +177,12 @@ export const useEmployeeData = (
 
         if (error) throw error;
 
+        console.log("🔍 DEBUG - Query results:", {
+          totalCount: count,
+          returnedEmployees: data?.length,
+          sampleEmployees: data?.slice(0, 3).map(e => ({ name: e.name, department: e.department }))
+        });
+
         setDisplayedEmployees(data || []);
         setTotalFilteredEmployeeCount(count || 0);
         setTotalPages(Math.ceil((count || 0) / EMPLOYEES_PER_PAGE));
