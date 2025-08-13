@@ -62,6 +62,10 @@ function App() {
                           element={<ProposalList />}
                         />
                         <Route
+                          path="/batch-leave-proposals"
+                          element={<BatchLeaveProposals />}
+                        />
+                        <Route
                           path="/leave-history"
                           element={<LeaveHistoryPage />}
                         />
