@@ -215,6 +215,74 @@ const ProposalList = () => {
     }
   };
 
+  const handleBulkApprove = async () => {
+    try {
+      const pendingProposals = selectedProposals.filter(id => {
+        const proposal = proposals.find(p => p.id === id);
+        return proposal && proposal.status === 'pending';
+      });
+
+      if (pendingProposals.length === 0) {
+        toast({
+          title: "Info",
+          description: "Tidak ada usulan yang bisa disetujui",
+        });
+        return;
+      }
+
+      toast({
+        title: "Info",
+        description: `Sedang memproses ${pendingProposals.length} usulan...`,
+      });
+
+      // Approve each selected proposal
+      for (const proposalId of pendingProposals) {
+        const proposal = proposals.find(p => p.id === proposalId);
+        const letterNum = `SRT/CUTI/${new Date().getFullYear()}/${Math.floor(Math.random() * 1000).toString().padStart(3, '0')}`;
+
+        await updateProposalStatus(proposalId, 'approved', {
+          letter_number: letterNum,
+          letter_date: format(new Date(), "yyyy-MM-dd"),
+          notes: "Approved via bulk action"
+        });
+      }
+
+      setSelectedProposals([]);
+      setShowBulkActions(false);
+
+      toast({
+        title: "Success",
+        description: `${pendingProposals.length} usulan berhasil disetujui`,
+      });
+    } catch (error) {
+      console.error("Error bulk approving:", error);
+      toast({
+        title: "Error",
+        description: "Gagal menyetujui usulan secara massal",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const handleSelectProposal = (proposalId, checked) => {
+    if (checked) {
+      setSelectedProposals(prev => [...prev, proposalId]);
+    } else {
+      setSelectedProposals(prev => prev.filter(id => id !== proposalId));
+    }
+  };
+
+  const handleSelectAll = (checked) => {
+    if (checked) {
+      const selectableProposals = filteredProposals
+        .filter(p => p.status === 'pending')
+        .map(p => p.id);
+      setSelectedProposals(selectableProposals);
+    } else {
+      setSelectedProposals([]);
+    }
+  };
+
   return (
     <div className="p-6 space-y-6">
       {/* Header */}
