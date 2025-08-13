@@ -85,10 +85,30 @@ const LeaveRequests = () => {
 
       // Fix: Use unit_kerja instead of unitKerja
       const userUnit = currentUser?.unit_kerja || currentUser?.unitKerja;
+      let employeeIdsFilter = null;
+
       if (currentUser && currentUser.role === 'admin_unit' && userUnit) {
-        console.log("🔍 DEBUG LeaveRequests - Applying unit filter:", userUnit);
-        // Use correct PostgREST syntax for filtering on joined table
-        countQuery = countQuery.eq("employees(department)", userUnit);
+        console.log("🔍 DEBUG LeaveRequests - Getting employees from unit:", userUnit);
+
+        // First get employee IDs from the user's unit
+        const { data: unitEmployees, error: empError } = await supabase
+          .from("employees")
+          .select("id")
+          .eq("department", userUnit);
+
+        if (empError) {
+          console.error("Error fetching unit employees:", empError);
+        } else {
+          employeeIdsFilter = unitEmployees.map(emp => emp.id);
+          console.log("🔍 DEBUG LeaveRequests - Employee IDs in unit:", employeeIdsFilter.length);
+
+          if (employeeIdsFilter.length > 0) {
+            countQuery = countQuery.in("employee_id", employeeIdsFilter);
+          } else {
+            // No employees in this unit, return empty result
+            countQuery = countQuery.eq("employee_id", "00000000-0000-0000-0000-000000000000"); // Non-existent ID
+          }
+        }
       }
 
       // Apply filters to the count query
