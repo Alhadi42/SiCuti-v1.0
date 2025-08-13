@@ -80,8 +80,10 @@ export const useEmployeeData = (
         .from("employees")
         .select("position_type, asn_status, rank_group");
 
-      if (currentUser && currentUser.role === 'admin_unit' && currentUser.unitKerja) {
-        employeeQuery = employeeQuery.eq("department", currentUser.unitKerja);
+      // Fix: Use unit_kerja instead of unitKerja
+      if (currentUser && currentUser.role === 'admin_unit' && userUnit) {
+        console.log("🔍 DEBUG - Applying unit filter to employee query:", userUnit);
+        employeeQuery = employeeQuery.eq("department", userUnit);
       }
 
       const { data, error } = await employeeQuery;
