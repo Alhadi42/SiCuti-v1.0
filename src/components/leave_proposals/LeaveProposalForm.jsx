@@ -95,21 +95,14 @@ const LeaveProposalForm = ({ onSubmit, onCancel }) => {
   };
 
   const addEmployeeToProposal = () => {
-    // Validation
-    if (!currentLeaveItem.employee_id) {
-      toast({ title: "Error", description: "Pilih pegawai terlebih dahulu", variant: "destructive" });
-      return;
-    }
-    if (!currentLeaveItem.leave_type_id) {
-      toast({ title: "Error", description: "Pilih jenis cuti terlebih dahulu", variant: "destructive" });
-      return;
-    }
-    if (!currentLeaveItem.start_date || !currentLeaveItem.end_date) {
-      toast({ title: "Error", description: "Tentukan tanggal cuti terlebih dahulu", variant: "destructive" });
-      return;
-    }
-    if (currentLeaveItem.days_requested <= 0) {
-      toast({ title: "Error", description: "Durasi cuti harus lebih dari 0 hari", variant: "destructive" });
+    // Validate employee leave item
+    const validationErrors = validateEmployeeLeaveItem(currentLeaveItem);
+    if (validationErrors.length > 0) {
+      toast({
+        title: "Error",
+        description: validationErrors[0],
+        variant: "destructive"
+      });
       return;
     }
 
@@ -117,6 +110,17 @@ const LeaveProposalForm = ({ onSubmit, onCancel }) => {
     const existingEmployee = selectedEmployees.find(emp => emp.employee_id === currentLeaveItem.employee_id);
     if (existingEmployee) {
       toast({ title: "Error", description: "Pegawai sudah ditambahkan ke usulan", variant: "destructive" });
+      return;
+    }
+
+    // Check for leave conflicts
+    const potentialConflicts = checkLeaveConflicts([...selectedEmployees, currentLeaveItem]);
+    if (potentialConflicts.length > 0) {
+      toast({
+        title: "Warning",
+        description: potentialConflicts[0].conflict,
+        variant: "destructive"
+      });
       return;
     }
 
