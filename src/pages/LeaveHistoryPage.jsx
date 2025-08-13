@@ -208,9 +208,17 @@ const LeaveHistoryPage = () => {
 
         // Get total employees count on initial load
         if (isInitialLoad || overallTotalEmployees === 0) {
-          const { count: totalCount, error: countError } = await supabase
+          let totalCountQuery = supabase
             .from("employees")
             .select("*", { count: "exact", head: true });
+
+          // Apply unit filtering to total count for admin_unit users
+          if (currentUser && currentUser.role === 'admin_unit' && userUnit) {
+            console.log("🔍 DEBUG LeaveHistory - Applying unit filter to total count:", userUnit);
+            totalCountQuery = totalCountQuery.eq("department", userUnit);
+          }
+
+          const { count: totalCount, error: countError } = await totalCountQuery;
 
           if (countError) throw countError;
           setOverallTotalEmployees(totalCount || 0);
@@ -626,7 +634,7 @@ const LeaveHistoryPage = () => {
     toast({
       title: `🚀 ${feature}`,
       description:
-        "🚧 Fitur ini belum diimplementasikan—tapi jangan khawatir! Anda bisa memintanya di prompt berikutnya! 🚀",
+        "�� Fitur ini belum diimplementasikan—tapi jangan khawatir! Anda bisa memintanya di prompt berikutnya! 🚀",
     });
   };
 
