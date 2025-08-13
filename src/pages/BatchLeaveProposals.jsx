@@ -352,10 +352,18 @@ const BatchLeaveProposals = () => {
             ) : filteredUnits.length === 0 ? (
               <div className="text-center py-8">
                 <Building2 className="w-16 h-16 text-slate-600 mx-auto mb-4" />
-                <h3 className="text-lg font-medium text-white mb-2">Tidak Ada Usulan</h3>
-                <p className="text-slate-400">
-                  Belum ada usulan cuti yang sesuai dengan filter
+                <h3 className="text-lg font-medium text-white mb-2">Belum Ada Usulan dari Admin Unit</h3>
+                <p className="text-slate-400 mb-2">
+                  Saat ini belum ada admin unit yang membuat usulan cuti melalui sistem.
                 </p>
+                <p className="text-slate-400 text-sm">
+                  Usulan cuti dari admin unit akan muncul di sini untuk dikelola secara batch.
+                </p>
+                <div className="mt-4 p-4 bg-blue-900/20 border border-blue-700/50 rounded-lg max-w-md mx-auto">
+                  <p className="text-blue-400 text-sm">
+                    <strong>Info:</strong> Total {window.totalUnitsInDatabase || 0} unit kerja tersedia di sistem
+                  </p>
+                </div>
               </div>
             ) : (
               <div className="space-y-4">
