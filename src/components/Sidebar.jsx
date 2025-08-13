@@ -20,6 +20,8 @@ import { AuthManager } from "@/lib/auth";
 const menuItems = [
   { icon: Users, label: "Data Pegawai", path: "/employees" },
   { icon: Calendar, label: "Pengajuan Cuti", path: "/leave-requests" },
+  { icon: Send, label: "Usulan Cuti", path: "/leave-proposals" },
+  { icon: List, label: "Daftar Usulan", path: "/proposal-list" },
   { icon: History, label: "Riwayat Cuti", path: "/leave-history" },
   {
     type: "group",
