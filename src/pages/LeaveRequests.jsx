@@ -37,6 +37,7 @@ import { format } from "date-fns";
 import { id } from "date-fns/locale";
 import { useDepartments } from "@/hooks/useDepartments";
 import { useLeaveTypes } from "@/hooks/useLeaveTypes";
+import { AuthManager } from "@/lib/auth";
 
 const LeaveRequests = () => {
   const { toast } = useToast();
