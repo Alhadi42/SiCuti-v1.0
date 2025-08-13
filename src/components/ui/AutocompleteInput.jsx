@@ -57,6 +57,7 @@ const AutocompleteInput = ({
 
   const handleSelect = (option) => {
     setInputValue(option.label);
+    onChange(option.value); // Call onChange with the value, not label
     onSelect(option);
     setIsFocused(false);
   };
