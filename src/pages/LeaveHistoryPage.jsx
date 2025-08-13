@@ -173,6 +173,30 @@ const LeaveHistoryPage = () => {
 
         // Build the base query for employees
         console.log("🔍 DEBUG LeaveHistory - Building query...");
+
+        // Test basic Supabase query first
+        console.log("🔍 Testing basic employees query...");
+        try {
+          const testQuery = await supabase
+            .from("employees")
+            .select("id")
+            .limit(1);
+
+          console.log("🔍 Basic query test result:", {
+            success: !testQuery.error,
+            error: testQuery.error,
+            dataLength: testQuery.data?.length
+          });
+
+          if (testQuery.error) {
+            console.error("❌ Basic query failed:", JSON.stringify(testQuery.error, null, 2));
+            throw new Error(`Basic query failed: ${testQuery.error.message}`);
+          }
+        } catch (basicTestError) {
+          console.error("❌ Basic query test failed:", basicTestError);
+          throw basicTestError;
+        }
+
         let query = supabase
           .from("employees")
           .select("id, name, nip, department, position_name, rank_group", {
@@ -363,7 +387,7 @@ const LeaveHistoryPage = () => {
         if (requestsError) throw requestsError;
 
         console.log(
-          `📊 Leave Requests Data for ${employeeIds.length} employees:`,
+          `�� Leave Requests Data for ${employeeIds.length} employees:`,
           {
             totalRequests: leaveRequestsData?.length || 0,
             year: year,
