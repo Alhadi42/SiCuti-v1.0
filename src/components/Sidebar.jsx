@@ -11,8 +11,6 @@ import {
   Building2,
   History,
   UserCheck,
-  Send,
-  List,
   Layers,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
