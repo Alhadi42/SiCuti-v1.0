@@ -153,11 +153,18 @@ const LeaveHistoryPage = () => {
         const currentUser = AuthManager.getUserSession();
 
         // DEBUG: Log user session for leave history
-        console.log("🔍 DEBUG LeaveHistory - User session:", {
+        console.log("🔍 DEBUG LeaveHistory - User session:");
+        console.log("🔍 Raw user object:", currentUser);
+        console.log("🔍 User JSON:", JSON.stringify(currentUser, null, 2));
+        console.log("🔍 User session details:", {
+          hasUser: !!currentUser,
+          userId: currentUser?.id,
+          userName: currentUser?.name,
           role: currentUser?.role,
           unit_kerja: currentUser?.unit_kerja,
           unitKerja: currentUser?.unitKerja,
-          hasUser: !!currentUser
+          permissions: currentUser?.permissions,
+          userType: typeof currentUser
         });
 
         // Safety check for user session
@@ -387,7 +394,7 @@ const LeaveHistoryPage = () => {
         if (requestsError) throw requestsError;
 
         console.log(
-          `�� Leave Requests Data for ${employeeIds.length} employees:`,
+          `📊 Leave Requests Data for ${employeeIds.length} employees:`,
           {
             totalRequests: leaveRequestsData?.length || 0,
             year: year,
