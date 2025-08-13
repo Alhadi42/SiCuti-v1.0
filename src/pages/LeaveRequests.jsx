@@ -153,10 +153,14 @@ const LeaveRequests = () => {
         .order("submitted_date", { ascending: false });
 
       // Apply unit-based filtering for admin_unit users to data query
-      if (currentUser && currentUser.role === 'admin_unit' && userUnit) {
-        console.log("🔍 DEBUG LeaveRequests - Applying unit filter to data query:", userUnit);
-        // Use correct PostgREST syntax for filtering on joined table
-        dataQuery = dataQuery.eq("employees(department)", userUnit);
+      if (currentUser && currentUser.role === 'admin_unit' && employeeIdsFilter) {
+        console.log("🔍 DEBUG LeaveRequests - Applying employee IDs filter to data query:", employeeIdsFilter.length);
+        if (employeeIdsFilter.length > 0) {
+          dataQuery = dataQuery.in("employee_id", employeeIdsFilter);
+        } else {
+          // No employees in this unit, return empty result
+          dataQuery = dataQuery.eq("employee_id", "00000000-0000-0000-0000-000000000000"); // Non-existent ID
+        }
       }
 
       // Only apply pagination if not searching (for search, we need all data to filter client-side)
@@ -361,7 +365,7 @@ const LeaveRequests = () => {
         console.error(`Gagal mengembalikan saldo cuti:`, rpcError.message);
 
       toast({
-        title: "✅ Data Dihapus",
+        title: "��� Data Dihapus",
         description: "Data cuti berhasil dihapus dan saldo telah dikembalikan.",
       });
       fetchLeaveRequests();
