@@ -168,7 +168,7 @@ const UserManagement = () => {
     if (userData.role === "master_admin") {
       permissions = ["all"];
     } else if (userData.role === "admin_unit") {
-      permissions = ["dashboard", "employees_unit", "leave_requests_unit", "leave_history_unit"];
+      permissions = ["dashboard", "employees_unit", "leave_requests_unit", "leave_proposals_unit", "leave_history_unit"];
     } else {
       permissions = ["dashboard"];
     }
@@ -204,7 +204,7 @@ const UserManagement = () => {
     if (userData.role === "master_admin") {
       permissions = ["all"];
     } else if (userData.role === "admin_unit") {
-      permissions = ["dashboard", "employees_unit", "leave_requests_unit", "leave_history_unit"];
+      permissions = ["dashboard", "employees_unit", "leave_requests_unit", "leave_proposals_unit", "leave_history_unit"];
     } else {
       permissions = ["dashboard"];
     }
