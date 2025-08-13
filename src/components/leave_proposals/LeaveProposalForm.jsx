@@ -15,6 +15,7 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { CalendarIcon, Plus, Trash2, Users } from "lucide-react";
 import { format, differenceInDays, addDays } from "date-fns";
 import { id } from "date-fns/locale";
+import { validateLeaveProposal, validateEmployeeLeaveItem, sanitizeProposalData, checkLeaveConflicts } from "@/utils/leaveProposalValidation";
 
 const LeaveProposalForm = ({ onSubmit, onCancel }) => {
   const { toast } = useToast();
