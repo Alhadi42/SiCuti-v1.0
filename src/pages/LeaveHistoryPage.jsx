@@ -534,15 +534,20 @@ const LeaveHistoryPage = () => {
         // Update the state with processed data
         setEmployeesWithBalances(processedData);
       } catch (error) {
-        console.error("❌ Error in fetchLeaveData:", error);
+        console.error("❌ Error in fetchLeaveData:");
+        console.error("❌ Raw error:", error);
+        console.error("❌ Error JSON:", JSON.stringify(error, Object.getOwnPropertyNames(error), 2));
         console.error("❌ Error type:", typeof error);
+        console.error("❌ Error constructor:", error?.constructor?.name);
         console.error("❌ Error details:", {
-          message: error?.message,
-          name: error?.name,
-          stack: error?.stack,
-          code: error?.code,
-          details: error?.details,
-          hint: error?.hint
+          message: error?.message || "No message",
+          name: error?.name || "No name",
+          stack: error?.stack ? error.stack.substring(0, 500) + "..." : "No stack",
+          code: error?.code || "No code",
+          details: error?.details || "No details",
+          hint: error?.hint || "No hint",
+          statusCode: error?.statusCode || "No status code",
+          status: error?.status || "No status"
         });
 
         // Determine appropriate error message based on error type
