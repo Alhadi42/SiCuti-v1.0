@@ -14,6 +14,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/components/ui/use-toast";
 import { supabase } from "@/lib/supabaseClient";
+import { AuthManager } from "@/lib/auth";
 
 import { useLeaveTypes } from "@/hooks/useLeaveTypes";
 import { useDepartments } from "@/hooks/useDepartments";
