@@ -521,14 +521,43 @@ const LeaveHistoryPage = () => {
         // Update the state with processed data
         setEmployeesWithBalances(processedData);
       } catch (error) {
-        console.error("Error in fetchLeaveData:", error);
+        console.error("❌ Error in fetchLeaveData:", error);
+        console.error("❌ Error type:", typeof error);
+        console.error("❌ Error details:", {
+          message: error?.message,
+          name: error?.name,
+          stack: error?.stack,
+          code: error?.code,
+          details: error?.details,
+          hint: error?.hint
+        });
+
+        // Determine appropriate error message based on error type
+        let errorMessage = "Terjadi kesalahan saat mengambil data cuti. Silakan coba lagi.";
+        let errorTitle = "Gagal mengambil data cuti";
+
+        if (error?.message?.includes("fetch") || error?.name === "TypeError") {
+          errorMessage = "Gagal terhubung ke server. Periksa koneksi internet Anda.";
+          errorTitle = "Connection Error";
+        } else if (error?.message?.includes("permission") || error?.message?.includes("policy")) {
+          errorMessage = "Anda tidak memiliki izin untuk mengakses data ini.";
+          errorTitle = "Permission Error";
+        } else if (error?.code) {
+          errorMessage = `Database error (${error.code}): ${error.message}`;
+          errorTitle = "Database Error";
+        } else if (error?.message) {
+          errorMessage = error.message;
+        }
+
         toast({
           variant: "destructive",
-          title: "Gagal mengambil data cuti",
-          description:
-            error.message ||
-            "Terjadi kesalahan saat memuat data. Silakan coba lagi.",
+          title: errorTitle,
+          description: errorMessage,
         });
+
+        // Reset data on error
+        setEmployeesWithBalances([]);
+        setTotalEmployeesInFilter(0);
       } finally {
         setIsLoadingData(false);
       }
@@ -714,7 +743,7 @@ const LeaveHistoryPage = () => {
   const handleExportDataCuti = async () => {
     try {
       toast({
-        title: "📊 Export Data Cuti",
+        title: "��� Export Data Cuti",
         description: "Sedang mempersiapkan data untuk export...",
       });
 
