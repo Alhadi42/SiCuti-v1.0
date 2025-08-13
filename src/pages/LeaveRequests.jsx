@@ -75,8 +75,19 @@ const LeaveRequests = () => {
 
       // Apply unit-based filtering for admin_unit users
       const currentUser = AuthManager.getUserSession();
-      if (currentUser && currentUser.role === 'admin_unit' && currentUser.unitKerja) {
-        countQuery = countQuery.eq("employees.department", currentUser.unitKerja);
+
+      // DEBUG: Log user session for leave requests
+      console.log("🔍 DEBUG LeaveRequests - User session:", {
+        role: currentUser?.role,
+        unit_kerja: currentUser?.unit_kerja,
+        unitKerja: currentUser?.unitKerja
+      });
+
+      // Fix: Use unit_kerja instead of unitKerja
+      const userUnit = currentUser?.unit_kerja || currentUser?.unitKerja;
+      if (currentUser && currentUser.role === 'admin_unit' && userUnit) {
+        console.log("🔍 DEBUG LeaveRequests - Applying unit filter:", userUnit);
+        countQuery = countQuery.eq("employees.department", userUnit);
       }
 
       // Apply filters to the count query
