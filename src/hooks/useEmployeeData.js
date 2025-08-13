@@ -91,6 +91,13 @@ export const useEmployeeData = (
             { count: "exact" },
           );
 
+        // Apply unit-based filtering for admin_unit users
+        const currentUser = AuthManager.getUserSession();
+        if (currentUser && currentUser.role === 'admin_unit' && currentUser.unitKerja) {
+          // Admin unit can only see employees from their unit
+          query = query.eq("department", currentUser.unitKerja);
+        }
+
         // Apply all filters
         if (debouncedSearchTerm) {
           query = query.or(
