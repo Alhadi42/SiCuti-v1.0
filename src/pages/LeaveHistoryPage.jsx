@@ -141,6 +141,14 @@ const LeaveHistoryPage = () => {
 
       setIsLoadingData(true);
       try {
+        // Test Supabase connection first if debugging
+        if (import.meta.env.DEV) {
+          const connectionTest = await checkSupabaseConnection();
+          if (!connectionTest.success) {
+            throw new Error(`Supabase connection failed: ${connectionTest.error}`);
+          }
+        }
+
         // Apply unit-based filtering for admin_unit users
         const currentUser = AuthManager.getUserSession();
 
