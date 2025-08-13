@@ -23,6 +23,7 @@ import Login from "@/pages/Login";
 import ProtectedRoute from "@/components/ProtectedRoute";
 import ErrorBoundary from "@/components/ErrorBoundary";
 import ConnectionHealthChecker from "@/components/ConnectionHealthChecker";
+import "@/utils/debugHelper"; // Add debug helper
 
 function App() {
   return (
