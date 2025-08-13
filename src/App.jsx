@@ -52,14 +52,6 @@ function App() {
                           element={<LeaveRequests />}
                         />
                         <Route
-                          path="/leave-proposals"
-                          element={<LeaveProposals />}
-                        />
-                        <Route
-                          path="/proposal-list"
-                          element={<ProposalList />}
-                        />
-                        <Route
                           path="/batch-leave-proposals"
                           element={<BatchLeaveProposals />}
                         />
