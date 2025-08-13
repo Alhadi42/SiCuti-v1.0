@@ -313,7 +313,15 @@ const LeaveHistoryPage = () => {
             console.log("🔍 DEBUG LeaveHistory - Total count:", totalCount);
             setOverallTotalEmployees(totalCount || 0);
           } catch (countFetchError) {
-            console.error("❌ Failed to fetch total count:", countFetchError);
+            console.error("❌ Failed to fetch total count:");
+            console.error("❌ Raw count fetch error:", countFetchError);
+            console.error("❌ Count fetch error JSON:", JSON.stringify(countFetchError, Object.getOwnPropertyNames(countFetchError), 2));
+            console.error("❌ Count fetch error details:", {
+              message: countFetchError?.message || "No message",
+              name: countFetchError?.name || "No name",
+              code: countFetchError?.code || "No code",
+              stack: countFetchError?.stack ? countFetchError.stack.substring(0, 200) + "..." : "No stack"
+            });
             // Don't throw here, just log and continue with 0 count
             setOverallTotalEmployees(0);
           }
