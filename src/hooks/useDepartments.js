@@ -30,6 +30,7 @@ export const useDepartments = () => {
         // Fallback data
         setDepartments([
           { value: "", label: "Semua Unit Kerja" },
+          { value: "All Units", label: "All Units (Master Admin)" },
           { value: "Teknologi Informasi", label: "Teknologi Informasi" },
           { value: "Human Resources", label: "Human Resources" },
           { value: "Keuangan", label: "Keuangan" },
