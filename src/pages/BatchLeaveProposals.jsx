@@ -93,10 +93,26 @@ const BatchLeaveProposals = () => {
       // Store total units for statistics card
       window.totalUnitsInDatabase = uniqueUnits.length;
 
-      // TODO: When admin units start creating actual proposals through the system,
-      // we will fetch from leave_proposals table instead of leave_requests
+      // TODO: In the future, when admin units create proposals, use this query:
+      // const { data: actualProposals, error: proposalsError } = await supabase
+      //   .from("leave_proposals")
+      //   .select(`
+      //     *,
+      //     leave_proposal_items (
+      //       id,
+      //       employee_name,
+      //       employee_nip,
+      //       employee_department,
+      //       leave_type_name,
+      //       start_date,
+      //       end_date,
+      //       days_requested
+      //     )
+      //   `)
+      //   .order("created_at", { ascending: false });
 
       console.log("✅ Ready to display actual proposals when admin units create them");
+      console.log("📊 Current state: No proposals from admin units yet");
 
     } catch (error) {
       console.error("Error fetching batch proposals:", error);
