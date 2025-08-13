@@ -131,8 +131,14 @@ export class AuthManager {
       // Remove sensitive data before storing
       const { password: _, ...safeUser } = user;
 
+      // Map database field names to frontend field names
+      const mappedUser = {
+        ...safeUser,
+        unitKerja: safeUser.unit_kerja || safeUser.unitKerja // Ensure unitKerja is available
+      };
+
       // Set session
-      this.setUserSession(safeUser);
+      this.setUserSession(mappedUser);
 
       return safeUser;
     } catch (error) {
