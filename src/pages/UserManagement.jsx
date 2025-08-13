@@ -706,24 +706,13 @@ const EditUserDialog = ({ user, onEdit, onClose }) => {
       </div>
       <div>
         <Label htmlFor="edit-unitKerja" className="text-slate-300">Unit Kerja</Label>
-        <Select
+        <AutocompleteInput
           value={formData.unitKerja}
-          onValueChange={(value) => setFormData({ ...formData, unitKerja: value })}
-        >
-          <SelectTrigger id="edit-unitKerja" className="bg-slate-700 border-slate-600 text-white">
-            <SelectValue placeholder="Select Unit Kerja" />
-          </SelectTrigger>
-          <SelectContent className="bg-slate-700 border-slate-600">
-            <SelectItem value="All Units" className="text-white hover:bg-slate-600">All Units (Master Admin)</SelectItem>
-            <SelectItem value="IT Department" className="text-white hover:bg-slate-600">IT Department</SelectItem>
-            <SelectItem value="HR Department" className="text-white hover:bg-slate-600">HR Department</SelectItem>
-            <SelectItem value="Finance Department" className="text-white hover:bg-slate-600">Finance Department</SelectItem>
-            <SelectItem value="Marketing Department" className="text-white hover:bg-slate-600">Marketing Department</SelectItem>
-            <SelectItem value="Operations Department" className="text-white hover:bg-slate-600">Operations Department</SelectItem>
-            <SelectItem value="Legal Department" className="text-white hover:bg-slate-600">Legal Department</SelectItem>
-            <SelectItem value="Customer Service" className="text-white hover:bg-slate-600">Customer Service</SelectItem>
-          </SelectContent>
-        </Select>
+          onChange={(val) => setFormData({ ...formData, unitKerja: val })}
+          options={departments}
+          loading={isLoadingDepartments}
+          placeholder="Ketik nama unit..."
+        />
       </div>
       <div>
         <Label htmlFor="edit-status" className="text-slate-300">Status</Label>
@@ -752,4 +741,4 @@ const EditUserDialog = ({ user, onEdit, onClose }) => {
   );
 };
 
-export default UserManagement; 
+export default UserManagement;
