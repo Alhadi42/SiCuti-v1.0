@@ -15,9 +15,10 @@ export const useDepartments = () => {
         // Use optimized query with caching
         const uniqueDepartments = await OptimizedQueries.getDepartments();
 
-        // Format for autocomplete: add "Semua Unit" option at the top
+        // Format for autocomplete: add special options at the top
         const formattedOptions = [
           { value: "", label: "Semua Unit Kerja" },
+          { value: "All Units", label: "All Units (Master Admin)" },
           ...uniqueDepartments.map((d) => ({ value: d, label: d })),
         ];
 
