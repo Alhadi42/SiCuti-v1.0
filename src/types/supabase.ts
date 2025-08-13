@@ -335,6 +335,160 @@ export type Database = {
         }
         Relationships: []
       }
+      leave_proposals: {
+        Row: {
+          id: string
+          proposal_title: string
+          proposed_by: string
+          proposer_name: string
+          proposer_unit: string
+          proposal_date: string
+          total_employees: number
+          status: string
+          approved_by: string | null
+          approved_date: string | null
+          rejection_reason: string | null
+          notes: string | null
+          letter_number: string | null
+          letter_date: string | null
+          created_at: string | null
+          updated_at: string | null
+        }
+        Insert: {
+          id?: string
+          proposal_title: string
+          proposed_by: string
+          proposer_name: string
+          proposer_unit: string
+          proposal_date?: string
+          total_employees?: number
+          status?: string
+          approved_by?: string | null
+          approved_date?: string | null
+          rejection_reason?: string | null
+          notes?: string | null
+          letter_number?: string | null
+          letter_date?: string | null
+          created_at?: string | null
+          updated_at?: string | null
+        }
+        Update: {
+          id?: string
+          proposal_title?: string
+          proposed_by?: string
+          proposer_name?: string
+          proposer_unit?: string
+          proposal_date?: string
+          total_employees?: number
+          status?: string
+          approved_by?: string | null
+          approved_date?: string | null
+          rejection_reason?: string | null
+          notes?: string | null
+          letter_number?: string | null
+          letter_date?: string | null
+          created_at?: string | null
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "leave_proposals_proposed_by_fkey"
+            columns: ["proposed_by"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "leave_proposals_approved_by_fkey"
+            columns: ["approved_by"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      leave_proposal_items: {
+        Row: {
+          id: string
+          proposal_id: string
+          employee_id: string
+          employee_name: string
+          employee_nip: string
+          employee_department: string
+          employee_position: string | null
+          leave_type_id: string
+          leave_type_name: string
+          start_date: string
+          end_date: string
+          days_requested: number
+          leave_quota_year: number
+          reason: string | null
+          address_during_leave: string | null
+          status: string
+          created_at: string | null
+        }
+        Insert: {
+          id?: string
+          proposal_id: string
+          employee_id: string
+          employee_name: string
+          employee_nip: string
+          employee_department: string
+          employee_position?: string | null
+          leave_type_id: string
+          leave_type_name: string
+          start_date: string
+          end_date: string
+          days_requested: number
+          leave_quota_year: number
+          reason?: string | null
+          address_during_leave?: string | null
+          status?: string
+          created_at?: string | null
+        }
+        Update: {
+          id?: string
+          proposal_id?: string
+          employee_id?: string
+          employee_name?: string
+          employee_nip?: string
+          employee_department?: string
+          employee_position?: string | null
+          leave_type_id?: string
+          leave_type_name?: string
+          start_date?: string
+          end_date?: string
+          days_requested?: number
+          leave_quota_year?: number
+          reason?: string | null
+          address_during_leave?: string | null
+          status?: string
+          created_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "leave_proposal_items_proposal_id_fkey"
+            columns: ["proposal_id"]
+            isOneToOne: false
+            referencedRelation: "leave_proposals"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "leave_proposal_items_employee_id_fkey"
+            columns: ["employee_id"]
+            isOneToOne: false
+            referencedRelation: "employees"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "leave_proposal_items_leave_type_id_fkey"
+            columns: ["leave_type_id"]
+            isOneToOne: false
+            referencedRelation: "leave_types"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
     }
     Views: {
       [_ in never]: never
