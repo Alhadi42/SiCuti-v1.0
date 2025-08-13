@@ -93,47 +93,10 @@ const BatchLeaveProposals = () => {
       // Store total units for statistics card
       window.totalUnitsInDatabase = uniqueUnits.length;
 
-      // Group by unit/department
-      const unitGroups = {};
-      
-      leaveRequests.forEach(request => {
-        const department = request.employees?.department || "Unit Tidak Diketahui";
-        
-        if (!unitGroups[department]) {
-          unitGroups[department] = {
-            unitName: department,
-            requests: [],
-            totalEmployees: new Set(),
-            totalDays: 0,
-            dateRange: { earliest: null, latest: null }
-          };
-        }
-        
-        unitGroups[department].requests.push(request);
-        unitGroups[department].totalEmployees.add(request.employee_id);
-        unitGroups[department].totalDays += request.days_requested || 0;
-        
-        // Track date range
-        const startDate = new Date(request.start_date);
-        const endDate = new Date(request.end_date);
-        
-        if (!unitGroups[department].dateRange.earliest || startDate < unitGroups[department].dateRange.earliest) {
-          unitGroups[department].dateRange.earliest = startDate;
-        }
-        if (!unitGroups[department].dateRange.latest || endDate > unitGroups[department].dateRange.latest) {
-          unitGroups[department].dateRange.latest = endDate;
-        }
-      });
+      // TODO: When admin units start creating actual proposals through the system,
+      // we will fetch from leave_proposals table instead of leave_requests
 
-      // Convert to array and add computed properties
-      const unitsArray = Object.values(unitGroups).map(unit => ({
-        ...unit,
-        totalEmployees: unit.totalEmployees.size,
-        totalRequests: unit.requests.length
-      }));
-
-      console.log("🔍 Grouped by units:", unitsArray.length);
-      setUnitProposals(unitsArray);
+      console.log("✅ Ready to display actual proposals when admin units create them");
 
     } catch (error) {
       console.error("Error fetching batch proposals:", error);
