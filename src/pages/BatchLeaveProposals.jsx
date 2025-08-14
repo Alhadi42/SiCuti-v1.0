@@ -80,6 +80,16 @@ const BatchLeaveProposals = () => {
         throw allProposalsError;
       }
 
+      console.log("📊 Raw proposals from database:", allProposals);
+      console.log("�� Total proposals found:", allProposals?.length || 0);
+
+      if (allProposals && allProposals.length > 0) {
+        console.log("📊 Proposal details:");
+        allProposals.forEach((prop, index) => {
+          console.log(`  ${index + 1}. ID: ${prop.id}, Unit: "${prop.proposer_unit}", Title: "${prop.proposal_title}", Status: ${prop.status}`);
+        });
+      }
+
       // Get proposal items separately if proposals exist
       let proposalItemsMap = {};
       if (allProposals && allProposals.length > 0) {
