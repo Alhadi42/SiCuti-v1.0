@@ -20,25 +20,9 @@ const LeaveProposals = () => {
   const [showCreateForm, setShowCreateForm] = useState(false);
   const [tableExists, setTableExists] = useState(true);
 
-  // Check if tables exist on mount
+  // Tables don't exist, set to false immediately
   useEffect(() => {
-    const checkTableExists = async () => {
-      try {
-        const { data, error } = await supabase
-          .from("leave_proposals")
-          .select("*")
-          .limit(1);
-
-        if (error && error.code === "42P01") {
-          setTableExists(false);
-        }
-      } catch (err) {
-        console.error("Error checking table existence:", err);
-        setTableExists(false);
-      }
-    };
-
-    checkTableExists();
+    setTableExists(false);
   }, []);
 
   // Check user permission
@@ -319,7 +303,7 @@ const LeaveProposals = () => {
                         <div className="flex items-center space-x-4 text-sm text-slate-400 mb-2">
                           <span>📅 {format(new Date(proposal.proposal_date), "dd MMM yyyy", { locale: id })}</span>
                           <span>👥 {proposal.total_employees} pegawai</span>
-                          <span>��� {proposal.proposer_unit}</span>
+                          <span>🏢 {proposal.proposer_unit}</span>
                         </div>
                         {proposal.notes && (
                           <p className="text-slate-300 text-sm">{proposal.notes}</p>
