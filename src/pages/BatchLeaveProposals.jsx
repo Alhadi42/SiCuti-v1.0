@@ -83,6 +83,20 @@ const BatchLeaveProposals = () => {
 
       if (allProposalsError) {
         console.error("Error fetching all proposals:", allProposalsError);
+        console.error("Error code:", allProposalsError.code);
+        console.error("Error message:", allProposalsError.message);
+        console.error("Error details:", allProposalsError.details);
+
+        // Check if it's a permission/RLS issue
+        if (allProposalsError.code === "42501" || allProposalsError.message?.includes("permission") || allProposalsError.message?.includes("policy")) {
+          console.error("🚨 RLS Policy Issue: Master Admin cannot access proposals");
+          toast({
+            title: "Permission Error",
+            description: "Master Admin tidak dapat mengakses usulan. Periksa RLS policies di database.",
+            variant: "destructive",
+          });
+        }
+
         throw allProposalsError;
       }
 
@@ -520,7 +534,7 @@ const BatchLeaveProposals = () => {
                       </div>
                     </div>
                     <div className="mt-2 text-sm text-slate-300">
-                      �� {format(new Date(request.start_date), "dd MMM", { locale: id })} - {format(new Date(request.end_date), "dd MMM yyyy", { locale: id })}
+                      📅 {format(new Date(request.start_date), "dd MMM", { locale: id })} - {format(new Date(request.end_date), "dd MMM yyyy", { locale: id })}
                       {request.reason && (
                         <div className="mt-1 text-slate-400">
                           💬 {request.reason}
