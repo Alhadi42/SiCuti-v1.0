@@ -1038,14 +1038,15 @@ const BatchLeaveProposals = () => {
                   <Button
                     onClick={async () => {
                       for (const [leaveType, requests] of Object.entries(leaveTypeClassification)) {
-                        await handleGenerateBatchLetter(leaveType, requests);
+                        await handleGenerateBatchLetter(leaveType, requests, selectedTemplate);
                         // Add small delay between downloads
                         await new Promise(resolve => setTimeout(resolve, 500));
                       }
                       setShowBatchDialog(false);
                     }}
+                    disabled={!selectedTemplate || availableTemplates.length === 0}
                     variant="outline"
-                    className="border-green-600 text-green-400 hover:bg-green-900/20"
+                    className="border-green-600 text-green-400 hover:bg-green-900/20 disabled:opacity-50"
                   >
                     <Layers className="w-4 h-4 mr-2" />
                     Buat Semua Surat
