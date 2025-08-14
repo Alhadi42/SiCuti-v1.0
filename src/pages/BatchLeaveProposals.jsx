@@ -340,6 +340,10 @@ const BatchLeaveProposals = () => {
   const uniqueUnits = [...new Set(unitProposals.map(unit => unit.unitName))];
 
   useEffect(() => {
+    // Load completed proposals from localStorage
+    const savedCompleted = JSON.parse(localStorage.getItem('completedProposals') || '[]');
+    setCompletedProposals(new Set(savedCompleted));
+
     fetchBatchProposals();
   }, [fetchBatchProposals]);
 
