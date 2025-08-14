@@ -777,8 +777,8 @@ const BatchLeaveProposals = () => {
                         }}
                         className="bg-blue-600 hover:bg-blue-700 text-white"
                       >
-                        <FileText className="w-4 h-4 mr-2" />
-                        Buat Surat {leaveType}
+                        <Download className="w-4 h-4 mr-2" />
+                        Buat Surat
                       </Button>
                     </div>
 
