@@ -437,7 +437,7 @@ const BatchLeaveProposals = () => {
               Detail Usulan Cuti - {selectedUnitDetail?.unitName}
             </DialogTitle>
             <DialogDescription className="text-slate-400">
-              Daftar semua pengajuan cuti dari unit ini
+              Pengajuan cuti yang dibuat pada {selectedUnitDetail?.proposalDate && format(new Date(selectedUnitDetail.proposalDate), "dd MMMM yyyy", { locale: id })}
             </DialogDescription>
           </DialogHeader>
           {selectedUnitDetail && (
