@@ -80,6 +80,32 @@ const BatchLeaveProposals = () => {
         throw proposalsError;
       }
 
+      // Get proposal items separately if proposals exist
+      let proposalItemsMap = {};
+      if (actualProposals && actualProposals.length > 0) {
+        const proposalIds = actualProposals.map(p => p.id);
+
+        const { data: proposalItems, error: itemsError } = await supabase
+          .from("leave_proposal_items")
+          .select("*")
+          .in("proposal_id", proposalIds);
+
+        if (itemsError) {
+          console.error("Error fetching proposal items:", itemsError);
+          throw itemsError;
+        }
+
+        // Group items by proposal_id
+        if (proposalItems) {
+          proposalItems.forEach(item => {
+            if (!proposalItemsMap[item.proposal_id]) {
+              proposalItemsMap[item.proposal_id] = [];
+            }
+            proposalItemsMap[item.proposal_id].push(item);
+          });
+        }
+      }
+
       // Group proposals by unit
       const unitProposalsMap = {};
 
