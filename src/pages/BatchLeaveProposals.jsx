@@ -509,6 +509,18 @@ const BatchLeaveProposals = () => {
     }
   };
 
+  const clearCache = () => {
+    try {
+      localStorage.removeItem('cachedBatchProposals');
+      toast({
+        title: "Cache Dibersihkan",
+        description: "Data cache lokal telah dihapus. Refresh untuk mengambil data terbaru.",
+      });
+    } catch (error) {
+      console.error("Error clearing cache:", error);
+    }
+  };
+
   // Filter units based on search, selection, and completion status
   const filteredUnits = unitProposals.filter(unit => {
     const matchesSearch = searchTerm === "" ||
