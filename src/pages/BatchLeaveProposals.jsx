@@ -58,6 +58,7 @@ const BatchLeaveProposals = () => {
   const [currentlyGenerating, setCurrentlyGenerating] = useState(null);
   const [availableTemplates, setAvailableTemplates] = useState([]);
   const [selectedTemplate, setSelectedTemplate] = useState(null);
+  const [loadingTemplates, setLoadingTemplates] = useState(true);
 
   // Check user permission
   if (!currentUser || currentUser.role !== 'master_admin') {
