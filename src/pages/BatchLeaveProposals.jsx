@@ -328,6 +328,9 @@ const BatchLeaveProposals = () => {
 
   const handleGenerateBatchLetter = async (leaveType, requests) => {
     try {
+      setGeneratingLetter(true);
+      setCurrentlyGenerating(leaveType);
+
       toast({
         title: "Info",
         description: `Sedang mempersiapkan surat batch untuk ${leaveType}...`,
