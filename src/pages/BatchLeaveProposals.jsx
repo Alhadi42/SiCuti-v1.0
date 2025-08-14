@@ -33,7 +33,8 @@ import {
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { format } from "date-fns";
 import { id } from "date-fns/locale";
-import { downloadLeaveProposalLetter } from "@/utils/leaveProposalLetterGenerator";
+import { processDocxTemplate } from "@/utils/docxTemplates";
+import { saveAs } from "file-saver";
 import ConnectionStatus from "@/components/ConnectionStatus";
 
 const BatchLeaveProposals = () => {
