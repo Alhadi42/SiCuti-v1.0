@@ -197,29 +197,21 @@ const BatchLeaveProposals = () => {
         description: "Sedang mempersiapkan surat batch...",
       });
 
-      // Collect all proposal items from all proposals in this unit
-      const allProposalItems = [];
-      unit.proposals.forEach(proposal => {
-        if (proposal.leave_proposal_items) {
-          allProposalItems.push(...proposal.leave_proposal_items);
-        }
-      });
-
-      // Transform proposal items to format expected by letter generator
-      const proposalItems = allProposalItems.map(item => ({
-        employee_id: item.employee_id || null,
-        employee_name: item.employee_name || "Nama tidak diketahui",
-        employee_nip: item.employee_nip || "-",
-        employee_department: item.employee_department || unit.unitName,
-        employee_position: item.employee_position || "-",
-        leave_type_id: item.leave_type_id || null,
-        leave_type_name: item.leave_type_name || "Jenis cuti tidak diketahui",
-        start_date: item.start_date,
-        end_date: item.end_date,
-        days_requested: item.days_requested || 0,
-        leave_quota_year: item.leave_quota_year || new Date(item.start_date).getFullYear(),
-        reason: item.reason || "",
-        address_during_leave: item.address_during_leave || "",
+      // Transform leave requests to format expected by letter generator
+      const proposalItems = unit.requests.map(request => ({
+        employee_id: request.employee_id,
+        employee_name: request.employees?.name || "Nama tidak diketahui",
+        employee_nip: request.employees?.nip || "-",
+        employee_department: request.employees?.department || unit.unitName,
+        employee_position: request.employees?.position_name || "-",
+        leave_type_id: request.leave_type_id,
+        leave_type_name: request.leave_types?.name || "Jenis cuti tidak diketahui",
+        start_date: request.start_date,
+        end_date: request.end_date,
+        days_requested: request.days_requested || 0,
+        leave_quota_year: request.leave_quota_year || new Date(request.start_date).getFullYear(),
+        reason: request.reason || "",
+        address_during_leave: request.address_during_leave || "",
       }));
 
       // Prepare proposal data for letter generation
