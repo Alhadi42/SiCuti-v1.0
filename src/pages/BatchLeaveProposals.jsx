@@ -48,6 +48,9 @@ const BatchLeaveProposals = () => {
   const [connectionError, setConnectionError] = useState(false);
   const [completedProposals, setCompletedProposals] = useState(new Set());
   const [showCompleted, setShowCompleted] = useState(false);
+  const [showBatchDialog, setShowBatchDialog] = useState(false);
+  const [selectedUnitForBatch, setSelectedUnitForBatch] = useState(null);
+  const [leaveTypeClassification, setLeaveTypeClassification] = useState({});
 
   // Check user permission
   if (!currentUser || currentUser.role !== 'master_admin') {
