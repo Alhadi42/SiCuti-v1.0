@@ -825,7 +825,7 @@ const BatchLeaveProposals = () => {
                     variant="outline"
                     className="border-green-600 text-green-400 hover:bg-green-900/20"
                   >
-                    <Plus className="w-4 h-4 mr-2" />
+                    <Layers className="w-4 h-4 mr-2" />
                     Buat Semua Surat
                   </Button>
                 </div>
