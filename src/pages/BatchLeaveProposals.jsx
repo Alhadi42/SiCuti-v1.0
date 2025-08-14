@@ -189,17 +189,22 @@ const BatchLeaveProposals = () => {
       if (error.message?.includes("Failed to fetch") || error.message?.includes("fetch")) {
         errorTitle = "Koneksi Bermasalah";
         errorMessage = "Tidak dapat terhubung ke server. Periksa koneksi internet Anda.";
+        setConnectionError(true);
       } else if (error.message?.includes("No internet connection")) {
         errorTitle = "Tidak Ada Internet";
         errorMessage = "Periksa koneksi internet Anda dan coba lagi.";
+        setConnectionError(true);
       } else if (error.code === "PGRST301") {
         errorTitle = "Masalah Database";
         errorMessage = "Tabel atau kolom tidak ditemukan. Sistem perlu update database.";
+        setConnectionError(false);
       } else if (error.code === "42501") {
         errorTitle = "Akses Ditolak";
         errorMessage = "Anda tidak memiliki izin untuk mengakses data ini.";
+        setConnectionError(false);
       } else {
         errorMessage = error.message || "Terjadi kesalahan yang tidak diketahui";
+        setConnectionError(false);
       }
 
       toast({
