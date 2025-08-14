@@ -94,6 +94,16 @@ const BatchLeaveProposals = () => {
           });
         }
 
+        // Check if it's a relationship issue
+        if (allProposalsError.code === "PGRST200" || allProposalsError.message?.includes("relationship") || allProposalsError.message?.includes("foreign key")) {
+          console.error("🚨 Database Relationship Issue:", allProposalsError.message);
+          toast({
+            title: "Database Error",
+            description: "Masalah relasi database. Foreign key constraint perlu diperbaiki.",
+            variant: "destructive",
+          });
+        }
+
         throw allProposalsError;
       }
 
