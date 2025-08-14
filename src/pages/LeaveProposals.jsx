@@ -115,11 +115,25 @@ const LeaveProposals = () => {
         address_during_leave: emp.address_during_leave,
       }));
 
-      const { error: itemsError } = await supabase
-        .from("leave_proposal_items")
-        .insert(proposalItems);
+      console.log("📝 Creating proposal items:", proposalItems);
+      console.log("📊 Total items to create:", proposalItems.length);
 
-      if (itemsError) throw itemsError;
+      const { data: insertedItems, error: itemsError } = await supabase
+        .from("leave_proposal_items")
+        .insert(proposalItems)
+        .select();
+
+      console.log("📊 Items insert result:", { insertedItems, itemsError });
+
+      if (itemsError) {
+        console.error("❌ Items insert error:", itemsError);
+        console.error("Error code:", itemsError.code);
+        console.error("Error message:", itemsError.message);
+        console.error("Error details:", itemsError.details);
+        throw itemsError;
+      }
+
+      console.log("✅ Proposal items created successfully:", insertedItems);
 
       toast({
         title: "Success",
