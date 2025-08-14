@@ -736,6 +736,28 @@ const BatchLeaveProposals = () => {
 
           {selectedUnitForBatch && (
             <div className="space-y-4 max-h-96 overflow-y-auto">
+              {/* Summary Section */}
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-4 p-4 bg-slate-700/30 rounded-lg">
+                <div className="text-center">
+                  <p className="text-slate-400 text-sm">Unit Kerja</p>
+                  <p className="text-white font-bold">{selectedUnitForBatch.unitName}</p>
+                </div>
+                <div className="text-center">
+                  <p className="text-slate-400 text-sm">Total Pengajuan</p>
+                  <p className="text-white font-bold text-xl">{selectedUnitForBatch.totalRequests}</p>
+                </div>
+                <div className="text-center">
+                  <p className="text-slate-400 text-sm">Jenis Cuti</p>
+                  <p className="text-white font-bold text-xl">{Object.keys(leaveTypeClassification).length}</p>
+                </div>
+                <div className="text-center">
+                  <p className="text-slate-400 text-sm">Tanggal Usulan</p>
+                  <p className="text-white font-bold text-sm">
+                    {format(new Date(selectedUnitForBatch.proposalDate), "dd MMM yyyy", { locale: id })}
+                  </p>
+                </div>
+              </div>
+
               <div className="grid grid-cols-1 gap-4">
                 {Object.entries(leaveTypeClassification).map(([leaveType, requests]) => (
                   <div key={leaveType} className="p-4 bg-slate-700/30 rounded-lg border border-slate-600/50">
