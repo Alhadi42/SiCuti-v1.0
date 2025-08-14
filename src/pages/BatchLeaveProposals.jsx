@@ -100,8 +100,8 @@ const BatchLeaveProposals = () => {
       console.log("📊 Raw leave requests from database:", leaveRequests);
       console.log("📊 Total leave requests found:", leaveRequests?.length || 0);
 
-      // Group requests by employee department (unit kerja)
-      const unitRequestsMap = {};
+      // Group requests by employee department (unit kerja) AND creation date
+      const unitDateRequestsMap = {};
 
       if (leaveRequests && leaveRequests.length > 0) {
         leaveRequests.forEach(request => {
@@ -113,9 +113,14 @@ const BatchLeaveProposals = () => {
             return;
           }
 
-          if (!unitRequestsMap[unitName]) {
-            unitRequestsMap[unitName] = {
+          // Get creation date (YYYY-MM-DD format)
+          const createdDate = new Date(request.created_at).toISOString().split('T')[0];
+          const groupKey = `${unitName}|${createdDate}`;
+
+          if (!unitDateRequestsMap[groupKey]) {
+            unitDateRequestsMap[groupKey] = {
               unitName,
+              proposalDate: createdDate,
               requests: [],
               totalRequests: 0,
               totalEmployees: new Set(), // Use Set to count unique employees
@@ -124,20 +129,20 @@ const BatchLeaveProposals = () => {
             };
           }
 
-          unitRequestsMap[unitName].requests.push(request);
-          unitRequestsMap[unitName].totalRequests += 1;
-          unitRequestsMap[unitName].totalEmployees.add(request.employee_id);
-          unitRequestsMap[unitName].totalDays += request.days_requested || 0;
+          unitDateRequestsMap[groupKey].requests.push(request);
+          unitDateRequestsMap[groupKey].totalRequests += 1;
+          unitDateRequestsMap[groupKey].totalEmployees.add(request.employee_id);
+          unitDateRequestsMap[groupKey].totalDays += request.days_requested || 0;
 
-          // Calculate date range
+          // Calculate date range for leave dates (not creation dates)
           const startDate = new Date(request.start_date);
           const endDate = new Date(request.end_date);
 
-          if (!unitRequestsMap[unitName].dateRange.earliest || startDate < unitRequestsMap[unitName].dateRange.earliest) {
-            unitRequestsMap[unitName].dateRange.earliest = startDate;
+          if (!unitDateRequestsMap[groupKey].dateRange.earliest || startDate < unitDateRequestsMap[groupKey].dateRange.earliest) {
+            unitDateRequestsMap[groupKey].dateRange.earliest = startDate;
           }
-          if (!unitRequestsMap[unitName].dateRange.latest || endDate > unitRequestsMap[unitName].dateRange.latest) {
-            unitRequestsMap[unitName].dateRange.latest = endDate;
+          if (!unitDateRequestsMap[groupKey].dateRange.latest || endDate > unitDateRequestsMap[groupKey].dateRange.latest) {
+            unitDateRequestsMap[groupKey].dateRange.latest = endDate;
           }
         });
       }
