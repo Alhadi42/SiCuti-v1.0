@@ -601,9 +601,25 @@ const BatchLeaveProposals = () => {
 
     } catch (error) {
       console.error("Error generating batch letter:", error);
+
+      let errorMessage = "Gagal membuat surat batch";
+
+      // Provide more specific error messages
+      if (error.message?.includes("includes is not a function")) {
+        errorMessage = "Format template tidak valid. Template mungkin rusak atau format tidak didukung.";
+      } else if (error.message?.includes("Template content is empty")) {
+        errorMessage = "Template kosong atau tidak ditemukan. Pilih template yang valid.";
+      } else if (error.message?.includes("base64")) {
+        errorMessage = "Template tidak dalam format yang benar. Coba upload ulang template.";
+      } else if (error.message?.includes("zip") || error.message?.includes("docx")) {
+        errorMessage = "Template DOCX rusak atau tidak valid. Coba gunakan template lain.";
+      } else {
+        errorMessage = error.message || "Terjadi kesalahan yang tidak diketahui";
+      }
+
       toast({
         title: "Error",
-        description: "Gagal membuat surat batch: " + (error.message || "Unknown error"),
+        description: errorMessage,
         variant: "destructive",
       });
     } finally {
