@@ -127,7 +127,7 @@ const BatchLeaveProposals = () => {
       }
 
       // Get leave requests with employee and leave type information
-      console.log("���� Executing main Supabase query...");
+      console.log("📊 Executing main Supabase query...");
       const startTime = Date.now();
 
       // Use shorter timeout for faster failure detection
@@ -180,9 +180,9 @@ const BatchLeaveProposals = () => {
         const isServerError = requestsError.code?.startsWith("5") ||
                              requestsError.message?.includes("Internal server error");
 
-        if ((isNetworkError || isTimeoutError || isServerError) && retryCount < 3) {
-          console.log(`🔄 Network/timeout/server error detected. Retrying... Attempt ${retryCount + 1}/4`);
-          const backoffDelay = Math.min(1000 * Math.pow(2, retryCount), 8000); // Exponential backoff, max 8s
+        if ((isNetworkError || isTimeoutError || isServerError) && retryCount < 2) {
+          console.log(`🔄 Network/timeout/server error detected. Retrying... Attempt ${retryCount + 1}/3`);
+          const backoffDelay = Math.min(2000 * Math.pow(2, retryCount), 6000); // Exponential backoff, max 6s
           console.log(`⏳ Waiting ${backoffDelay}ms before retry...`);
           await new Promise(resolve => setTimeout(resolve, backoffDelay));
           return fetchBatchProposals(retryCount + 1);
