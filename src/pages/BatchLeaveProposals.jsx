@@ -783,10 +783,15 @@ const BatchLeaveProposals = () => {
                           handleGenerateBatchLetter(leaveType, requests);
                           setShowBatchDialog(false);
                         }}
-                        className="bg-blue-600 hover:bg-blue-700 text-white"
+                        disabled={generatingLetter}
+                        className="bg-blue-600 hover:bg-blue-700 text-white disabled:opacity-50"
                       >
-                        <Download className="w-4 h-4 mr-2" />
-                        Buat Surat
+                        {currentlyGenerating === leaveType ? (
+                          <RefreshCw className="w-4 h-4 mr-2 animate-spin" />
+                        ) : (
+                          <Download className="w-4 h-4 mr-2" />
+                        )}
+                        {currentlyGenerating === leaveType ? "Membuat..." : "Buat Surat"}
                       </Button>
                     </div>
 
