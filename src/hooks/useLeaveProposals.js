@@ -19,10 +19,52 @@ export const useLeaveProposals = () => {
         throw new Error("User not authenticated");
       }
 
-      // For now, just set empty proposals since tables don't exist
-      console.log("⚠️ Leave proposals feature disabled - tables not available");
-      setProposals([]);
-      return;
+      let query = supabase
+        .from("leave_proposals")
+        .select("*")
+        .order("created_at", { ascending: false });
+
+      // Apply unit-based filtering
+      if (currentUser.role === 'admin_unit' && currentUser.unitKerja) {
+        // Admin unit can only see proposals from their unit
+        query = query.eq("proposer_unit", currentUser.unitKerja);
+      }
+      // Master admin can see all proposals (no additional filter needed)
+
+      const { data, error } = await query;
+
+      if (error) throw error;
+
+      // Get proposal items separately if proposals exist
+      let proposalsWithItems = data || [];
+      if (proposalsWithItems.length > 0) {
+        const proposalIds = proposalsWithItems.map(p => p.id);
+
+        const { data: proposalItems, error: itemsError } = await supabase
+          .from("leave_proposal_items")
+          .select("*")
+          .in("proposal_id", proposalIds);
+
+        if (!itemsError && proposalItems) {
+          // Group items by proposal_id
+          const itemsMap = {};
+          proposalItems.forEach(item => {
+            if (!itemsMap[item.proposal_id]) {
+              itemsMap[item.proposal_id] = [];
+            }
+            itemsMap[item.proposal_id].push(item);
+          });
+
+          // Attach items to proposals
+          proposalsWithItems = proposalsWithItems.map(proposal => ({
+            ...proposal,
+            leave_proposal_items: itemsMap[proposal.id] || []
+          }));
+        }
+      }
+
+      console.log("Fetched proposals:", proposalsWithItems);
+      setProposals(proposalsWithItems);
 
     } catch (err) {
       console.error("Error fetching proposals:", err);
