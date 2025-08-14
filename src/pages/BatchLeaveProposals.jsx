@@ -146,17 +146,32 @@ const BatchLeaveProposals = () => {
       console.log(`⏱️ Query completed in ${queryTime}ms`);
 
       if (requestsError) {
-        console.error("Error fetching leave requests:", requestsError);
-        console.error("Error code:", requestsError.code);
-        console.error("Error message:", requestsError.message);
+        console.error("❌ Error fetching leave requests:", requestsError);
+        console.error("📊 Error details:", {
+          code: requestsError.code,
+          message: requestsError.message,
+          details: requestsError.details,
+          hint: requestsError.hint
+        });
 
-        // Check if it's a network error and retry
-        if (requestsError.message?.includes("Failed to fetch") || requestsError.message?.includes("fetch")) {
-          if (retryCount < 2) {
-            console.log(`🔄 Retrying fetch... Attempt ${retryCount + 1}/3`);
-            await new Promise(resolve => setTimeout(resolve, 1000 * (retryCount + 1))); // Exponential backoff
-            return fetchBatchProposals(retryCount + 1);
-          }
+        // Analyze error type and decide on retry strategy
+        const isNetworkError = requestsError.message?.includes("Failed to fetch") ||
+                              requestsError.message?.includes("fetch") ||
+                              requestsError.message?.includes("Network") ||
+                              requestsError.code === "NETWORK_ERROR";
+
+        const isTimeoutError = requestsError.message?.includes("timeout") ||
+                              requestsError.message?.includes("Query timeout");
+
+        const isServerError = requestsError.code?.startsWith("5") ||
+                             requestsError.message?.includes("Internal server error");
+
+        if ((isNetworkError || isTimeoutError || isServerError) && retryCount < 3) {
+          console.log(`🔄 Network/timeout/server error detected. Retrying... Attempt ${retryCount + 1}/4`);
+          const backoffDelay = Math.min(1000 * Math.pow(2, retryCount), 8000); // Exponential backoff, max 8s
+          console.log(`⏳ Waiting ${backoffDelay}ms before retry...`);
+          await new Promise(resolve => setTimeout(resolve, backoffDelay));
+          return fetchBatchProposals(retryCount + 1);
         }
 
         throw requestsError;
