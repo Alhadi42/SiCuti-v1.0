@@ -476,6 +476,16 @@ const BatchLeaveProposals = () => {
         return;
       }
 
+      // Validate template has content
+      if (!template.content && !template.template_data) {
+        toast({
+          title: "Template Tidak Valid",
+          description: "Template tidak memiliki konten. Coba upload ulang template.",
+          variant: "destructive",
+        });
+        return;
+      }
+
       toast({
         title: "Info",
         description: `Sedang mempersiapkan surat batch untuk ${leaveType}...`,
@@ -538,7 +548,7 @@ const BatchLeaveProposals = () => {
       // Templates are typically stored as { content: { data: "base64..." } }
       let templateContent = template.content?.data || template.content || template.template_data;
 
-      console.log("🔍 Template content structure:", {
+      console.log("���� Template content structure:", {
         hasContent: !!template.content,
         hasContentData: !!template.content?.data,
         hasTemplateData: !!template.template_data,
