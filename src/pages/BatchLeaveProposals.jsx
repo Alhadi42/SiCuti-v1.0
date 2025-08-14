@@ -147,15 +147,17 @@ const BatchLeaveProposals = () => {
         });
       }
 
-      // Convert Set to count for totalEmployees
-      const groupedRequests = Object.values(unitRequestsMap).map(unit => ({
-        ...unit,
-        totalEmployees: unit.totalEmployees.size
-      }));
+      // Convert Set to count for totalEmployees and sort by proposal date (newest first)
+      const groupedRequests = Object.values(unitDateRequestsMap)
+        .map(unit => ({
+          ...unit,
+          totalEmployees: unit.totalEmployees.size
+        }))
+        .sort((a, b) => new Date(b.proposalDate) - new Date(a.proposalDate));
 
-      console.log("📊 Unit requests map:", unitRequestsMap);
+      console.log("📊 Unit-date requests map:", unitDateRequestsMap);
       console.log("📊 Final grouped requests:", groupedRequests);
-      console.log("✅ Fetched", groupedRequests.length, "units with leave requests");
+      console.log("✅ Fetched", groupedRequests.length, "unit-date groups with leave requests");
 
       setUnitProposals(groupedRequests);
 
