@@ -596,19 +596,42 @@ const BatchLeaveProposals = () => {
   const uniqueUnits = [...new Set(unitProposals.map(unit => unit.unitName))];
 
   // Load available templates
-  const loadTemplates = useCallback(async () => {
+  const loadTemplates = useCallback(async (retryCount = 0) => {
     try {
-      const { data, error } = await supabase
-        .from("templates")
-        .select("*")
-        .eq("type", "docx")
-        .order("name");
+      console.log("📋 Loading templates...");
 
-      if (error) throw error;
+      const { data, error } = await Promise.race([
+        supabase
+          .from("templates")
+          .select("*")
+          .eq("type", "docx")
+          .order("name"),
+        new Promise((_, reject) =>
+          setTimeout(() => reject(new Error("Template loading timeout")), 8000)
+        )
+      ]);
+
+      if (error) {
+        console.error("Error from Supabase:", error);
+
+        // Retry logic for templates
+        if (error.message?.includes("Failed to fetch") && retryCount < 1) {
+          console.log(`🔄 Retrying template load... Attempt ${retryCount + 1}/2`);
+          await new Promise(resolve => setTimeout(resolve, 2000));
+          return loadTemplates(retryCount + 1);
+        }
+
+        throw error;
+      }
 
       setAvailableTemplates(data || []);
+      console.log(`✅ Loaded ${data?.length || 0} templates`);
     } catch (error) {
       console.error("Error loading templates:", error);
+      setAvailableTemplates([]); // Set empty array on error
+
+      // Don't show error toast for template loading - it's not critical
+      console.log("ℹ️ Templates unavailable - batch letters will be disabled");
     }
   }, []);
 
