@@ -67,61 +67,11 @@ const BatchLeaveProposals = () => {
   const fetchBatchProposals = useCallback(async () => {
     setIsLoading(true);
     try {
-      console.log("🔍 Checking leave proposals system...");
+      console.log("🔍 Leave proposals system disabled - tables not available");
 
-      // Check if leave_proposals table exists by attempting a simple query
-      const { data: actualProposals, error: proposalsError } = await supabase
-        .from("leave_proposals")
-        .select("*")
-        .limit(1);
-
-      if (proposalsError) {
-        // If table doesn't exist, set empty state and return
-        if (proposalsError.code === "42P01") {
-          console.log("⚠️ Leave proposals table doesn't exist - feature not available");
-          setUnitProposals([]);
-          return;
-        }
-        console.error("Error fetching proposals:", proposalsError);
-        throw proposalsError;
-      }
-
-      // If we get here, table exists, fetch all proposals
-      const { data: allProposals, error: allProposalsError } = await supabase
-        .from("leave_proposals")
-        .select("*")
-        .order("created_at", { ascending: false });
-
-      if (allProposalsError) {
-        console.error("Error fetching all proposals:", allProposalsError);
-        throw allProposalsError;
-      }
-
-      // Get proposal items separately if proposals exist
-      let proposalItemsMap = {};
-      if (allProposals && allProposals.length > 0) {
-        const proposalIds = allProposals.map(p => p.id);
-
-        const { data: proposalItems, error: itemsError } = await supabase
-          .from("leave_proposal_items")
-          .select("*")
-          .in("proposal_id", proposalIds);
-
-        if (itemsError) {
-          console.error("Error fetching proposal items:", itemsError);
-          throw itemsError;
-        }
-
-        // Group items by proposal_id
-        if (proposalItems) {
-          proposalItems.forEach(item => {
-            if (!proposalItemsMap[item.proposal_id]) {
-              proposalItemsMap[item.proposal_id] = [];
-            }
-            proposalItemsMap[item.proposal_id].push(item);
-          });
-        }
-      }
+      // Set empty proposals since tables don't exist
+      setUnitProposals([]);
+      return;
 
       // Group proposals by unit
       const unitProposalsMap = {};
