@@ -176,6 +176,7 @@ const BatchLeaveProposals = () => {
       console.log("✅ Fetched", groupedRequests.length, "unit-date groups with leave requests");
 
       setUnitProposals(groupedRequests);
+      setConnectionError(false); // Reset error state on successful fetch
 
 
     } catch (error) {
