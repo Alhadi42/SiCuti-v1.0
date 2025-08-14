@@ -81,7 +81,7 @@ const BatchLeaveProposals = () => {
       }
 
       console.log("📊 Raw proposals from database:", allProposals);
-      console.log("�� Total proposals found:", allProposals?.length || 0);
+      console.log("📊 Total proposals found:", allProposals?.length || 0);
 
       if (allProposals && allProposals.length > 0) {
         console.log("📊 Proposal details:");
@@ -107,12 +107,17 @@ const BatchLeaveProposals = () => {
 
         // Group items by proposal_id
         if (proposalItems) {
+          console.log("📊 Raw proposal items from database:", proposalItems);
+          console.log("📊 Total proposal items found:", proposalItems.length);
+
           proposalItems.forEach(item => {
             if (!proposalItemsMap[item.proposal_id]) {
               proposalItemsMap[item.proposal_id] = [];
             }
             proposalItemsMap[item.proposal_id].push(item);
           });
+
+          console.log("📊 Grouped proposal items map:", proposalItemsMap);
         }
       }
 
