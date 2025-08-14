@@ -380,16 +380,24 @@ const BatchLeaveProposals = () => {
             ) : filteredUnits.length === 0 ? (
               <div className="text-center py-8">
                 <Building2 className="w-16 h-16 text-slate-600 mx-auto mb-4" />
-                <h3 className="text-lg font-medium text-white mb-2">Belum Ada Usulan dari Admin Unit</h3>
+                <h3 className="text-lg font-medium text-white mb-2">Sistem Usulan Cuti Batch</h3>
                 <p className="text-slate-400 mb-2">
-                  Saat ini belum ada admin unit yang membuat usulan cuti melalui sistem.
+                  Fitur usulan cuti batch belum tersedia.
                 </p>
-                <p className="text-slate-400 text-sm">
-                  Usulan cuti dari admin unit akan muncul di sini untuk dikelola secara batch.
+                <p className="text-slate-400 text-sm mb-4">
+                  Tabel database untuk sistem usulan cuti belum dibuat.
                 </p>
-                <div className="mt-4 p-3 bg-blue-900/20 border border-blue-700/50 rounded-lg max-w-md mx-auto">
-                  <p className="text-blue-400 text-sm">
-                    💡 <strong>Panduan:</strong> Admin unit dapat membuat usulan di menu "Usulan Cuti"
+                <div className="mt-4 p-4 bg-amber-900/20 border border-amber-700/50 rounded-lg max-w-lg mx-auto">
+                  <h4 className="text-amber-400 font-medium mb-2">⚠️ Setup Diperlukan</h4>
+                  <p className="text-amber-300 text-sm mb-3">
+                    Untuk menggunakan fitur ini, perlu dibuat tabel database berikut:
+                  </p>
+                  <div className="text-left text-amber-200 text-xs space-y-1">
+                    <p>• <code>leave_proposals</code> - Data usulan utama</p>
+                    <p>• <code>leave_proposal_items</code> - Detail pegawai per usulan</p>
+                  </div>
+                  <p className="text-amber-300 text-sm mt-3">
+                    Hubungi administrator database untuk setup tabel yang diperlukan.
                   </p>
                 </div>
               </div>
