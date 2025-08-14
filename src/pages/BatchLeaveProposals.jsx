@@ -81,10 +81,38 @@ const BatchLeaveProposals = () => {
       console.log("🔍 Fetching leave requests grouped by unit...");
       console.log("🔍 Current user role:", currentUser?.role);
       console.log("🔍 Current user unit:", currentUser?.unitKerja);
+      console.log("🔍 Retry attempt:", retryCount);
 
       // Check if we have a valid connection first
       if (!navigator.onLine) {
+        console.log("🚫 Device is offline");
+        setConnectionError(true);
         throw new Error("No internet connection");
+      }
+
+      // Test basic connectivity before main query
+      try {
+        console.log("🔌 Testing basic connectivity...");
+        const connectivityTest = await fetch(import.meta.env.VITE_SUPABASE_URL + '/rest/v1/', {
+          method: 'HEAD',
+          headers: {
+            'apikey': import.meta.env.VITE_SUPABASE_ANON_KEY,
+          },
+          signal: AbortSignal.timeout(5000) // 5 second timeout
+        });
+
+        if (!connectivityTest.ok) {
+          throw new Error(`Connectivity test failed: ${connectivityTest.status}`);
+        }
+        console.log("✅ Basic connectivity OK");
+      } catch (connectError) {
+        console.error("❌ Connectivity test failed:", connectError);
+        if (retryCount < 2) {
+          console.log(`🔄 Retrying connectivity test... Attempt ${retryCount + 1}/3`);
+          await new Promise(resolve => setTimeout(resolve, 2000 * (retryCount + 1)));
+          return fetchBatchProposals(retryCount + 1);
+        }
+        throw new Error("Cannot connect to server");
       }
 
       // Get leave requests with employee and leave type information
