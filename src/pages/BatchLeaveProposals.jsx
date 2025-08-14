@@ -67,11 +67,91 @@ const BatchLeaveProposals = () => {
   const fetchBatchProposals = useCallback(async () => {
     setIsLoading(true);
     try {
-      console.log("🔍 Leave proposals system disabled - tables not available");
+      console.log("🔍 Fetching batch proposals by unit...");
 
-      // Set empty proposals since tables don't exist
-      setUnitProposals([]);
-      return;
+      // Get actual proposals from admin units
+      const { data: allProposals, error: allProposalsError } = await supabase
+        .from("leave_proposals")
+        .select("*")
+        .order("created_at", { ascending: false });
+
+      if (allProposalsError) {
+        console.error("Error fetching all proposals:", allProposalsError);
+        throw allProposalsError;
+      }
+
+      // Get proposal items separately if proposals exist
+      let proposalItemsMap = {};
+      if (allProposals && allProposals.length > 0) {
+        const proposalIds = allProposals.map(p => p.id);
+
+        const { data: proposalItems, error: itemsError } = await supabase
+          .from("leave_proposal_items")
+          .select("*")
+          .in("proposal_id", proposalIds);
+
+        if (itemsError) {
+          console.error("Error fetching proposal items:", itemsError);
+          throw itemsError;
+        }
+
+        // Group items by proposal_id
+        if (proposalItems) {
+          proposalItems.forEach(item => {
+            if (!proposalItemsMap[item.proposal_id]) {
+              proposalItemsMap[item.proposal_id] = [];
+            }
+            proposalItemsMap[item.proposal_id].push(item);
+          });
+        }
+      }
+
+      // Group proposals by unit
+      const unitProposalsMap = {};
+
+      if (allProposals && allProposals.length > 0) {
+        allProposals.forEach(proposal => {
+          const unitName = proposal.proposer_unit;
+
+          if (!unitProposalsMap[unitName]) {
+            unitProposalsMap[unitName] = {
+              unitName,
+              proposals: [],
+              totalRequests: 0,
+              totalEmployees: 0,
+              totalDays: 0,
+              dateRange: { earliest: null, latest: null }
+            };
+          }
+
+          // Attach proposal items to the proposal
+          proposal.leave_proposal_items = proposalItemsMap[proposal.id] || [];
+
+          unitProposalsMap[unitName].proposals.push(proposal);
+          unitProposalsMap[unitName].totalRequests += proposal.leave_proposal_items.length;
+          unitProposalsMap[unitName].totalEmployees += proposal.total_employees || 0;
+
+          // Calculate total days and date range
+          proposal.leave_proposal_items.forEach(item => {
+            unitProposalsMap[unitName].totalDays += item.days_requested || 0;
+
+            const startDate = new Date(item.start_date);
+            const endDate = new Date(item.end_date);
+
+            if (!unitProposalsMap[unitName].dateRange.earliest || startDate < unitProposalsMap[unitName].dateRange.earliest) {
+              unitProposalsMap[unitName].dateRange.earliest = startDate;
+            }
+            if (!unitProposalsMap[unitName].dateRange.latest || endDate > unitProposalsMap[unitName].dateRange.latest) {
+              unitProposalsMap[unitName].dateRange.latest = endDate;
+            }
+          });
+        });
+      }
+
+      const groupedProposals = Object.values(unitProposalsMap);
+      setUnitProposals(groupedProposals);
+
+      console.log("✅ Fetched", groupedProposals.length, "units with proposals");
 
 
     } catch (error) {
