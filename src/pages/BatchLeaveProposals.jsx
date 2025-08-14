@@ -47,6 +47,7 @@ const BatchLeaveProposals = () => {
   const [unitLeaveRequests, setUnitLeaveRequests] = useState([]);
   const [connectionError, setConnectionError] = useState(false);
   const [completedProposals, setCompletedProposals] = useState(new Set());
+  const [showCompleted, setShowCompleted] = useState(false);
 
   // Check user permission
   if (!currentUser || currentUser.role !== 'master_admin') {
