@@ -19,32 +19,10 @@ export const useLeaveProposals = () => {
         throw new Error("User not authenticated");
       }
 
-      // Check if leave_proposals table exists first
-      const { data: checkData, error: checkError } = await supabase
-        .from("leave_proposals")
-        .select("*")
-        .limit(1);
-
-      if (checkError && checkError.code === "42P01") {
-        // Table doesn't exist
-        console.log("⚠️ Leave proposals table doesn't exist - feature not available");
-        setProposals([]);
-        return;
-      }
-
-      let query = supabase
-        .from("leave_proposals")
-        .select("*")
-        .order("created_at", { ascending: false });
-
-      // Apply unit-based filtering
-      if (currentUser.role === 'admin_unit' && currentUser.unitKerja) {
-        // Admin unit can only see proposals from their unit
-        query = query.eq("proposer_unit", currentUser.unitKerja);
-      }
-      // Master admin can see all proposals (no additional filter needed)
-
-      const { data, error } = await query;
+      // For now, just set empty proposals since tables don't exist
+      console.log("⚠️ Leave proposals feature disabled - tables not available");
+      setProposals([]);
+      return;
 
       if (error) throw error;
 
