@@ -599,6 +599,7 @@ const BatchLeaveProposals = () => {
   // Load available templates
   const loadTemplates = useCallback(async (retryCount = 0) => {
     try {
+      setLoadingTemplates(true);
       console.log("📋 Loading templates...");
 
       const { data, error } = await Promise.race([
@@ -633,6 +634,8 @@ const BatchLeaveProposals = () => {
 
       // Don't show error toast for template loading - it's not critical
       console.log("ℹ️ Templates unavailable - batch letters will be disabled");
+    } finally {
+      setLoadingTemplates(false);
     }
   }, []);
 
