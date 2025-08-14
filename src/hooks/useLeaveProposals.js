@@ -68,11 +68,23 @@ export const useLeaveProposals = () => {
     } catch (err) {
       console.error("Error fetching proposals:", err);
       setError(err.message);
-      toast({
-        title: "Error",
-        description: "Gagal mengambil data usulan cuti: " + err.message,
-        variant: "destructive",
-      });
+
+      // Check if it's a table not found error
+      if (err.message && (err.message.includes("relation") || err.message.includes("table"))) {
+        console.log("⚠️ Leave proposals tables not found - system not fully set up yet");
+        setProposals([]);
+        toast({
+          title: "Info",
+          description: "Sistem usulan cuti belum dikonfigurasi. Tabel database belum tersedia.",
+          variant: "default",
+        });
+      } else {
+        toast({
+          title: "Error",
+          description: "Gagal mengambil data usulan cuti: " + err.message,
+          variant: "destructive",
+        });
+      }
     } finally {
       setIsLoading(false);
     }
