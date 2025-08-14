@@ -980,9 +980,9 @@ const BatchLeaveProposals = () => {
               {/* Template Selection */}
               <div className="p-4 bg-slate-700/30 rounded-lg border border-slate-600/50">
                 <Label className="text-slate-300 text-sm font-medium">Pilih Template DOCX</Label>
-                <Select value={selectedTemplate} onValueChange={setSelectedTemplate}>
+                <Select value={selectedTemplate} onValueChange={setSelectedTemplate} disabled={loadingTemplates}>
                   <SelectTrigger className="bg-slate-700/50 border-slate-600/50 text-white mt-2">
-                    <SelectValue placeholder="Pilih template untuk surat batch..." />
+                    <SelectValue placeholder={loadingTemplates ? "Memuat template..." : "Pilih template untuk surat batch..."} />
                   </SelectTrigger>
                   <SelectContent className="bg-slate-700 border-slate-600">
                     {availableTemplates.map(template => (
@@ -992,9 +992,18 @@ const BatchLeaveProposals = () => {
                     ))}
                   </SelectContent>
                 </Select>
-                {availableTemplates.length === 0 && (
+                {loadingTemplates ? (
+                  <p className="text-blue-400 text-sm mt-2 flex items-center">
+                    <RefreshCw className="w-3 h-3 mr-1 animate-spin" />
+                    Memuat template...
+                  </p>
+                ) : availableTemplates.length === 0 ? (
                   <p className="text-red-400 text-sm mt-2">
                     ⚠️ Tidak ada template tersedia. Buat template di menu Template Management.
+                  </p>
+                ) : (
+                  <p className="text-green-400 text-sm mt-2">
+                    ✅ {availableTemplates.length} template tersedia
                   </p>
                 )}
               </div>
