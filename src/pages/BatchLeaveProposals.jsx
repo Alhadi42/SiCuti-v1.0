@@ -322,6 +322,77 @@ const BatchLeaveProposals = () => {
     }
   };
 
+  const handleGenerateBatchLetter = async (leaveType, requests) => {
+    try {
+      toast({
+        title: "Info",
+        description: `Sedang mempersiapkan surat batch untuk ${leaveType}...`,
+      });
+
+      // Transform leave requests to format expected by letter generator
+      const proposalItems = requests.map(request => ({
+        employee_id: request.employee_id,
+        employee_name: request.employees?.name || "Nama tidak diketahui",
+        employee_nip: request.employees?.nip || "-",
+        employee_department: request.employees?.department || selectedUnitForBatch.unitName,
+        employee_position: request.employees?.position_name || "-",
+        leave_type_id: request.leave_type_id,
+        leave_type_name: request.leave_types?.name || leaveType,
+        start_date: request.start_date,
+        end_date: request.end_date,
+        days_requested: request.days_requested || 0,
+        leave_quota_year: request.leave_quota_year || new Date(request.start_date).getFullYear(),
+        reason: request.reason || "",
+        address_during_leave: request.address_during_leave || "",
+      }));
+
+      // Prepare proposal data for letter generation
+      const proposalData = {
+        proposal: {
+          id: `batch-${selectedUnitForBatch.unitName.replace(/\s+/g, '-').toLowerCase()}-${leaveType.replace(/\s+/g, '-').toLowerCase()}-${Date.now()}`,
+          proposal_title: `Usulan ${leaveType} - ${selectedUnitForBatch.unitName}`,
+          proposer_name: "Master Admin",
+          proposer_unit: selectedUnitForBatch.unitName,
+          proposal_date: format(new Date(), "yyyy-MM-dd"),
+          total_employees: requests.length,
+          status: "approved",
+          letter_number: `SRT/${leaveType.toUpperCase().replace(/\s+/g, '')}/${new Date().getFullYear()}/${Math.floor(Math.random() * 1000).toString().padStart(3, '0')}`,
+          letter_date: format(new Date(), "yyyy-MM-dd"),
+          notes: `Surat batch untuk ${requests.length} pengajuan ${leaveType} dari ${selectedUnitForBatch.unitName}`,
+          leave_type: leaveType, // Add leave type for template customization
+        },
+        proposalItems: proposalItems,
+      };
+
+      console.log("📄 Generating batch letter for leave type:", {
+        leaveType,
+        unitName: selectedUnitForBatch.unitName,
+        totalRequests: requests.length,
+        proposalItemsCount: proposalItems.length
+      });
+
+      // Generate and download the letter with leave type in filename
+      const safeLeaveType = leaveType.replace(/[^a-zA-Z0-9]/g, '_');
+      const safeUnitName = selectedUnitForBatch.unitName.replace(/\s+/g, '_');
+      const filename = `Usulan_${safeLeaveType}_${safeUnitName}_${format(new Date(), "yyyy-MM-dd")}.docx`;
+
+      await downloadLeaveProposalLetter(proposalData, filename);
+
+      toast({
+        title: "Berhasil",
+        description: `Surat batch untuk ${requests.length} usulan ${leaveType} dari ${selectedUnitForBatch.unitName} berhasil dibuat dan diunduh`,
+      });
+
+    } catch (error) {
+      console.error("Error generating batch letter:", error);
+      toast({
+        title: "Error",
+        description: "Gagal membuat surat batch: " + (error.message || "Unknown error"),
+        variant: "destructive",
+      });
+    }
+  };
+
   // Filter units based on search, selection, and completion status
   const filteredUnits = unitProposals.filter(unit => {
     const matchesSearch = searchTerm === "" ||
