@@ -640,8 +640,14 @@ const BatchLeaveProposals = () => {
     const savedCompleted = JSON.parse(localStorage.getItem('completedProposals') || '[]');
     setCompletedProposals(new Set(savedCompleted));
 
-    fetchBatchProposals();
-    loadTemplates();
+    // Stagger the requests to avoid overwhelming the network
+    const timer = setTimeout(() => {
+      fetchBatchProposals();
+      // Load templates after a small delay
+      setTimeout(loadTemplates, 500);
+    }, 100);
+
+    return () => clearTimeout(timer);
   }, [fetchBatchProposals, loadTemplates]);
 
   return (
