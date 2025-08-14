@@ -12,11 +12,24 @@ export const useLeaveProposals = () => {
   const fetchProposals = useCallback(async () => {
     setIsLoading(true);
     setError(null);
-    
+
     try {
       const currentUser = AuthManager.getUserSession();
       if (!currentUser) {
         throw new Error("User not authenticated");
+      }
+
+      // Check if leave_proposals table exists first
+      const { data: checkData, error: checkError } = await supabase
+        .from("leave_proposals")
+        .select("*")
+        .limit(1);
+
+      if (checkError && checkError.code === "42P01") {
+        // Table doesn't exist
+        console.log("⚠️ Leave proposals table doesn't exist - feature not available");
+        setProposals([]);
+        return;
       }
 
       let query = supabase
