@@ -64,12 +64,17 @@ const BatchLeaveProposals = () => {
     );
   }
 
-  const fetchBatchProposals = useCallback(async () => {
+  const fetchBatchProposals = useCallback(async (retryCount = 0) => {
     setIsLoading(true);
     try {
       console.log("🔍 Fetching leave requests grouped by unit...");
       console.log("🔍 Current user role:", currentUser?.role);
       console.log("🔍 Current user unit:", currentUser?.unitKerja);
+
+      // Check if we have a valid connection first
+      if (!navigator.onLine) {
+        throw new Error("No internet connection");
+      }
 
       // Get leave requests with employee and leave type information
       const { data: leaveRequests, error: requestsError } = await supabase
@@ -94,6 +99,16 @@ const BatchLeaveProposals = () => {
         console.error("Error fetching leave requests:", requestsError);
         console.error("Error code:", requestsError.code);
         console.error("Error message:", requestsError.message);
+
+        // Check if it's a network error and retry
+        if (requestsError.message?.includes("Failed to fetch") || requestsError.message?.includes("fetch")) {
+          if (retryCount < 2) {
+            console.log(`🔄 Retrying fetch... Attempt ${retryCount + 1}/3`);
+            await new Promise(resolve => setTimeout(resolve, 1000 * (retryCount + 1))); // Exponential backoff
+            return fetchBatchProposals(retryCount + 1);
+          }
+        }
+
         throw requestsError;
       }
 
