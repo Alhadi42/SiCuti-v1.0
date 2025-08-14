@@ -53,6 +53,8 @@ const BatchLeaveProposals = () => {
   const [showBatchDialog, setShowBatchDialog] = useState(false);
   const [selectedUnitForBatch, setSelectedUnitForBatch] = useState(null);
   const [leaveTypeClassification, setLeaveTypeClassification] = useState({});
+  const [generatingLetter, setGeneratingLetter] = useState(false);
+  const [currentlyGenerating, setCurrentlyGenerating] = useState(null);
 
   // Check user permission
   if (!currentUser || currentUser.role !== 'master_admin') {
