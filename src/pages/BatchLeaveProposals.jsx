@@ -124,12 +124,15 @@ const BatchLeaveProposals = () => {
             };
           }
 
+          // Attach proposal items to the proposal
+          proposal.leave_proposal_items = proposalItemsMap[proposal.id] || [];
+
           unitProposalsMap[unitName].proposals.push(proposal);
-          unitProposalsMap[unitName].totalRequests += proposal.leave_proposal_items?.length || 0;
+          unitProposalsMap[unitName].totalRequests += proposal.leave_proposal_items.length;
           unitProposalsMap[unitName].totalEmployees += proposal.total_employees || 0;
 
           // Calculate total days and date range
-          proposal.leave_proposal_items?.forEach(item => {
+          proposal.leave_proposal_items.forEach(item => {
             unitProposalsMap[unitName].totalDays += item.days_requested || 0;
 
             const startDate = new Date(item.start_date);
