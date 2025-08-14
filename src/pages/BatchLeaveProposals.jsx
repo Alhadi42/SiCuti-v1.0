@@ -72,19 +72,7 @@ const BatchLeaveProposals = () => {
       // Get actual proposals from admin units
       const { data: actualProposals, error: proposalsError } = await supabase
         .from("leave_proposals")
-        .select(`
-          *,
-          leave_proposal_items (
-            id,
-            employee_name,
-            employee_nip,
-            employee_department,
-            leave_type_name,
-            start_date,
-            end_date,
-            days_requested
-          )
-        `)
+        .select("*")
         .order("created_at", { ascending: false });
 
       if (proposalsError) {
