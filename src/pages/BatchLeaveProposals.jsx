@@ -126,8 +126,8 @@ const BatchLeaveProposals = () => {
       // Group proposals by unit
       const unitProposalsMap = {};
 
-      if (actualProposals && actualProposals.length > 0) {
-        actualProposals.forEach(proposal => {
+      if (allProposals && allProposals.length > 0) {
+        allProposals.forEach(proposal => {
           const unitName = proposal.proposer_unit;
 
           if (!unitProposalsMap[unitName]) {
