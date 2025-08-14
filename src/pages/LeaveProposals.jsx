@@ -16,8 +16,9 @@ const LeaveProposals = () => {
   const { toast } = useToast();
   const currentUser = AuthManager.getUserSession();
   const { proposals, isLoading, fetchProposals } = useLeaveProposals();
-  
+
   const [showCreateForm, setShowCreateForm] = useState(false);
+  const [tableExists, setTableExists] = useState(true);
 
   // Check user permission
   if (!currentUser || currentUser.role !== 'admin_unit') {
