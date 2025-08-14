@@ -574,24 +574,38 @@ const BatchLeaveProposals = () => {
                             <Eye className="w-4 h-4 mr-1" />
                             Detail
                           </Button>
-                          <Button
-                            size="sm"
-                            onClick={() => handleAddToBatchLetter(unit)}
-                            className="bg-blue-600 hover:bg-blue-700 text-white"
-                          >
-                            <Plus className="w-4 h-4 mr-1" />
-                            Buat Surat Batch
-                          </Button>
+                          {!showCompleted && (
+                            <Button
+                              size="sm"
+                              onClick={() => handleAddToBatchLetter(unit)}
+                              className="bg-blue-600 hover:bg-blue-700 text-white"
+                            >
+                              <Plus className="w-4 h-4 mr-1" />
+                              Buat Surat Batch
+                            </Button>
+                          )}
                         </div>
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => handleMarkAsCompleted(unit)}
-                          className="bg-green-900/20 border-green-700/50 text-green-400 hover:bg-green-900/30 hover:text-green-300 w-full"
-                        >
-                          <CheckCircle className="w-4 h-4 mr-1" />
-                          Selesai di Ajukan
-                        </Button>
+                        {showCompleted ? (
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => handleRestoreProposal(unit)}
+                            className="bg-yellow-900/20 border-yellow-700/50 text-yellow-400 hover:bg-yellow-900/30 hover:text-yellow-300 w-full"
+                          >
+                            <RefreshCw className="w-4 h-4 mr-1" />
+                            Kembalikan ke Aktif
+                          </Button>
+                        ) : (
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => handleMarkAsCompleted(unit)}
+                            className="bg-green-900/20 border-green-700/50 text-green-400 hover:bg-green-900/30 hover:text-green-300 w-full"
+                          >
+                            <CheckCircle className="w-4 h-4 mr-1" />
+                            Selesai di Ajukan
+                          </Button>
+                        )}
                       </div>
                     </div>
                   </div>
