@@ -93,29 +93,37 @@ const BatchLeaveProposals = () => {
         throw new Error("No internet connection");
       }
 
-      // Test basic connectivity before main query
-      try {
-        console.log("🔌 Testing basic connectivity...");
-        const connectivityTest = await fetch(import.meta.env.VITE_SUPABASE_URL + '/rest/v1/', {
-          method: 'HEAD',
-          headers: {
-            'apikey': import.meta.env.VITE_SUPABASE_ANON_KEY,
-          },
-          signal: AbortSignal.timeout(5000) // 5 second timeout
-        });
+      // Skip connectivity test on first attempt to avoid double network calls
+      if (retryCount > 0) {
+        try {
+          console.log("🔌 Testing basic connectivity...");
+          const controller = new AbortController();
+          const timeoutId = setTimeout(() => controller.abort(), 3000); // 3 second timeout
 
-        if (!connectivityTest.ok) {
-          throw new Error(`Connectivity test failed: ${connectivityTest.status}`);
+          const connectivityTest = await fetch(import.meta.env.VITE_SUPABASE_URL + '/rest/v1/', {
+            method: 'HEAD',
+            headers: {
+              'apikey': import.meta.env.VITE_SUPABASE_ANON_KEY,
+            },
+            signal: controller.signal
+          });
+
+          clearTimeout(timeoutId);
+
+          if (!connectivityTest.ok) {
+            throw new Error(`Connectivity test failed: ${connectivityTest.status}`);
+          }
+          console.log("✅ Basic connectivity OK");
+        } catch (connectError) {
+          console.error("❌ Connectivity test failed:", connectError);
+          if (retryCount < 2) {
+            console.log(`🔄 Retrying... Attempt ${retryCount + 1}/3`);
+            await new Promise(resolve => setTimeout(resolve, 3000));
+            return fetchBatchProposals(retryCount + 1);
+          }
+          // Don't throw here, let the main query handle the error
+          console.log("⚠️ Connectivity test failed, proceeding with main query anyway");
         }
-        console.log("✅ Basic connectivity OK");
-      } catch (connectError) {
-        console.error("❌ Connectivity test failed:", connectError);
-        if (retryCount < 2) {
-          console.log(`🔄 Retrying connectivity test... Attempt ${retryCount + 1}/3`);
-          await new Promise(resolve => setTimeout(resolve, 2000 * (retryCount + 1)));
-          return fetchBatchProposals(retryCount + 1);
-        }
-        throw new Error("Cannot connect to server");
       }
 
       // Get leave requests with employee and leave type information
