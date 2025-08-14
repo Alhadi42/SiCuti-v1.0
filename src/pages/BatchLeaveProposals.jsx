@@ -256,20 +256,58 @@ const BatchLeaveProposals = () => {
 
 
     } catch (error) {
-      console.error("Error fetching batch proposals:", error);
-      setUnitProposals([]);
+      console.error("❌ Error fetching batch proposals:", error);
+
+      // Try to load cached data as fallback
+      let usedCachedData = false;
+      try {
+        const cachedData = localStorage.getItem('cachedBatchProposals');
+        if (cachedData) {
+          const { data, timestamp, userRole } = JSON.parse(cachedData);
+          const cacheAge = Date.now() - timestamp;
+          const maxCacheAge = 1000 * 60 * 30; // 30 minutes
+
+          if (cacheAge < maxCacheAge && userRole === currentUser?.role && data?.length > 0) {
+            console.log("📱 Using cached data as fallback");
+            setUnitProposals(data);
+            usedCachedData = true;
+
+            toast({
+              title: "Mode Offline",
+              description: `Menampilkan data tersimpan (${Math.round(cacheAge / 1000 / 60)} menit yang lalu)`,
+              variant: "default",
+            });
+          }
+        }
+      } catch (cacheError) {
+        console.warn("⚠️ Failed to load cached data:", cacheError);
+      }
+
+      if (!usedCachedData) {
+        setUnitProposals([]);
+      }
 
       let errorMessage = "Gagal mengambil data usulan cuti";
       let errorTitle = "Error";
 
       // Handle different types of errors
-      if (error.message?.includes("Failed to fetch") || error.message?.includes("fetch")) {
+      if (error.message?.includes("Failed to fetch") || error.message?.includes("fetch") || error.message?.includes("Cannot connect")) {
         errorTitle = "Koneksi Bermasalah";
-        errorMessage = "Tidak dapat terhubung ke server. Periksa koneksi internet Anda.";
+        errorMessage = usedCachedData
+          ? "Koneksi bermasalah. Menampilkan data tersimpan."
+          : "Tidak dapat terhubung ke server. Periksa koneksi internet Anda.";
         setConnectionError(true);
       } else if (error.message?.includes("No internet connection")) {
         errorTitle = "Tidak Ada Internet";
-        errorMessage = "Periksa koneksi internet Anda dan coba lagi.";
+        errorMessage = usedCachedData
+          ? "Tidak ada internet. Menampilkan data tersimpan."
+          : "Periksa koneksi internet Anda dan coba lagi.";
+        setConnectionError(true);
+      } else if (error.message?.includes("timeout")) {
+        errorTitle = "Timeout";
+        errorMessage = usedCachedData
+          ? "Server lambat. Menampilkan data tersimpan."
+          : "Server merespons terlalu lambat. Coba lagi nanti.";
         setConnectionError(true);
       } else if (error.code === "PGRST301") {
         errorTitle = "Masalah Database";
@@ -284,11 +322,13 @@ const BatchLeaveProposals = () => {
         setConnectionError(false);
       }
 
-      toast({
-        title: errorTitle,
-        description: errorMessage,
-        variant: "destructive",
-      });
+      if (!usedCachedData) {
+        toast({
+          title: errorTitle,
+          description: errorMessage,
+          variant: "destructive",
+        });
+      }
     } finally {
       setIsLoading(false);
     }
