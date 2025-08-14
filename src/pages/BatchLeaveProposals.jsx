@@ -331,15 +331,18 @@ const BatchLeaveProposals = () => {
             </p>
           )}
         </div>
-        <Button
-          onClick={() => fetchBatchProposals(0)}
-          variant="outline"
-          className={`border-slate-600 text-slate-300 hover:text-white ${connectionError ? 'border-red-500 text-red-400' : ''}`}
-          disabled={isLoading}
-        >
-          <RefreshCw className={`w-4 h-4 mr-2 ${isLoading ? 'animate-spin' : ''}`} />
-          {connectionError ? 'Coba Lagi' : 'Refresh'}
-        </Button>
+        <div className="flex items-center space-x-3">
+          <ConnectionStatus onRetry={() => fetchBatchProposals(0)} />
+          <Button
+            onClick={() => fetchBatchProposals(0)}
+            variant="outline"
+            className={`border-slate-600 text-slate-300 hover:text-white ${connectionError ? 'border-red-500 text-red-400' : ''}`}
+            disabled={isLoading}
+          >
+            <RefreshCw className={`w-4 h-4 mr-2 ${isLoading ? 'animate-spin' : ''}`} />
+            {connectionError ? 'Coba Lagi' : 'Refresh'}
+          </Button>
+        </div>
       </motion.div>
 
 
