@@ -550,9 +550,16 @@ const BatchLeaveProposals = () => {
             Kelola pengajuan cuti pegawai yang dikelompokkan berdasarkan unit kerja
           </p>
           {connectionError ? (
-            <p className="text-red-400 text-sm">
-              ⚠️ Masalah koneksi - Data mungkin tidak terbaru
-            </p>
+            <div className="space-y-1">
+              <p className="text-red-400 text-sm">
+                ⚠️ Masalah koneksi - Data mungkin tidak terbaru
+              </p>
+              {unitProposals.length > 0 && (
+                <p className="text-yellow-400 text-xs">
+                  📱 Menampilkan data tersimpan dari cache lokal
+                </p>
+              )}
+            </div>
           ) : (
             <p className="text-blue-400 text-sm">
               💡 Data diambil dari pengajuan cuti yang dibuat melalui menu "Pengajuan Cuti"
