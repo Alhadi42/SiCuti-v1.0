@@ -435,64 +435,105 @@ const BatchLeaveProposals = () => {
     }
   };
 
-  const handleGenerateBatchLetter = async (leaveType, requests) => {
+  const handleGenerateBatchLetter = async (leaveType, requests, templateId = null) => {
     try {
       setGeneratingLetter(true);
       setCurrentlyGenerating(leaveType);
+
+      // Check if we have a template
+      if (!templateId && availableTemplates.length === 0) {
+        toast({
+          title: "Template Tidak Tersedia",
+          description: "Tidak ada template DOCX yang tersedia. Silakan buat template terlebih dahulu.",
+          variant: "destructive",
+        });
+        return;
+      }
+
+      // Use the first template if no specific template is selected
+      const template = templateId
+        ? availableTemplates.find(t => t.id === templateId)
+        : availableTemplates[0];
+
+      if (!template) {
+        toast({
+          title: "Template Tidak Ditemukan",
+          description: "Template yang dipilih tidak ditemukan.",
+          variant: "destructive",
+        });
+        return;
+      }
 
       toast({
         title: "Info",
         description: `Sedang mempersiapkan surat batch untuk ${leaveType}...`,
       });
 
-      // Transform leave requests to format expected by letter generator
-      const proposalItems = requests.map(request => ({
-        employee_id: request.employee_id,
-        employee_name: request.employees?.name || "Nama tidak diketahui",
-        employee_nip: request.employees?.nip || "-",
-        employee_department: request.employees?.department || selectedUnitForBatch.unitName,
-        employee_position: request.employees?.position_name || "-",
-        leave_type_id: request.leave_type_id,
-        leave_type_name: request.leave_types?.name || leaveType,
-        start_date: request.start_date,
-        end_date: request.end_date,
-        days_requested: request.days_requested || 0,
-        leave_quota_year: request.leave_quota_year || new Date(request.start_date).getFullYear(),
-        reason: request.reason || "",
-        address_during_leave: request.address_during_leave || "",
-      }));
+      // Prepare variables for template
+      const variables = {
+        // General information
+        unit_kerja: selectedUnitForBatch.unitName,
+        jenis_cuti: leaveType,
+        tanggal_usulan: format(new Date(selectedUnitForBatch.proposalDate), "dd MMMM yyyy", { locale: id }),
+        tanggal_surat: format(new Date(), "dd MMMM yyyy", { locale: id }),
+        jumlah_pegawai: requests.length,
+        total_hari: requests.reduce((sum, req) => sum + (req.days_requested || 0), 0),
 
-      // Prepare proposal data for letter generation
-      const proposalData = {
-        proposal: {
-          id: `batch-${selectedUnitForBatch.unitName.replace(/\s+/g, '-').toLowerCase()}-${leaveType.replace(/\s+/g, '-').toLowerCase()}-${Date.now()}`,
-          proposal_title: `Usulan ${leaveType} - ${selectedUnitForBatch.unitName}`,
-          proposer_name: "Master Admin",
-          proposer_unit: selectedUnitForBatch.unitName,
-          proposal_date: format(new Date(), "yyyy-MM-dd"),
-          total_employees: requests.length,
-          status: "approved",
-          letter_number: `SRT/${leaveType.toUpperCase().replace(/\s+/g, '')}/${new Date().getFullYear()}/${Math.floor(Math.random() * 1000).toString().padStart(3, '0')}`,
-          letter_date: format(new Date(), "yyyy-MM-dd"),
-          notes: `Surat batch untuk ${requests.length} pengajuan ${leaveType} dari ${selectedUnitForBatch.unitName}`,
-          leave_type: leaveType, // Add leave type for template customization
-        },
-        proposalItems: proposalItems,
+        // Letter numbering
+        nomor_surat: `SRT/${leaveType.toUpperCase().replace(/\s+/g, '')}/${new Date().getFullYear()}/${Math.floor(Math.random() * 1000).toString().padStart(3, '0')}`,
+
+        // Employee list variables for table/loop processing
+        pegawai_list: requests.map((request, index) => ({
+          no: index + 1,
+          nama: request.employees?.name || "Nama tidak diketahui",
+          nip: request.employees?.nip || "-",
+          jabatan: request.employees?.position_name || "-",
+          departemen: request.employees?.department || selectedUnitForBatch.unitName,
+          jenis_cuti: request.leave_types?.name || leaveType,
+          tanggal_mulai: format(new Date(request.start_date), "dd/MM/yyyy"),
+          tanggal_selesai: format(new Date(request.end_date), "dd/MM/yyyy"),
+          jumlah_hari: request.days_requested || 0,
+          alasan: request.reason || "-",
+          alamat_cuti: request.address_during_leave || "-",
+        }))
       };
 
-      console.log("📄 Generating batch letter for leave type:", {
+      // Create indexed variables for template loops
+      requests.forEach((request, index) => {
+        const num = index + 1;
+        variables[`nama_${num}`] = request.employees?.name || "Nama tidak diketahui";
+        variables[`nip_${num}`] = request.employees?.nip || "-";
+        variables[`jabatan_${num}`] = request.employees?.position_name || "-";
+        variables[`jenis_cuti_${num}`] = request.leave_types?.name || leaveType;
+        variables[`tanggal_mulai_${num}`] = format(new Date(request.start_date), "dd/MM/yyyy");
+        variables[`tanggal_selesai_${num}`] = format(new Date(request.end_date), "dd/MM/yyyy");
+        variables[`jumlah_hari_${num}`] = request.days_requested || 0;
+        variables[`alasan_${num}`] = request.reason || "-";
+      });
+
+      console.log("📄 Generating batch letter with variables:", {
         leaveType,
         unitName: selectedUnitForBatch.unitName,
         totalRequests: requests.length,
-        proposalItemsCount: proposalItems.length
+        templateId: template.id,
+        templateName: template.name,
+        variableCount: Object.keys(variables).length
       });
 
-      // Generate and download the letter with leave type in filename
+      // Process template using existing system
+      const processedBuffer = await processDocxTemplate(
+        template.content,
+        variables,
+        { preserveFormatting: true }
+      );
+
+      // Generate filename
       const safeLeaveType = leaveType.replace(/[^a-zA-Z0-9]/g, '_');
       const safeUnitName = selectedUnitForBatch.unitName.replace(/\s+/g, '_');
       const filename = `Usulan_${safeLeaveType}_${safeUnitName}_${format(new Date(), "yyyy-MM-dd")}.docx`;
 
-      await downloadLeaveProposalLetter(proposalData, filename);
+      // Download the file
+      saveAs(processedBuffer, filename);
 
       toast({
         title: "Berhasil",
