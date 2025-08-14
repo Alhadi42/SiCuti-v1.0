@@ -64,21 +64,38 @@ const LeaveProposals = () => {
 
   const handleCreateProposal = async (proposalData) => {
     try {
+      console.log("🔍 Creating proposal with data:", proposalData);
+      console.log("👤 Current user:", currentUser);
+
+      const proposalPayload = {
+        proposal_title: proposalData.title,
+        proposed_by: currentUser.id,
+        proposer_name: currentUser.name,
+        proposer_unit: currentUser.unitKerja,
+        notes: proposalData.notes,
+        total_employees: proposalData.employees.length,
+      };
+
+      console.log("📝 Proposal payload:", proposalPayload);
+
       // Create proposal
       const { data: proposal, error: proposalError } = await supabase
         .from("leave_proposals")
-        .insert({
-          proposal_title: proposalData.title,
-          proposed_by: currentUser.id,
-          proposer_name: currentUser.name,
-          proposer_unit: currentUser.unitKerja,
-          notes: proposalData.notes,
-          total_employees: proposalData.employees.length,
-        })
+        .insert(proposalPayload)
         .select()
         .single();
 
-      if (proposalError) throw proposalError;
+      console.log("📊 Proposal insert result:", { proposal, proposalError });
+
+      if (proposalError) {
+        console.error("❌ Proposal insert error:", proposalError);
+        console.error("Error code:", proposalError.code);
+        console.error("Error message:", proposalError.message);
+        console.error("Error details:", proposalError.details);
+        throw proposalError;
+      }
+
+      console.log("✅ Proposal created successfully:", proposal);
 
       // Create proposal items
       const proposalItems = proposalData.employees.map(emp => ({
