@@ -68,11 +68,17 @@ const BatchLeaveProposals = () => {
     setIsLoading(true);
     try {
       console.log("🔍 Fetching batch proposals by unit...");
+      console.log("🔍 Current user role:", currentUser?.role);
+      console.log("🔍 Current user unit:", currentUser?.unitKerja);
 
       // Get actual proposals from admin units
+      // For master admin, we should be able to see all proposals
       const { data: allProposals, error: allProposalsError } = await supabase
         .from("leave_proposals")
-        .select("*")
+        .select(`
+          *,
+          proposed_by_user:users!leave_proposals_proposed_by_fkey(username, unit_kerja)
+        `)
         .order("created_at", { ascending: false });
 
       if (allProposalsError) {
