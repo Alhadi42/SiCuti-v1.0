@@ -35,8 +35,36 @@ export const useLeaveProposals = () => {
 
       if (error) throw error;
 
-      console.log("Fetched proposals:", data);
-      setProposals(data || []);
+      // Get proposal items separately if proposals exist
+      let proposalsWithItems = data || [];
+      if (proposalsWithItems.length > 0) {
+        const proposalIds = proposalsWithItems.map(p => p.id);
+
+        const { data: proposalItems, error: itemsError } = await supabase
+          .from("leave_proposal_items")
+          .select("*")
+          .in("proposal_id", proposalIds);
+
+        if (!itemsError && proposalItems) {
+          // Group items by proposal_id
+          const itemsMap = {};
+          proposalItems.forEach(item => {
+            if (!itemsMap[item.proposal_id]) {
+              itemsMap[item.proposal_id] = [];
+            }
+            itemsMap[item.proposal_id].push(item);
+          });
+
+          // Attach items to proposals
+          proposalsWithItems = proposalsWithItems.map(proposal => ({
+            ...proposal,
+            leave_proposal_items: itemsMap[proposal.id] || []
+          }));
+        }
+      }
+
+      console.log("Fetched proposals:", proposalsWithItems);
+      setProposals(proposalsWithItems);
     } catch (err) {
       console.error("Error fetching proposals:", err);
       setError(err.message);
