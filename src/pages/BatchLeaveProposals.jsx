@@ -226,6 +226,40 @@ const BatchLeaveProposals = () => {
     setShowDetailDialog(true);
   };
 
+  const handleMarkAsCompleted = async (unit) => {
+    try {
+      const proposalKey = `${unit.unitName}|${unit.proposalDate}`;
+
+      // Show confirmation dialog
+      const confirmed = window.confirm(
+        `Apakah Anda yakin ingin menandai usulan cuti dari ${unit.unitName} tanggal ${format(new Date(unit.proposalDate), "dd MMMM yyyy", { locale: id })} sebagai "Selesai di Ajukan"?\n\nUsulan ini akan disembunyikan dari daftar.`
+      );
+
+      if (!confirmed) return;
+
+      // Add to completed proposals set
+      setCompletedProposals(prev => new Set([...prev, proposalKey]));
+
+      // Store in localStorage for persistence
+      const completedList = JSON.parse(localStorage.getItem('completedProposals') || '[]');
+      completedList.push(proposalKey);
+      localStorage.setItem('completedProposals', JSON.stringify(completedList));
+
+      toast({
+        title: "Berhasil",
+        description: `Usulan cuti dari ${unit.unitName} telah ditandai sebagai selesai diajukan`,
+      });
+
+    } catch (error) {
+      console.error("Error marking proposal as completed:", error);
+      toast({
+        title: "Error",
+        description: "Gagal menandai usulan sebagai selesai: " + (error.message || "Unknown error"),
+        variant: "destructive",
+      });
+    }
+  };
+
   const handleAddToBatchLetter = async (unit) => {
     try {
       toast({
