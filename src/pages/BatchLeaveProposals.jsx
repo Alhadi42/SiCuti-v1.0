@@ -32,6 +32,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { format } from "date-fns";
 import { id } from "date-fns/locale";
 import { downloadLeaveProposalLetter } from "@/utils/leaveProposalLetterGenerator";
+import ConnectionStatus from "@/components/ConnectionStatus";
 
 const BatchLeaveProposals = () => {
   const { toast } = useToast();
@@ -535,7 +536,7 @@ const BatchLeaveProposals = () => {
                       </div>
                     </div>
                     <div className="mt-2 text-sm text-slate-300">
-                      ��� {format(new Date(request.start_date), "dd MMM", { locale: id })} - {format(new Date(request.end_date), "dd MMM yyyy", { locale: id })}
+                      📅 {format(new Date(request.start_date), "dd MMM", { locale: id })} - {format(new Date(request.end_date), "dd MMM yyyy", { locale: id })}
                       {request.reason && (
                         <div className="mt-1 text-slate-400">
                           💬 {request.reason}
