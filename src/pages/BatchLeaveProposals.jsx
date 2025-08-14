@@ -437,7 +437,7 @@ const BatchLeaveProposals = () => {
             </p>
           </CardHeader>
           <CardContent>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
               <div>
                 <Label className="text-slate-300">Unit Kerja</Label>
                 <Select value={selectedUnit} onValueChange={setSelectedUnit}>
@@ -460,6 +460,31 @@ const BatchLeaveProposals = () => {
                   placeholder="Cari nama unit..."
                   className="bg-slate-700/50 border-slate-600/50 text-white"
                 />
+              </div>
+              <div>
+                <Label className="text-slate-300">Status Usulan</Label>
+                <div className="flex items-center space-x-3 mt-2">
+                  <button
+                    onClick={() => setShowCompleted(false)}
+                    className={`px-3 py-2 rounded-lg text-sm transition-colors ${
+                      !showCompleted
+                        ? 'bg-blue-600 text-white'
+                        : 'bg-slate-700/50 text-slate-300 hover:bg-slate-700'
+                    }`}
+                  >
+                    Aktif ({unitProposals.filter(unit => !completedProposals.has(`${unit.unitName}|${unit.proposalDate}`)).length})
+                  </button>
+                  <button
+                    onClick={() => setShowCompleted(true)}
+                    className={`px-3 py-2 rounded-lg text-sm transition-colors ${
+                      showCompleted
+                        ? 'bg-green-600 text-white'
+                        : 'bg-slate-700/50 text-slate-300 hover:bg-slate-700'
+                    }`}
+                  >
+                    Selesai ({completedProposals.size})
+                  </button>
+                </div>
               </div>
             </div>
           </CardContent>
