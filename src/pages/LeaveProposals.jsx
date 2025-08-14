@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { motion } from "framer-motion";
 import { FileText, Plus, List, Clock, CheckCircle, XCircle } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -16,8 +16,32 @@ const LeaveProposals = () => {
   const { toast } = useToast();
   const currentUser = AuthManager.getUserSession();
   const { proposals, isLoading, fetchProposals } = useLeaveProposals();
-  
+
   const [showCreateForm, setShowCreateForm] = useState(false);
+  const [tableExists, setTableExists] = useState(true);
+
+  // Check if tables exist on mount
+  useEffect(() => {
+    const checkTableExists = async () => {
+      try {
+        const { data, error } = await supabase
+          .from("leave_proposals")
+          .select("*")
+          .limit(1);
+
+        if (error && error.code === "42P01") {
+          setTableExists(false);
+        } else {
+          setTableExists(true);
+        }
+      } catch (err) {
+        console.error("Error checking table existence:", err);
+        setTableExists(false);
+      }
+    };
+
+    checkTableExists();
+  }, []);
 
   // Check user permission
   if (!currentUser || currentUser.role !== 'admin_unit') {
@@ -40,21 +64,38 @@ const LeaveProposals = () => {
 
   const handleCreateProposal = async (proposalData) => {
     try {
+      console.log("🔍 Creating proposal with data:", proposalData);
+      console.log("👤 Current user:", currentUser);
+
+      const proposalPayload = {
+        proposal_title: proposalData.title,
+        proposed_by: currentUser.id,
+        proposer_name: currentUser.name,
+        proposer_unit: currentUser.unitKerja,
+        notes: proposalData.notes,
+        total_employees: proposalData.employees.length,
+      };
+
+      console.log("📝 Proposal payload:", proposalPayload);
+
       // Create proposal
       const { data: proposal, error: proposalError } = await supabase
         .from("leave_proposals")
-        .insert({
-          proposal_title: proposalData.title,
-          proposed_by: currentUser.id,
-          proposer_name: currentUser.name,
-          proposer_unit: currentUser.unitKerja,
-          notes: proposalData.notes,
-          total_employees: proposalData.employees.length,
-        })
+        .insert(proposalPayload)
         .select()
         .single();
 
-      if (proposalError) throw proposalError;
+      console.log("📊 Proposal insert result:", { proposal, proposalError });
+
+      if (proposalError) {
+        console.error("❌ Proposal insert error:", proposalError);
+        console.error("Error code:", proposalError.code);
+        console.error("Error message:", proposalError.message);
+        console.error("Error details:", proposalError.details);
+        throw proposalError;
+      }
+
+      console.log("✅ Proposal created successfully:", proposal);
 
       // Create proposal items
       const proposalItems = proposalData.employees.map(emp => ({
@@ -74,11 +115,25 @@ const LeaveProposals = () => {
         address_during_leave: emp.address_during_leave,
       }));
 
-      const { error: itemsError } = await supabase
-        .from("leave_proposal_items")
-        .insert(proposalItems);
+      console.log("📝 Creating proposal items:", proposalItems);
+      console.log("📊 Total items to create:", proposalItems.length);
 
-      if (itemsError) throw itemsError;
+      const { data: insertedItems, error: itemsError } = await supabase
+        .from("leave_proposal_items")
+        .insert(proposalItems)
+        .select();
+
+      console.log("📊 Items insert result:", { insertedItems, itemsError });
+
+      if (itemsError) {
+        console.error("❌ Items insert error:", itemsError);
+        console.error("Error code:", itemsError.code);
+        console.error("Error message:", itemsError.message);
+        console.error("Error details:", itemsError.details);
+        throw itemsError;
+      }
+
+      console.log("✅ Proposal items created successfully:", insertedItems);
 
       toast({
         title: "Success",
@@ -119,6 +174,30 @@ const LeaveProposals = () => {
           onSubmit={handleCreateProposal}
           onCancel={() => setShowCreateForm(false)}
         />
+      </div>
+    );
+  }
+
+  // Show setup message if tables don't exist
+  if (!tableExists) {
+    return (
+      <div className="p-6">
+        <Card className="bg-slate-800/50 border-slate-700/50">
+          <CardContent className="p-8">
+            <div className="text-center">
+              <FileText className="w-16 h-16 text-slate-600 mx-auto mb-4" />
+              <h2 className="text-xl font-bold text-white mb-3">Fitur Usulan Cuti Belum Tersedia</h2>
+              <p className="text-slate-400 mb-4">
+                Sistem usulan cuti belum dikonfigurasi. Tabel database yang diperlukan belum dibuat.
+              </p>
+              <div className="p-4 bg-amber-900/20 border border-amber-700/50 rounded-lg max-w-md mx-auto">
+                <p className="text-amber-400 text-sm">
+                  <strong>⚠️ Setup Diperlukan:</strong> Hubungi administrator database untuk membuat tabel leave_proposals dan leave_proposal_items.
+                </p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
       </div>
     );
   }

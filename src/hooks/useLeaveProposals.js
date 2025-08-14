@@ -12,7 +12,7 @@ export const useLeaveProposals = () => {
   const fetchProposals = useCallback(async () => {
     setIsLoading(true);
     setError(null);
-    
+
     try {
       const currentUser = AuthManager.getUserSession();
       if (!currentUser) {
@@ -21,18 +21,7 @@ export const useLeaveProposals = () => {
 
       let query = supabase
         .from("leave_proposals")
-        .select(`
-          *,
-          leave_proposal_items (
-            id,
-            employee_name,
-            employee_nip,
-            leave_type_name,
-            start_date,
-            end_date,
-            days_requested
-          )
-        `)
+        .select("*")
         .order("created_at", { ascending: false });
 
       // Apply unit-based filtering
@@ -46,11 +35,42 @@ export const useLeaveProposals = () => {
 
       if (error) throw error;
 
-      console.log("Fetched proposals:", data);
-      setProposals(data || []);
+      // Get proposal items separately if proposals exist
+      let proposalsWithItems = data || [];
+      if (proposalsWithItems.length > 0) {
+        const proposalIds = proposalsWithItems.map(p => p.id);
+
+        const { data: proposalItems, error: itemsError } = await supabase
+          .from("leave_proposal_items")
+          .select("*")
+          .in("proposal_id", proposalIds);
+
+        if (!itemsError && proposalItems) {
+          // Group items by proposal_id
+          const itemsMap = {};
+          proposalItems.forEach(item => {
+            if (!itemsMap[item.proposal_id]) {
+              itemsMap[item.proposal_id] = [];
+            }
+            itemsMap[item.proposal_id].push(item);
+          });
+
+          // Attach items to proposals
+          proposalsWithItems = proposalsWithItems.map(proposal => ({
+            ...proposal,
+            leave_proposal_items: itemsMap[proposal.id] || []
+          }));
+        }
+      }
+
+      console.log("Fetched proposals:", proposalsWithItems);
+      setProposals(proposalsWithItems);
+
     } catch (err) {
       console.error("Error fetching proposals:", err);
       setError(err.message);
+      setProposals([]);
+
       toast({
         title: "Error",
         description: "Gagal mengambil data usulan cuti: " + err.message,
