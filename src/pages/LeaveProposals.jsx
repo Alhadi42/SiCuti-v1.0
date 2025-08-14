@@ -46,64 +46,8 @@ const LeaveProposals = () => {
 
   const handleCreateProposal = async (proposalData) => {
     try {
-      // Check if table exists first
-      const { data: checkData, error: checkError } = await supabase
-        .from("leave_proposals")
-        .select("*")
-        .limit(1);
-
-      if (checkError && checkError.code === "42P01") {
-        setTableExists(false);
-        throw new Error("Tabel leave_proposals belum tersedia. Hubungi administrator untuk setup database.");
-      }
-
-      // Create proposal
-      const { data: proposal, error: proposalError } = await supabase
-        .from("leave_proposals")
-        .insert({
-          proposal_title: proposalData.title,
-          proposed_by: currentUser.id,
-          proposer_name: currentUser.name,
-          proposer_unit: currentUser.unitKerja,
-          notes: proposalData.notes,
-          total_employees: proposalData.employees.length,
-        })
-        .select()
-        .single();
-
-      if (proposalError) throw proposalError;
-
-      // Create proposal items
-      const proposalItems = proposalData.employees.map(emp => ({
-        proposal_id: proposal.id,
-        employee_id: emp.employee_id,
-        employee_name: emp.employee_name,
-        employee_nip: emp.employee_nip,
-        employee_department: emp.employee_department,
-        employee_position: emp.employee_position,
-        leave_type_id: emp.leave_type_id,
-        leave_type_name: emp.leave_type_name,
-        start_date: emp.start_date,
-        end_date: emp.end_date,
-        days_requested: emp.days_requested,
-        leave_quota_year: emp.leave_quota_year,
-        reason: emp.reason,
-        address_during_leave: emp.address_during_leave,
-      }));
-
-      const { error: itemsError } = await supabase
-        .from("leave_proposal_items")
-        .insert(proposalItems);
-
-      if (itemsError) throw itemsError;
-
-      toast({
-        title: "Success",
-        description: "Usulan cuti berhasil dibuat dan dikirim ke Master Admin",
-      });
-
-      setShowCreateForm(false);
-      fetchProposals();
+      // Tables don't exist, throw error immediately
+      throw new Error("Tabel leave_proposals belum tersedia. Hubungi administrator untuk setup database.");
     } catch (error) {
       console.error("Error creating proposal:", error);
       throw error;
