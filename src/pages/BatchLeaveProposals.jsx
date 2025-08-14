@@ -69,50 +69,72 @@ const BatchLeaveProposals = () => {
     try {
       console.log("🔍 Fetching batch proposals by unit...");
 
-      // Get all units from employees table first
-      const { data: allUnits, error: unitsError } = await supabase
-        .from("employees")
-        .select("department")
-        .not("department", "is", null);
+      // Get actual proposals from admin units
+      const { data: actualProposals, error: proposalsError } = await supabase
+        .from("leave_proposals")
+        .select(`
+          *,
+          leave_proposal_items (
+            id,
+            employee_name,
+            employee_nip,
+            employee_department,
+            leave_type_name,
+            start_date,
+            end_date,
+            days_requested
+          )
+        `)
+        .order("created_at", { ascending: false });
 
-      if (unitsError) {
-        console.error("Error fetching units:", unitsError);
-        throw unitsError;
+      if (proposalsError) {
+        console.error("Error fetching proposals:", proposalsError);
+        throw proposalsError;
       }
 
-      const uniqueUnits = [...new Set(allUnits.map(emp => emp.department))];
-      console.log("🔍 Total units in database:", uniqueUnits.length);
+      // Group proposals by unit
+      const unitProposalsMap = {};
 
-      // For now, since we don't have actual "proposals" from admin units yet,
-      // we'll show empty state but still display the correct total units count
-      console.log("🔍 No actual proposals from admin units yet - showing empty state");
+      if (actualProposals && actualProposals.length > 0) {
+        actualProposals.forEach(proposal => {
+          const unitName = proposal.proposer_unit;
 
-      // Set empty proposals but with correct unit count
-      setUnitProposals([]);
+          if (!unitProposalsMap[unitName]) {
+            unitProposalsMap[unitName] = {
+              unitName,
+              proposals: [],
+              totalRequests: 0,
+              totalEmployees: 0,
+              totalDays: 0,
+              dateRange: { earliest: null, latest: null }
+            };
+          }
 
-      // Store total units for statistics card
-      window.totalUnitsInDatabase = uniqueUnits.length;
+          unitProposalsMap[unitName].proposals.push(proposal);
+          unitProposalsMap[unitName].totalRequests += proposal.leave_proposal_items?.length || 0;
+          unitProposalsMap[unitName].totalEmployees += proposal.total_employees || 0;
 
-      // TODO: In the future, when admin units create proposals, use this query:
-      // const { data: actualProposals, error: proposalsError } = await supabase
-      //   .from("leave_proposals")
-      //   .select(`
-      //     *,
-      //     leave_proposal_items (
-      //       id,
-      //       employee_name,
-      //       employee_nip,
-      //       employee_department,
-      //       leave_type_name,
-      //       start_date,
-      //       end_date,
-      //       days_requested
-      //     )
-      //   `)
-      //   .order("created_at", { ascending: false });
+          // Calculate total days and date range
+          proposal.leave_proposal_items?.forEach(item => {
+            unitProposalsMap[unitName].totalDays += item.days_requested || 0;
 
-      console.log("✅ Ready to display actual proposals when admin units create them");
-      console.log("📊 Current state: No proposals from admin units yet");
+            const startDate = new Date(item.start_date);
+            const endDate = new Date(item.end_date);
+
+            if (!unitProposalsMap[unitName].dateRange.earliest || startDate < unitProposalsMap[unitName].dateRange.earliest) {
+              unitProposalsMap[unitName].dateRange.earliest = startDate;
+            }
+            if (!unitProposalsMap[unitName].dateRange.latest || endDate > unitProposalsMap[unitName].dateRange.latest) {
+              unitProposalsMap[unitName].dateRange.latest = endDate;
+            }
+          });
+        });
+      }
+
+      const groupedProposals = Object.values(unitProposalsMap);
+      setUnitProposals(groupedProposals);
+
+      console.log("✅ Fetched", groupedProposals.length, "units with proposals");
 
     } catch (error) {
       console.error("Error fetching batch proposals:", error);
@@ -128,7 +150,22 @@ const BatchLeaveProposals = () => {
 
   const handleViewUnitDetail = async (unit) => {
     setSelectedUnitDetail(unit);
-    setUnitLeaveRequests(unit.requests);
+
+    // Collect all proposal items from all proposals in this unit
+    const allProposalItems = [];
+    unit.proposals.forEach(proposal => {
+      if (proposal.leave_proposal_items) {
+        proposal.leave_proposal_items.forEach(item => {
+          allProposalItems.push({
+            ...item,
+            proposal_id: proposal.id,
+            proposal_title: proposal.proposal_title
+          });
+        });
+      }
+    });
+
+    setUnitLeaveRequests(allProposalItems);
     setShowDetailDialog(true);
   };
 
@@ -139,21 +176,29 @@ const BatchLeaveProposals = () => {
         description: "Sedang mempersiapkan surat batch...",
       });
 
-      // Transform leave requests to proposal format
-      const proposalItems = unit.requests.map(request => ({
-        employee_id: request.employee_id,
-        employee_name: request.employees?.name || "Nama tidak diketahui",
-        employee_nip: request.employees?.nip || "-",
-        employee_department: request.employees?.department || unit.unitName,
-        employee_position: request.employees?.position_name || "-",
-        leave_type_id: request.leave_type_id,
-        leave_type_name: request.leave_types?.name || "Jenis cuti tidak diketahui",
-        start_date: request.start_date,
-        end_date: request.end_date,
-        days_requested: request.days_requested || 0,
-        leave_quota_year: new Date(request.start_date).getFullYear(),
-        reason: request.reason || "",
-        address_during_leave: request.address_during_leave || "",
+      // Collect all proposal items from all proposals in this unit
+      const allProposalItems = [];
+      unit.proposals.forEach(proposal => {
+        if (proposal.leave_proposal_items) {
+          allProposalItems.push(...proposal.leave_proposal_items);
+        }
+      });
+
+      // Transform proposal items to format expected by letter generator
+      const proposalItems = allProposalItems.map(item => ({
+        employee_id: item.employee_id || null,
+        employee_name: item.employee_name || "Nama tidak diketahui",
+        employee_nip: item.employee_nip || "-",
+        employee_department: item.employee_department || unit.unitName,
+        employee_position: item.employee_position || "-",
+        leave_type_id: item.leave_type_id || null,
+        leave_type_name: item.leave_type_name || "Jenis cuti tidak diketahui",
+        start_date: item.start_date,
+        end_date: item.end_date,
+        days_requested: item.days_requested || 0,
+        leave_quota_year: item.leave_quota_year || new Date(item.start_date).getFullYear(),
+        reason: item.reason || "",
+        address_during_leave: item.address_during_leave || "",
       }));
 
       // Prepare proposal data for letter generation
@@ -242,78 +287,6 @@ const BatchLeaveProposals = () => {
         </Button>
       </motion.div>
 
-      {/* Statistics Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
-        <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.1 }}>
-          <Card className="bg-slate-800/50 border-slate-700/50">
-            <CardContent className="p-6">
-              <div className="flex items-center">
-                <div className="w-12 h-12 bg-blue-500/20 rounded-lg flex items-center justify-center">
-                  <Building2 className="w-6 h-6 text-blue-400" />
-                </div>
-                <div className="ml-4">
-                  <p className="text-slate-400 text-sm">Total Unit</p>
-                  <p className="text-2xl font-bold text-white">{window.totalUnitsInDatabase || 0}</p>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-        </motion.div>
-
-        <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.2 }}>
-          <Card className="bg-slate-800/50 border-slate-700/50">
-            <CardContent className="p-6">
-              <div className="flex items-center">
-                <div className="w-12 h-12 bg-green-500/20 rounded-lg flex items-center justify-center">
-                  <FileText className="w-6 h-6 text-green-400" />
-                </div>
-                <div className="ml-4">
-                  <p className="text-slate-400 text-sm">Total Usulan</p>
-                  <p className="text-2xl font-bold text-white">
-                    {unitProposals.reduce((sum, unit) => sum + unit.totalRequests, 0)}
-                  </p>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-        </motion.div>
-
-        <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.3 }}>
-          <Card className="bg-slate-800/50 border-slate-700/50">
-            <CardContent className="p-6">
-              <div className="flex items-center">
-                <div className="w-12 h-12 bg-purple-500/20 rounded-lg flex items-center justify-center">
-                  <Users className="w-6 h-6 text-purple-400" />
-                </div>
-                <div className="ml-4">
-                  <p className="text-slate-400 text-sm">Total Pegawai</p>
-                  <p className="text-2xl font-bold text-white">
-                    {unitProposals.reduce((sum, unit) => sum + unit.totalEmployees, 0)}
-                  </p>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-        </motion.div>
-
-        <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.4 }}>
-          <Card className="bg-slate-800/50 border-slate-700/50">
-            <CardContent className="p-6">
-              <div className="flex items-center">
-                <div className="w-12 h-12 bg-orange-500/20 rounded-lg flex items-center justify-center">
-                  <Calendar className="w-6 h-6 text-orange-400" />
-                </div>
-                <div className="ml-4">
-                  <p className="text-slate-400 text-sm">Total Hari</p>
-                  <p className="text-2xl font-bold text-white">
-                    {unitProposals.reduce((sum, unit) => sum + unit.totalDays, 0)}
-                  </p>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-        </motion.div>
-      </div>
 
       {/* Filters */}
       <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.5 }}>
@@ -378,11 +351,6 @@ const BatchLeaveProposals = () => {
                 <p className="text-slate-400 text-sm">
                   Usulan cuti dari admin unit akan muncul di sini untuk dikelola secara batch.
                 </p>
-                <div className="mt-4 p-4 bg-blue-900/20 border border-blue-700/50 rounded-lg max-w-md mx-auto">
-                  <p className="text-blue-400 text-sm">
-                    <strong>Info:</strong> Total {window.totalUnitsInDatabase || 0} unit kerja tersedia di sistem
-                  </p>
-                </div>
               </div>
             ) : (
               <div className="space-y-4">
@@ -484,14 +452,15 @@ const BatchLeaveProposals = () => {
               
               <div className="space-y-2">
                 {unitLeaveRequests.map((request, index) => (
-                  <div key={request.id} className="p-3 bg-slate-700/50 rounded border border-slate-600/50">
+                  <div key={`${request.proposal_id}-${request.id}`} className="p-3 bg-slate-700/50 rounded border border-slate-600/50">
                     <div className="flex items-center justify-between">
                       <div>
-                        <h4 className="text-white font-medium">{request.employees?.name}</h4>
-                        <p className="text-slate-400 text-sm">{request.employees?.nip} - {request.employees?.position_name}</p>
+                        <h4 className="text-white font-medium">{request.employee_name}</h4>
+                        <p className="text-slate-400 text-sm">{request.employee_nip} - {request.employee_department}</p>
+                        <p className="text-slate-500 text-xs mt-1">Dari usulan: {request.proposal_title}</p>
                       </div>
                       <div className="text-right">
-                        <Badge variant="outline">{request.leave_types?.name}</Badge>
+                        <Badge variant="outline">{request.leave_type_name}</Badge>
                         <p className="text-slate-400 text-sm mt-1">{request.days_requested} hari</p>
                       </div>
                     </div>
