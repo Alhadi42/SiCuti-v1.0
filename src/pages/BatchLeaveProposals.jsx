@@ -73,52 +73,6 @@ const BatchLeaveProposals = () => {
       setUnitProposals([]);
       return;
 
-      // Group proposals by unit
-      const unitProposalsMap = {};
-
-      if (allProposals && allProposals.length > 0) {
-        allProposals.forEach(proposal => {
-          const unitName = proposal.proposer_unit;
-
-          if (!unitProposalsMap[unitName]) {
-            unitProposalsMap[unitName] = {
-              unitName,
-              proposals: [],
-              totalRequests: 0,
-              totalEmployees: 0,
-              totalDays: 0,
-              dateRange: { earliest: null, latest: null }
-            };
-          }
-
-          // Attach proposal items to the proposal
-          proposal.leave_proposal_items = proposalItemsMap[proposal.id] || [];
-
-          unitProposalsMap[unitName].proposals.push(proposal);
-          unitProposalsMap[unitName].totalRequests += proposal.leave_proposal_items.length;
-          unitProposalsMap[unitName].totalEmployees += proposal.total_employees || 0;
-
-          // Calculate total days and date range
-          proposal.leave_proposal_items.forEach(item => {
-            unitProposalsMap[unitName].totalDays += item.days_requested || 0;
-
-            const startDate = new Date(item.start_date);
-            const endDate = new Date(item.end_date);
-
-            if (!unitProposalsMap[unitName].dateRange.earliest || startDate < unitProposalsMap[unitName].dateRange.earliest) {
-              unitProposalsMap[unitName].dateRange.earliest = startDate;
-            }
-            if (!unitProposalsMap[unitName].dateRange.latest || endDate > unitProposalsMap[unitName].dateRange.latest) {
-              unitProposalsMap[unitName].dateRange.latest = endDate;
-            }
-          });
-        });
-      }
-
-      const groupedProposals = Object.values(unitProposalsMap);
-      setUnitProposals(groupedProposals);
-
-      console.log("✅ Fetched", groupedProposals.length, "units with proposals");
 
     } catch (error) {
       console.error("Error fetching batch proposals:", error);
