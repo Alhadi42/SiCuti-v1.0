@@ -242,6 +242,18 @@ const BatchLeaveProposals = () => {
       setUnitProposals(groupedRequests);
       setConnectionError(false); // Reset error state on successful fetch
 
+      // Cache successful data for offline use
+      try {
+        localStorage.setItem('cachedBatchProposals', JSON.stringify({
+          data: groupedRequests,
+          timestamp: Date.now(),
+          userRole: currentUser?.role
+        }));
+        console.log("💾 Data cached successfully");
+      } catch (cacheError) {
+        console.warn("⚠️ Failed to cache data:", cacheError);
+      }
+
 
     } catch (error) {
       console.error("Error fetching batch proposals:", error);
