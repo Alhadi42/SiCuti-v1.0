@@ -92,7 +92,13 @@ const BatchLeaveProposals = () => {
       if (allProposals && allProposals.length > 0) {
         console.log("📊 Proposal details:");
         allProposals.forEach((prop, index) => {
-          console.log(`  ${index + 1}. ID: ${prop.id}, Unit: "${prop.proposer_unit}", Title: "${prop.proposal_title}", Status: ${prop.status}`);
+          console.log(`  ${index + 1}. ID: ${prop.id}`);
+          console.log(`     Unit: "${prop.proposer_unit}"`);
+          console.log(`     Title: "${prop.proposal_title}"`);
+          console.log(`     Status: ${prop.status}`);
+          console.log(`     Proposer: ${prop.proposer_name}`);
+          console.log(`     Created: ${prop.created_at}`);
+          console.log(`     User Info:`, prop.proposed_by_user);
         });
       }
 
@@ -514,7 +520,7 @@ const BatchLeaveProposals = () => {
                       </div>
                     </div>
                     <div className="mt-2 text-sm text-slate-300">
-                      📅 {format(new Date(request.start_date), "dd MMM", { locale: id })} - {format(new Date(request.end_date), "dd MMM yyyy", { locale: id })}
+                      �� {format(new Date(request.start_date), "dd MMM", { locale: id })} - {format(new Date(request.end_date), "dd MMM yyyy", { locale: id })}
                       {request.reason && (
                         <div className="mt-1 text-slate-400">
                           💬 {request.reason}
