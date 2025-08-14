@@ -21,18 +21,7 @@ export const useLeaveProposals = () => {
 
       let query = supabase
         .from("leave_proposals")
-        .select(`
-          *,
-          leave_proposal_items (
-            id,
-            employee_name,
-            employee_nip,
-            leave_type_name,
-            start_date,
-            end_date,
-            days_requested
-          )
-        `)
+        .select("*")
         .order("created_at", { ascending: false });
 
       // Apply unit-based filtering
