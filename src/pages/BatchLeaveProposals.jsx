@@ -56,6 +56,8 @@ const BatchLeaveProposals = () => {
   const [leaveTypeClassification, setLeaveTypeClassification] = useState({});
   const [generatingLetter, setGeneratingLetter] = useState(false);
   const [currentlyGenerating, setCurrentlyGenerating] = useState(null);
+  const [availableTemplates, setAvailableTemplates] = useState([]);
+  const [selectedTemplate, setSelectedTemplate] = useState(null);
 
   // Check user permission
   if (!currentUser || currentUser.role !== 'master_admin') {
