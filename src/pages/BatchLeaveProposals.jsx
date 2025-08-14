@@ -72,26 +72,11 @@ const BatchLeaveProposals = () => {
       console.log("🔍 Current user unit:", currentUser?.unitKerja);
 
       // Get actual proposals from admin units
-      // For master admin, we should be able to see all proposals
-      let { data: allProposals, error: allProposalsError } = await supabase
+      // Use simple query without foreign key join to avoid relationship errors
+      const { data: allProposals, error: allProposalsError } = await supabase
         .from("leave_proposals")
-        .select(`
-          *,
-          proposed_by_user:users!leave_proposals_proposed_by_fkey(username, unit_kerja)
-        `)
+        .select("*")
         .order("created_at", { ascending: false });
-
-      // Fallback: if join fails, try simple query
-      if (allProposalsError && (allProposalsError.message?.includes("foreign key") || allProposalsError.message?.includes("relationship"))) {
-        console.log("🔄 Fallback: Using simple query without user join");
-        const fallbackResult = await supabase
-          .from("leave_proposals")
-          .select("*")
-          .order("created_at", { ascending: false });
-
-        allProposals = fallbackResult.data;
-        allProposalsError = fallbackResult.error;
-      }
 
       if (allProposalsError) {
         console.error("Error fetching all proposals:", allProposalsError);
