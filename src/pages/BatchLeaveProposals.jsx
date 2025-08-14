@@ -261,6 +261,37 @@ const BatchLeaveProposals = () => {
     }
   };
 
+  const handleRestoreProposal = async (unit) => {
+    try {
+      const proposalKey = `${unit.unitName}|${unit.proposalDate}`;
+
+      // Remove from completed proposals set
+      setCompletedProposals(prev => {
+        const newSet = new Set(prev);
+        newSet.delete(proposalKey);
+        return newSet;
+      });
+
+      // Update localStorage
+      const completedList = JSON.parse(localStorage.getItem('completedProposals') || '[]');
+      const updatedList = completedList.filter(key => key !== proposalKey);
+      localStorage.setItem('completedProposals', JSON.stringify(updatedList));
+
+      toast({
+        title: "Berhasil",
+        description: `Usulan cuti dari ${unit.unitName} telah dikembalikan ke daftar aktif`,
+      });
+
+    } catch (error) {
+      console.error("Error restoring proposal:", error);
+      toast({
+        title: "Error",
+        description: "Gagal mengembalikan usulan: " + (error.message || "Unknown error"),
+        variant: "destructive",
+      });
+    }
+  };
+
   const handleAddToBatchLetter = async (unit) => {
     try {
       toast({
