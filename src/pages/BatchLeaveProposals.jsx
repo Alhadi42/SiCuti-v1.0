@@ -67,142 +67,92 @@ const BatchLeaveProposals = () => {
   const fetchBatchProposals = useCallback(async () => {
     setIsLoading(true);
     try {
-      console.log("🔍 Fetching batch proposals by unit...");
+      console.log("🔍 Fetching leave requests grouped by unit...");
       console.log("🔍 Current user role:", currentUser?.role);
       console.log("🔍 Current user unit:", currentUser?.unitKerja);
 
-      // Get actual proposals from admin units
-      // Use simple query without foreign key join to avoid relationship errors
-      const { data: allProposals, error: allProposalsError } = await supabase
-        .from("leave_proposals")
-        .select("*")
+      // Get leave requests with employee and leave type information
+      const { data: leaveRequests, error: requestsError } = await supabase
+        .from("leave_requests")
+        .select(`
+          *,
+          employees (
+            id,
+            name,
+            nip,
+            department,
+            position_name
+          ),
+          leave_types (
+            id,
+            name
+          )
+        `)
         .order("created_at", { ascending: false });
 
-      if (allProposalsError) {
-        console.error("Error fetching all proposals:", allProposalsError);
-        console.error("Error code:", allProposalsError.code);
-        console.error("Error message:", allProposalsError.message);
-        console.error("Error details:", allProposalsError.details);
-
-        // Check if it's a permission/RLS issue
-        if (allProposalsError.code === "42501" || allProposalsError.message?.includes("permission") || allProposalsError.message?.includes("policy")) {
-          console.error("🚨 RLS Policy Issue: Master Admin cannot access proposals");
-          toast({
-            title: "Permission Error",
-            description: "Master Admin tidak dapat mengakses usulan. Periksa RLS policies di database.",
-            variant: "destructive",
-          });
-        }
-
-        // Check if it's a relationship issue
-        if (allProposalsError.code === "PGRST200" || allProposalsError.message?.includes("relationship") || allProposalsError.message?.includes("foreign key")) {
-          console.error("🚨 Database Relationship Issue:", allProposalsError.message);
-          toast({
-            title: "Database Error",
-            description: "Masalah relasi database. Foreign key constraint perlu diperbaiki.",
-            variant: "destructive",
-          });
-        }
-
-        throw allProposalsError;
+      if (requestsError) {
+        console.error("Error fetching leave requests:", requestsError);
+        console.error("Error code:", requestsError.code);
+        console.error("Error message:", requestsError.message);
+        throw requestsError;
       }
 
-      console.log("📊 Raw proposals from database:", allProposals);
-      console.log("📊 Total proposals found:", allProposals?.length || 0);
+      console.log("📊 Raw leave requests from database:", leaveRequests);
+      console.log("📊 Total leave requests found:", leaveRequests?.length || 0);
 
-      if (allProposals && allProposals.length > 0) {
-        console.log("📊 Proposal details:");
-        allProposals.forEach((prop, index) => {
-          console.log(`  ${index + 1}. ID: ${prop.id}`);
-          console.log(`     Unit: "${prop.proposer_unit}"`);
-          console.log(`     Title: "${prop.proposal_title}"`);
-          console.log(`     Status: ${prop.status}`);
-          console.log(`     Proposer: ${prop.proposer_name}`);
-          console.log(`     Proposed By ID: ${prop.proposed_by}`);
-          console.log(`     Created: ${prop.created_at}`);
-        });
-      }
+      // Group requests by employee department (unit kerja)
+      const unitRequestsMap = {};
 
-      // Get proposal items separately if proposals exist
-      let proposalItemsMap = {};
-      if (allProposals && allProposals.length > 0) {
-        const proposalIds = allProposals.map(p => p.id);
+      if (leaveRequests && leaveRequests.length > 0) {
+        leaveRequests.forEach(request => {
+          const unitName = request.employees?.department;
 
-        const { data: proposalItems, error: itemsError } = await supabase
-          .from("leave_proposal_items")
-          .select("*")
-          .in("proposal_id", proposalIds);
+          // Skip requests without department info
+          if (!unitName) {
+            console.warn("⚠️ Skipping request without department:", request.id);
+            return;
+          }
 
-        if (itemsError) {
-          console.error("Error fetching proposal items:", itemsError);
-          throw itemsError;
-        }
-
-        // Group items by proposal_id
-        if (proposalItems) {
-          console.log("📊 Raw proposal items from database:", proposalItems);
-          console.log("📊 Total proposal items found:", proposalItems.length);
-
-          proposalItems.forEach(item => {
-            if (!proposalItemsMap[item.proposal_id]) {
-              proposalItemsMap[item.proposal_id] = [];
-            }
-            proposalItemsMap[item.proposal_id].push(item);
-          });
-
-          console.log("📊 Grouped proposal items map:", proposalItemsMap);
-        }
-      }
-
-      // Group proposals by unit
-      const unitProposalsMap = {};
-
-      if (allProposals && allProposals.length > 0) {
-        allProposals.forEach(proposal => {
-          const unitName = proposal.proposer_unit;
-
-          if (!unitProposalsMap[unitName]) {
-            unitProposalsMap[unitName] = {
+          if (!unitRequestsMap[unitName]) {
+            unitRequestsMap[unitName] = {
               unitName,
-              proposals: [],
+              requests: [],
               totalRequests: 0,
-              totalEmployees: 0,
+              totalEmployees: new Set(), // Use Set to count unique employees
               totalDays: 0,
               dateRange: { earliest: null, latest: null }
             };
           }
 
-          // Attach proposal items to the proposal
-          proposal.leave_proposal_items = proposalItemsMap[proposal.id] || [];
+          unitRequestsMap[unitName].requests.push(request);
+          unitRequestsMap[unitName].totalRequests += 1;
+          unitRequestsMap[unitName].totalEmployees.add(request.employee_id);
+          unitRequestsMap[unitName].totalDays += request.days_requested || 0;
 
-          unitProposalsMap[unitName].proposals.push(proposal);
-          unitProposalsMap[unitName].totalRequests += proposal.leave_proposal_items.length;
-          unitProposalsMap[unitName].totalEmployees += proposal.total_employees || 0;
+          // Calculate date range
+          const startDate = new Date(request.start_date);
+          const endDate = new Date(request.end_date);
 
-          // Calculate total days and date range
-          proposal.leave_proposal_items.forEach(item => {
-            unitProposalsMap[unitName].totalDays += item.days_requested || 0;
-
-            const startDate = new Date(item.start_date);
-            const endDate = new Date(item.end_date);
-
-            if (!unitProposalsMap[unitName].dateRange.earliest || startDate < unitProposalsMap[unitName].dateRange.earliest) {
-              unitProposalsMap[unitName].dateRange.earliest = startDate;
-            }
-            if (!unitProposalsMap[unitName].dateRange.latest || endDate > unitProposalsMap[unitName].dateRange.latest) {
-              unitProposalsMap[unitName].dateRange.latest = endDate;
-            }
-          });
+          if (!unitRequestsMap[unitName].dateRange.earliest || startDate < unitRequestsMap[unitName].dateRange.earliest) {
+            unitRequestsMap[unitName].dateRange.earliest = startDate;
+          }
+          if (!unitRequestsMap[unitName].dateRange.latest || endDate > unitRequestsMap[unitName].dateRange.latest) {
+            unitRequestsMap[unitName].dateRange.latest = endDate;
+          }
         });
       }
 
-      const groupedProposals = Object.values(unitProposalsMap);
+      // Convert Set to count for totalEmployees
+      const groupedRequests = Object.values(unitRequestsMap).map(unit => ({
+        ...unit,
+        totalEmployees: unit.totalEmployees.size
+      }));
 
-      console.log("📊 Unit proposals map:", unitProposalsMap);
-      console.log("📊 Final grouped proposals:", groupedProposals);
-      console.log("✅ Fetched", groupedProposals.length, "units with proposals");
+      console.log("📊 Unit requests map:", unitRequestsMap);
+      console.log("📊 Final grouped requests:", groupedRequests);
+      console.log("✅ Fetched", groupedRequests.length, "units with leave requests");
 
-      setUnitProposals(groupedProposals);
+      setUnitProposals(groupedRequests);
 
 
     } catch (error) {
