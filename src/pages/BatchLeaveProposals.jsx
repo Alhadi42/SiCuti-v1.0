@@ -927,7 +927,7 @@ const BatchLeaveProposals = () => {
               Klasifikasi Jenis Cuti - {selectedUnitForBatch?.unitName}
             </DialogTitle>
             <DialogDescription className="text-slate-400">
-              Pilih jenis cuti untuk membuat surat batch yang sesuai. Setiap jenis cuti akan menggunakan template surat yang berbeda.
+              Pilih template dan jenis cuti untuk membuat surat batch yang sesuai.
             </DialogDescription>
           </DialogHeader>
 
