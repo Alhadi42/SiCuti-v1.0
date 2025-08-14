@@ -116,23 +116,34 @@ const BatchLeaveProposals = () => {
       }
 
       // Get leave requests with employee and leave type information
-      const { data: leaveRequests, error: requestsError } = await supabase
-        .from("leave_requests")
-        .select(`
-          *,
-          employees (
-            id,
-            name,
-            nip,
-            department,
-            position_name
-          ),
-          leave_types (
-            id,
-            name
-          )
-        `)
-        .order("created_at", { ascending: false });
+      console.log("📊 Executing main Supabase query...");
+      const startTime = Date.now();
+
+      const { data: leaveRequests, error: requestsError } = await Promise.race([
+        supabase
+          .from("leave_requests")
+          .select(`
+            *,
+            employees (
+              id,
+              name,
+              nip,
+              department,
+              position_name
+            ),
+            leave_types (
+              id,
+              name
+            )
+          `)
+          .order("created_at", { ascending: false }),
+        new Promise((_, reject) =>
+          setTimeout(() => reject(new Error("Query timeout after 15 seconds")), 15000)
+        )
+      ]);
+
+      const queryTime = Date.now() - startTime;
+      console.log(`⏱️ Query completed in ${queryTime}ms`);
 
       if (requestsError) {
         console.error("Error fetching leave requests:", requestsError);
