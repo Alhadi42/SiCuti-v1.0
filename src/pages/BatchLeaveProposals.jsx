@@ -373,7 +373,12 @@ const BatchLeaveProposals = () => {
                       <div className="flex-1">
                         <div className="flex items-center space-x-3 mb-2">
                           <Building2 className="w-5 h-5 text-blue-400" />
-                          <h3 className="text-white font-medium">{unit.unitName}</h3>
+                          <div className="flex-1">
+                            <h3 className="text-white font-medium">{unit.unitName}</h3>
+                            <p className="text-slate-400 text-sm">
+                              Tanggal Usulan: {format(new Date(unit.proposalDate), "dd MMMM yyyy", { locale: id })}
+                            </p>
+                          </div>
                           <Badge variant="secondary">{unit.totalRequests} usulan</Badge>
                         </div>
                         <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm text-slate-400 mb-3">
