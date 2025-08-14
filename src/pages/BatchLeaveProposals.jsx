@@ -164,9 +164,12 @@ const BatchLeaveProposals = () => {
       }
 
       const groupedProposals = Object.values(unitProposalsMap);
-      setUnitProposals(groupedProposals);
 
+      console.log("📊 Unit proposals map:", unitProposalsMap);
+      console.log("📊 Final grouped proposals:", groupedProposals);
       console.log("✅ Fetched", groupedProposals.length, "units with proposals");
+
+      setUnitProposals(groupedProposals);
 
 
     } catch (error) {
