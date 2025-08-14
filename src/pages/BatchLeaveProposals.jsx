@@ -989,10 +989,10 @@ const BatchLeaveProposals = () => {
                       </div>
                       <Button
                         onClick={() => {
-                          handleGenerateBatchLetter(leaveType, requests);
+                          handleGenerateBatchLetter(leaveType, requests, selectedTemplate);
                           setShowBatchDialog(false);
                         }}
-                        disabled={generatingLetter}
+                        disabled={generatingLetter || !selectedTemplate || availableTemplates.length === 0}
                         className="bg-blue-600 hover:bg-blue-700 text-white disabled:opacity-50"
                       >
                         {currentlyGenerating === leaveType ? (
