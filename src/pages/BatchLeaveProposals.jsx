@@ -369,7 +369,10 @@ const BatchLeaveProposals = () => {
     const proposalKey = `${unit.unitName}|${unit.proposalDate}`;
     const isCompleted = completedProposals.has(proposalKey);
 
-    return matchesSearch && matchesSelection && !isCompleted;
+    // Show based on completion toggle
+    const showBasedOnCompletion = showCompleted ? isCompleted : !isCompleted;
+
+    return matchesSearch && matchesSelection && showBasedOnCompletion;
   });
 
   // Get unique units for filter dropdown
