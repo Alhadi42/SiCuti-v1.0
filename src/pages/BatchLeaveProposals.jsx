@@ -380,6 +380,11 @@ const BatchLeaveProposals = () => {
                 <p className="text-slate-400 text-sm">
                   Usulan cuti dari admin unit akan muncul di sini untuk dikelola secara batch.
                 </p>
+                <div className="mt-4 p-3 bg-blue-900/20 border border-blue-700/50 rounded-lg max-w-md mx-auto">
+                  <p className="text-blue-400 text-sm">
+                    💡 <strong>Panduan:</strong> Admin unit dapat membuat usulan di menu "Usulan Cuti"
+                  </p>
+                </div>
               </div>
             ) : (
               <div className="space-y-4">
