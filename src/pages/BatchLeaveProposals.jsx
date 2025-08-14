@@ -181,9 +181,29 @@ const BatchLeaveProposals = () => {
       console.error("Error fetching batch proposals:", error);
       setUnitProposals([]);
 
+      let errorMessage = "Gagal mengambil data usulan cuti";
+      let errorTitle = "Error";
+
+      // Handle different types of errors
+      if (error.message?.includes("Failed to fetch") || error.message?.includes("fetch")) {
+        errorTitle = "Koneksi Bermasalah";
+        errorMessage = "Tidak dapat terhubung ke server. Periksa koneksi internet Anda.";
+      } else if (error.message?.includes("No internet connection")) {
+        errorTitle = "Tidak Ada Internet";
+        errorMessage = "Periksa koneksi internet Anda dan coba lagi.";
+      } else if (error.code === "PGRST301") {
+        errorTitle = "Masalah Database";
+        errorMessage = "Tabel atau kolom tidak ditemukan. Sistem perlu update database.";
+      } else if (error.code === "42501") {
+        errorTitle = "Akses Ditolak";
+        errorMessage = "Anda tidak memiliki izin untuk mengakses data ini.";
+      } else {
+        errorMessage = error.message || "Terjadi kesalahan yang tidak diketahui";
+      }
+
       toast({
-        title: "Error",
-        description: "Gagal mengambil data usulan cuti: " + (error.message || "Unknown error"),
+        title: errorTitle,
+        description: errorMessage,
         variant: "destructive",
       });
     } finally {
