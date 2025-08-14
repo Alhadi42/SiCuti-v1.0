@@ -267,12 +267,12 @@ const BatchLeaveProposals = () => {
         className="flex justify-between items-center"
       >
         <div>
-          <h1 className="text-3xl font-bold text-white mb-2">Usulan Cuti per Unit</h1>
+          <h1 className="text-3xl font-bold text-white mb-2">Pengajuan Cuti per Unit</h1>
           <p className="text-slate-400 mb-1">
-            Kelola usulan cuti yang dikelompokkan berdasarkan unit kerja
+            Kelola pengajuan cuti pegawai yang dikelompokkan berdasarkan unit kerja
           </p>
-          <p className="text-amber-400 text-sm">
-            ⚠️ Status: Menunggu usulan dari admin unit - Sistem siap menerima usulan batch
+          <p className="text-blue-400 text-sm">
+            💡 Data diambil dari pengajuan cuti yang dibuat melalui menu "Pengajuan Cuti"
           </p>
         </div>
         <Button
