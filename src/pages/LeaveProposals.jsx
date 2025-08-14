@@ -135,6 +135,30 @@ const LeaveProposals = () => {
     );
   }
 
+  // Show setup message if tables don't exist
+  if (!tableExists) {
+    return (
+      <div className="p-6">
+        <Card className="bg-slate-800/50 border-slate-700/50">
+          <CardContent className="p-8">
+            <div className="text-center">
+              <FileText className="w-16 h-16 text-slate-600 mx-auto mb-4" />
+              <h2 className="text-xl font-bold text-white mb-3">Fitur Usulan Cuti Belum Tersedia</h2>
+              <p className="text-slate-400 mb-4">
+                Sistem usulan cuti belum dikonfigurasi. Tabel database yang diperlukan belum dibuat.
+              </p>
+              <div className="p-4 bg-amber-900/20 border border-amber-700/50 rounded-lg max-w-md mx-auto">
+                <p className="text-amber-400 text-sm">
+                  <strong>⚠️ Setup Diperlukan:</strong> Hubungi administrator database untuk membuat tabel leave_proposals dan leave_proposal_items.
+                </p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
+
   return (
     <div className="p-6 space-y-6">
       {/* Header */}
