@@ -108,8 +108,8 @@ const BatchLeaveProposals = () => {
           console.log(`     Title: "${prop.proposal_title}"`);
           console.log(`     Status: ${prop.status}`);
           console.log(`     Proposer: ${prop.proposer_name}`);
+          console.log(`     Proposed By ID: ${prop.proposed_by}`);
           console.log(`     Created: ${prop.created_at}`);
-          console.log(`     User Info:`, prop.proposed_by_user);
         });
       }
 
