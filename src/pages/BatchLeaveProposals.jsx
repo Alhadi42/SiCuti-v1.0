@@ -933,6 +933,28 @@ const BatchLeaveProposals = () => {
 
           {selectedUnitForBatch && (
             <div className="space-y-4 max-h-96 overflow-y-auto">
+              {/* Template Selection */}
+              <div className="p-4 bg-slate-700/30 rounded-lg border border-slate-600/50">
+                <Label className="text-slate-300 text-sm font-medium">Pilih Template DOCX</Label>
+                <Select value={selectedTemplate} onValueChange={setSelectedTemplate}>
+                  <SelectTrigger className="bg-slate-700/50 border-slate-600/50 text-white mt-2">
+                    <SelectValue placeholder="Pilih template untuk surat batch..." />
+                  </SelectTrigger>
+                  <SelectContent className="bg-slate-700 border-slate-600">
+                    {availableTemplates.map(template => (
+                      <SelectItem key={template.id} value={template.id}>
+                        {template.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                {availableTemplates.length === 0 && (
+                  <p className="text-red-400 text-sm mt-2">
+                    ⚠️ Tidak ada template tersedia. Buat template di menu Template Management.
+                  </p>
+                )}
+              </div>
+
               {/* Summary Section */}
               <div className="grid grid-cols-2 md:grid-cols-4 gap-4 p-4 bg-slate-700/30 rounded-lg">
                 <div className="text-center">
