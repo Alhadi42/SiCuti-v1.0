@@ -397,6 +397,9 @@ const BatchLeaveProposals = () => {
         description: "Gagal membuat surat batch: " + (error.message || "Unknown error"),
         variant: "destructive",
       });
+    } finally {
+      setGeneratingLetter(false);
+      setCurrentlyGenerating(null);
     }
   };
 
