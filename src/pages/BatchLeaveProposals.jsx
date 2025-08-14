@@ -331,12 +331,13 @@ const BatchLeaveProposals = () => {
           )}
         </div>
         <Button
-          onClick={fetchBatchProposals}
+          onClick={() => fetchBatchProposals(0)}
           variant="outline"
-          className="border-slate-600 text-slate-300 hover:text-white"
+          className={`border-slate-600 text-slate-300 hover:text-white ${connectionError ? 'border-red-500 text-red-400' : ''}`}
+          disabled={isLoading}
         >
-          <RefreshCw className="w-4 h-4 mr-2" />
-          Refresh
+          <RefreshCw className={`w-4 h-4 mr-2 ${isLoading ? 'animate-spin' : ''}`} />
+          {connectionError ? 'Coba Lagi' : 'Refresh'}
         </Button>
       </motion.div>
 
@@ -534,7 +535,7 @@ const BatchLeaveProposals = () => {
                       </div>
                     </div>
                     <div className="mt-2 text-sm text-slate-300">
-                      📅 {format(new Date(request.start_date), "dd MMM", { locale: id })} - {format(new Date(request.end_date), "dd MMM yyyy", { locale: id })}
+                      ��� {format(new Date(request.start_date), "dd MMM", { locale: id })} - {format(new Date(request.end_date), "dd MMM yyyy", { locale: id })}
                       {request.reason && (
                         <div className="mt-1 text-slate-400">
                           💬 {request.reason}
