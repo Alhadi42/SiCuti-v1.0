@@ -535,23 +535,28 @@ const BatchLeaveProposals = () => {
       });
 
       // Validate and prepare template content
-      let templateContent = template.content;
+      // Templates are typically stored as { content: { data: "base64..." } }
+      let templateContent = template.content?.data || template.content || template.template_data;
+
+      console.log("🔍 Template content structure:", {
+        hasContent: !!template.content,
+        hasContentData: !!template.content?.data,
+        hasTemplateData: !!template.template_data,
+        contentType: typeof templateContent,
+        isString: typeof templateContent === 'string'
+      });
 
       // Check if content is valid
       if (!templateContent) {
-        throw new Error("Template content is empty or undefined");
+        throw new Error("Template content is empty or undefined. Template might not be properly uploaded.");
       }
 
       // If content is not a string, convert it
       if (typeof templateContent !== 'string') {
         console.log("⚠️ Template content is not string, attempting conversion...");
 
-        // If it's an object with data property (common database storage pattern)
-        if (templateContent.data) {
-          templateContent = templateContent.data;
-        }
         // If it's a Buffer or ArrayBuffer, convert to base64
-        else if (templateContent instanceof ArrayBuffer || templateContent.buffer) {
+        if (templateContent instanceof ArrayBuffer || templateContent.buffer) {
           const uint8Array = new Uint8Array(templateContent);
           templateContent = btoa(String.fromCharCode.apply(null, uint8Array));
         }
