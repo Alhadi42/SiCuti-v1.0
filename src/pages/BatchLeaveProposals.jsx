@@ -455,7 +455,7 @@ const BatchLeaveProposals = () => {
       if (!templateId && availableTemplates.length === 0) {
         toast({
           title: "Template Tidak Tersedia",
-          description: "Tidak ada template DOCX yang tersedia. Silakan buat template terlebih dahulu.",
+          description: "Tidak ada template DOCX yang tersedia. Periksa koneksi atau buat template terlebih dahulu.",
           variant: "destructive",
         });
         return;
