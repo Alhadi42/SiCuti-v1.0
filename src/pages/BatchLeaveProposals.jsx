@@ -504,22 +504,33 @@ const BatchLeaveProposals = () => {
                           </div>
                         </div>
                       </div>
-                      <div className="flex space-x-2 ml-4">
+                      <div className="flex flex-col space-y-2 ml-4">
+                        <div className="flex space-x-2">
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => handleViewUnitDetail(unit)}
+                          >
+                            <Eye className="w-4 h-4 mr-1" />
+                            Detail
+                          </Button>
+                          <Button
+                            size="sm"
+                            onClick={() => handleAddToBatchLetter(unit)}
+                            className="bg-blue-600 hover:bg-blue-700 text-white"
+                          >
+                            <Plus className="w-4 h-4 mr-1" />
+                            Buat Surat Batch
+                          </Button>
+                        </div>
                         <Button
                           variant="outline"
                           size="sm"
-                          onClick={() => handleViewUnitDetail(unit)}
+                          onClick={() => handleMarkAsCompleted(unit)}
+                          className="bg-green-900/20 border-green-700/50 text-green-400 hover:bg-green-900/30 hover:text-green-300 w-full"
                         >
-                          <Eye className="w-4 h-4 mr-1" />
-                          Detail
-                        </Button>
-                        <Button
-                          size="sm"
-                          onClick={() => handleAddToBatchLetter(unit)}
-                          className="bg-blue-600 hover:bg-blue-700 text-white"
-                        >
-                          <Plus className="w-4 h-4 mr-1" />
-                          Buat Surat Batch
+                          <CheckCircle className="w-4 h-4 mr-1" />
+                          Selesai di Ajukan
                         </Button>
                       </div>
                     </div>
