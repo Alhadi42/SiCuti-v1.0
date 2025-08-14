@@ -529,12 +529,59 @@ const BatchLeaveProposals = () => {
         totalRequests: requests.length,
         templateId: template.id,
         templateName: template.name,
-        variableCount: Object.keys(variables).length
+        variableCount: Object.keys(variables).length,
+        contentType: typeof template.content,
+        contentLength: template.content?.length || 0
+      });
+
+      // Validate and prepare template content
+      let templateContent = template.content;
+
+      // Check if content is valid
+      if (!templateContent) {
+        throw new Error("Template content is empty or undefined");
+      }
+
+      // If content is not a string, convert it
+      if (typeof templateContent !== 'string') {
+        console.log("⚠️ Template content is not string, attempting conversion...");
+
+        // If it's an object with data property (common database storage pattern)
+        if (templateContent.data) {
+          templateContent = templateContent.data;
+        }
+        // If it's a Buffer or ArrayBuffer, convert to base64
+        else if (templateContent instanceof ArrayBuffer || templateContent.buffer) {
+          const uint8Array = new Uint8Array(templateContent);
+          templateContent = btoa(String.fromCharCode.apply(null, uint8Array));
+        }
+        // If it's an array (Uint8Array)
+        else if (Array.isArray(templateContent) || templateContent.constructor === Uint8Array) {
+          templateContent = btoa(String.fromCharCode.apply(null, templateContent));
+        }
+        // Last resort: stringify and encode
+        else {
+          console.warn("Unknown template content type, attempting JSON stringify...");
+          templateContent = btoa(JSON.stringify(templateContent));
+        }
+      }
+
+      // Ensure it's base64 format
+      if (!templateContent.includes(',') && !templateContent.match(/^[A-Za-z0-9+/]*={0,2}$/)) {
+        console.log("⚠️ Content doesn't appear to be base64, wrapping...");
+        templateContent = `data:application/vnd.openxmlformats-officedocument.wordprocessingml.document;base64,${templateContent}`;
+      }
+
+      console.log("✅ Template content prepared:", {
+        type: typeof templateContent,
+        length: templateContent.length,
+        hasComma: templateContent.includes(','),
+        isBase64: templateContent.match(/^[A-Za-z0-9+/]*={0,2}$/) !== null
       });
 
       // Process template using existing system
       const processedBuffer = await processDocxTemplate(
-        template.content,
+        templateContent,
         variables,
         { preserveFormatting: true }
       );
