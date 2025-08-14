@@ -41,6 +41,17 @@ const LeaveProposals = () => {
 
   const handleCreateProposal = async (proposalData) => {
     try {
+      // Check if table exists first
+      const { data: checkData, error: checkError } = await supabase
+        .from("leave_proposals")
+        .select("*")
+        .limit(1);
+
+      if (checkError && checkError.code === "42P01") {
+        setTableExists(false);
+        throw new Error("Tabel leave_proposals belum tersedia. Hubungi administrator untuk setup database.");
+      }
+
       // Create proposal
       const { data: proposal, error: proposalError } = await supabase
         .from("leave_proposals")
