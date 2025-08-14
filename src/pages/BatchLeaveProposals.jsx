@@ -543,13 +543,31 @@ const BatchLeaveProposals = () => {
   // Get unique units for filter dropdown
   const uniqueUnits = [...new Set(unitProposals.map(unit => unit.unitName))];
 
+  // Load available templates
+  const loadTemplates = useCallback(async () => {
+    try {
+      const { data, error } = await supabase
+        .from("templates")
+        .select("*")
+        .eq("type", "docx")
+        .order("name");
+
+      if (error) throw error;
+
+      setAvailableTemplates(data || []);
+    } catch (error) {
+      console.error("Error loading templates:", error);
+    }
+  }, []);
+
   useEffect(() => {
     // Load completed proposals from localStorage
     const savedCompleted = JSON.parse(localStorage.getItem('completedProposals') || '[]');
     setCompletedProposals(new Set(savedCompleted));
 
     fetchBatchProposals();
-  }, [fetchBatchProposals]);
+    loadTemplates();
+  }, [fetchBatchProposals, loadTemplates]);
 
   return (
     <div className="p-6 space-y-6">
