@@ -721,6 +721,95 @@ const BatchLeaveProposals = () => {
           )}
         </DialogContent>
       </Dialog>
+
+      {/* Batch Letter Classification Dialog */}
+      <Dialog open={showBatchDialog} onOpenChange={setShowBatchDialog}>
+        <DialogContent className="max-w-4xl bg-slate-800 border-slate-700">
+          <DialogHeader>
+            <DialogTitle className="text-white">
+              Klasifikasi Jenis Cuti - {selectedUnitForBatch?.unitName}
+            </DialogTitle>
+            <DialogDescription className="text-slate-400">
+              Pilih jenis cuti untuk membuat surat batch yang sesuai. Setiap jenis cuti akan menggunakan template surat yang berbeda.
+            </DialogDescription>
+          </DialogHeader>
+
+          {selectedUnitForBatch && (
+            <div className="space-y-4 max-h-96 overflow-y-auto">
+              <div className="grid grid-cols-1 gap-4">
+                {Object.entries(leaveTypeClassification).map(([leaveType, requests]) => (
+                  <div key={leaveType} className="p-4 bg-slate-700/30 rounded-lg border border-slate-600/50">
+                    <div className="flex items-center justify-between mb-3">
+                      <div>
+                        <h3 className="text-white font-medium text-lg">{leaveType}</h3>
+                        <p className="text-slate-400 text-sm">
+                          {requests.length} pengajuan cuti • {requests.reduce((sum, req) => sum + (req.days_requested || 0), 0)} hari total
+                        </p>
+                      </div>
+                      <Button
+                        onClick={() => {
+                          handleGenerateBatchLetter(leaveType, requests);
+                          setShowBatchDialog(false);
+                        }}
+                        className="bg-blue-600 hover:bg-blue-700 text-white"
+                      >
+                        <FileText className="w-4 h-4 mr-2" />
+                        Buat Surat {leaveType}
+                      </Button>
+                    </div>
+
+                    {/* Show employee list for this leave type */}
+                    <div className="space-y-2">
+                      <h4 className="text-slate-300 text-sm font-medium">Daftar Pegawai:</h4>
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+                        {requests.map((request, index) => (
+                          <div key={request.id} className="p-2 bg-slate-800/50 rounded text-sm">
+                            <div className="text-white font-medium">{request.employees?.name}</div>
+                            <div className="text-slate-400">
+                              {request.employees?.nip} • {request.days_requested} hari
+                            </div>
+                            <div className="text-slate-500 text-xs">
+                              {format(new Date(request.start_date), "dd MMM", { locale: id })} -
+                              {format(new Date(request.end_date), "dd MMM yyyy", { locale: id })}
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+
+              {/* Generate All Types Button */}
+              <div className="pt-4 border-t border-slate-600">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <h3 className="text-white font-medium">Buat Semua Surat Sekaligus</h3>
+                    <p className="text-slate-400 text-sm">
+                      Generate surat terpisah untuk setiap jenis cuti ({Object.keys(leaveTypeClassification).length} jenis)
+                    </p>
+                  </div>
+                  <Button
+                    onClick={async () => {
+                      for (const [leaveType, requests] of Object.entries(leaveTypeClassification)) {
+                        await handleGenerateBatchLetter(leaveType, requests);
+                        // Add small delay between downloads
+                        await new Promise(resolve => setTimeout(resolve, 500));
+                      }
+                      setShowBatchDialog(false);
+                    }}
+                    variant="outline"
+                    className="border-green-600 text-green-400 hover:bg-green-900/20"
+                  >
+                    <Plus className="w-4 h-4 mr-2" />
+                    Buat Semua Surat
+                  </Button>
+                </div>
+              </div>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };
