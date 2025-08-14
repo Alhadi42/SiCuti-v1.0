@@ -171,22 +171,7 @@ const BatchLeaveProposals = () => {
 
   const handleViewUnitDetail = async (unit) => {
     setSelectedUnitDetail(unit);
-
-    // Collect all proposal items from all proposals in this unit
-    const allProposalItems = [];
-    unit.proposals.forEach(proposal => {
-      if (proposal.leave_proposal_items) {
-        proposal.leave_proposal_items.forEach(item => {
-          allProposalItems.push({
-            ...item,
-            proposal_id: proposal.id,
-            proposal_title: proposal.proposal_title
-          });
-        });
-      }
-    });
-
-    setUnitLeaveRequests(allProposalItems);
+    setUnitLeaveRequests(unit.requests);
     setShowDetailDialog(true);
   };
 
