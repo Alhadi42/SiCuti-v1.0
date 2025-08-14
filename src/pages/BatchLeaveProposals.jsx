@@ -67,7 +67,7 @@ const BatchLeaveProposals = () => {
   const fetchBatchProposals = useCallback(async () => {
     setIsLoading(true);
     try {
-      console.log("🔍 Fetching leave requests grouped by unit...");
+      console.log("�� Fetching leave requests grouped by unit...");
       console.log("🔍 Current user role:", currentUser?.role);
       console.log("🔍 Current user unit:", currentUser?.unitKerja);
 
@@ -455,15 +455,15 @@ const BatchLeaveProposals = () => {
               
               <div className="space-y-2">
                 {unitLeaveRequests.map((request, index) => (
-                  <div key={`${request.proposal_id}-${request.id}`} className="p-3 bg-slate-700/50 rounded border border-slate-600/50">
+                  <div key={request.id} className="p-3 bg-slate-700/50 rounded border border-slate-600/50">
                     <div className="flex items-center justify-between">
                       <div>
-                        <h4 className="text-white font-medium">{request.employee_name}</h4>
-                        <p className="text-slate-400 text-sm">{request.employee_nip} - {request.employee_department}</p>
-                        <p className="text-slate-500 text-xs mt-1">Dari usulan: {request.proposal_title}</p>
+                        <h4 className="text-white font-medium">{request.employees?.name}</h4>
+                        <p className="text-slate-400 text-sm">{request.employees?.nip} - {request.employees?.position_name}</p>
+                        <p className="text-slate-500 text-xs mt-1">Departemen: {request.employees?.department}</p>
                       </div>
                       <div className="text-right">
-                        <Badge variant="outline">{request.leave_type_name}</Badge>
+                        <Badge variant="outline">{request.leave_types?.name}</Badge>
                         <p className="text-slate-400 text-sm mt-1">{request.days_requested} hari</p>
                       </div>
                     </div>
@@ -474,6 +474,9 @@ const BatchLeaveProposals = () => {
                           💬 {request.reason}
                         </div>
                       )}
+                      <div className="mt-1 text-slate-500 text-xs">
+                        Pengajuan: {format(new Date(request.created_at), "dd MMM yyyy HH:mm", { locale: id })}
+                      </div>
                     </div>
                   </div>
                 ))}
