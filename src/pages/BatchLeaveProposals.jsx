@@ -67,23 +67,40 @@ const BatchLeaveProposals = () => {
   const fetchBatchProposals = useCallback(async () => {
     setIsLoading(true);
     try {
-      console.log("🔍 Fetching batch proposals by unit...");
+      console.log("🔍 Checking leave proposals system...");
 
-      // Get actual proposals from admin units
+      // Check if leave_proposals table exists by attempting a simple query
       const { data: actualProposals, error: proposalsError } = await supabase
         .from("leave_proposals")
         .select("*")
-        .order("created_at", { ascending: false });
+        .limit(1);
 
       if (proposalsError) {
+        // If table doesn't exist, set empty state and return
+        if (proposalsError.code === "42P01") {
+          console.log("⚠️ Leave proposals table doesn't exist - feature not available");
+          setUnitProposals([]);
+          return;
+        }
         console.error("Error fetching proposals:", proposalsError);
         throw proposalsError;
       }
 
+      // If we get here, table exists, fetch all proposals
+      const { data: allProposals, error: allProposalsError } = await supabase
+        .from("leave_proposals")
+        .select("*")
+        .order("created_at", { ascending: false });
+
+      if (allProposalsError) {
+        console.error("Error fetching all proposals:", allProposalsError);
+        throw allProposalsError;
+      }
+
       // Get proposal items separately if proposals exist
       let proposalItemsMap = {};
-      if (actualProposals && actualProposals.length > 0) {
-        const proposalIds = actualProposals.map(p => p.id);
+      if (allProposals && allProposals.length > 0) {
+        const proposalIds = allProposals.map(p => p.id);
 
         const { data: proposalItems, error: itemsError } = await supabase
           .from("leave_proposal_items")
