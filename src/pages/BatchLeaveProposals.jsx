@@ -172,23 +172,13 @@ const BatchLeaveProposals = () => {
 
     } catch (error) {
       console.error("Error fetching batch proposals:", error);
+      setUnitProposals([]);
 
-      // Check if it's a table not found error
-      if (error.message && (error.message.includes("relation") || error.message.includes("table"))) {
-        console.log("⚠️ Leave proposals tables not found - system not fully set up yet");
-        setUnitProposals([]);
-        toast({
-          title: "Info",
-          description: "Sistem usulan cuti belum dikonfigurasi. Tabel database belum tersedia.",
-          variant: "default",
-        });
-      } else {
-        toast({
-          title: "Error",
-          description: "Gagal mengambil data usulan cuti: " + (error.message || "Unknown error"),
-          variant: "destructive",
-        });
-      }
+      toast({
+        title: "Error",
+        description: "Gagal mengambil data usulan cuti: " + (error.message || "Unknown error"),
+        variant: "destructive",
+      });
     } finally {
       setIsLoading(false);
     }
