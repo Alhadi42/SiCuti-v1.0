@@ -299,8 +299,11 @@ const BatchLeaveProposals = () => {
           <CardHeader>
             <CardTitle className="text-white flex items-center">
               <Filter className="w-5 h-5 mr-2" />
-              Filter Usulan
+              Filter Usulan per Tanggal
             </CardTitle>
+            <p className="text-slate-400 text-sm mt-1">
+              Usulan dikelompokkan berdasarkan unit kerja dan tanggal pengajuan
+            </p>
           </CardHeader>
           <CardContent>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
