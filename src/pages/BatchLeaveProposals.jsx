@@ -327,13 +327,17 @@ const BatchLeaveProposals = () => {
     }
   };
 
-  // Filter units based on search and selection
+  // Filter units based on search, selection, and completion status
   const filteredUnits = unitProposals.filter(unit => {
-    const matchesSearch = searchTerm === "" || 
+    const matchesSearch = searchTerm === "" ||
       unit.unitName.toLowerCase().includes(searchTerm.toLowerCase());
     const matchesSelection = selectedUnit === "all" || unit.unitName === selectedUnit;
-    
-    return matchesSearch && matchesSelection;
+
+    // Check if this proposal is marked as completed
+    const proposalKey = `${unit.unitName}|${unit.proposalDate}`;
+    const isCompleted = completedProposals.has(proposalKey);
+
+    return matchesSearch && matchesSelection && !isCompleted;
   });
 
   // Get unique units for filter dropdown
