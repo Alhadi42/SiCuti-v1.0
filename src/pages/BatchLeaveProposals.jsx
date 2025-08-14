@@ -320,9 +320,15 @@ const BatchLeaveProposals = () => {
           <p className="text-slate-400 mb-1">
             Kelola pengajuan cuti pegawai yang dikelompokkan berdasarkan unit kerja
           </p>
-          <p className="text-blue-400 text-sm">
-            💡 Data diambil dari pengajuan cuti yang dibuat melalui menu "Pengajuan Cuti"
-          </p>
+          {connectionError ? (
+            <p className="text-red-400 text-sm">
+              ⚠️ Masalah koneksi - Data mungkin tidak terbaru
+            </p>
+          ) : (
+            <p className="text-blue-400 text-sm">
+              💡 Data diambil dari pengajuan cuti yang dibuat melalui menu "Pengajuan Cuti"
+            </p>
+          )}
         </div>
         <Button
           onClick={fetchBatchProposals}
