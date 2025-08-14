@@ -496,10 +496,13 @@ const BatchLeaveProposals = () => {
         <Card className="bg-slate-800/50 border-slate-700/50">
           <CardHeader>
             <CardTitle className="text-white">
-              Daftar Usulan per Unit & Tanggal ({filteredUnits.length})
+              {showCompleted ? 'Usulan yang Selesai Diajukan' : 'Daftar Usulan per Unit & Tanggal'} ({filteredUnits.length})
             </CardTitle>
             <p className="text-slate-400 text-sm">
-              Setiap card menampilkan usulan cuti yang dibuat pada tanggal yang sama
+              {showCompleted
+                ? 'Usulan cuti yang sudah ditandai sebagai selesai diajukan'
+                : 'Setiap card menampilkan usulan cuti yang dibuat pada tanggal yang sama'
+              }
             </p>
           </CardHeader>
           <CardContent>
