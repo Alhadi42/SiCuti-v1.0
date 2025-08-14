@@ -127,8 +127,11 @@ const BatchLeaveProposals = () => {
       }
 
       // Get leave requests with employee and leave type information
-      console.log("📊 Executing main Supabase query...");
+      console.log("���� Executing main Supabase query...");
       const startTime = Date.now();
+
+      // Use shorter timeout for faster failure detection
+      const timeoutMs = retryCount === 0 ? 10000 : 5000; // 10s first try, 5s retries
 
       const { data: leaveRequests, error: requestsError } = await Promise.race([
         supabase
@@ -149,7 +152,7 @@ const BatchLeaveProposals = () => {
           `)
           .order("created_at", { ascending: false }),
         new Promise((_, reject) =>
-          setTimeout(() => reject(new Error("Query timeout after 15 seconds")), 15000)
+          setTimeout(() => reject(new Error(`Query timeout after ${timeoutMs/1000} seconds`)), timeoutMs)
         )
       ]);
 
