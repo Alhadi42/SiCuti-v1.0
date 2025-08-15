@@ -762,7 +762,7 @@ const BatchLeaveProposals = () => {
 
       toast({
         title: "Berhasil",
-        description: `Surat batch untuk ${requests.length} usulan ${leaveType} dari ${selectedUnitForBatch.unitName} berhasil dibuat dan diunduh`,
+        description: `Surat batch untuk ${completeRequests.length} usulan ${leaveType} dari ${selectedUnitForBatch.unitName} berhasil dibuat dan diunduh dengan data lengkap`,
       });
 
     } catch (error) {
