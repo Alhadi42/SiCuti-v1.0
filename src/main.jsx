@@ -10,6 +10,7 @@ import "@/utils/errorUtils.js";
 import "@/lib/productionOptimizer.js";
 import "@/lib/healthChecker.js";
 import "@/utils/errorTestUtility.js";
+import "@/utils/consoleTest.js";
 
 TempoDevtools.init();
 initDebugConsole();
