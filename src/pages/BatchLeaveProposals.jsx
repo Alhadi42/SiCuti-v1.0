@@ -596,7 +596,7 @@ const BatchLeaveProposals = () => {
       console.error("Error preparing batch letter:", error);
       toast({
         title: "Error",
-        description: "Gagal mempersiapkan surat batch: " + (error.message || "Unknown error"),
+        description: "Gagal mempersiapkan surat batch: " + safeErrorMessage(error),
         variant: "destructive",
       });
     }
