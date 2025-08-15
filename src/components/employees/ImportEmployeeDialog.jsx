@@ -170,7 +170,7 @@ const ImportEmployeeDialog = ({ isOpen, onOpenChange, onImportSuccess }) => {
         toast({
           variant: "destructive",
           title: "❌ Koneksi Gagal",
-          description: result.error,
+          description: typeof result.error === 'string' ? result.error : JSON.stringify(result.error),
         });
       }
     } catch (error) {
