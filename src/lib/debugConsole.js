@@ -93,6 +93,12 @@ export const initDebugConsole = () => {
   console.log(
     "🔍 Debug console initialized - will catch [object Object] errors",
   );
+
+  // Immediate test to verify override is working
+  if (import.meta.env.DEV) {
+    const testObj = { test: "immediate test", value: 123 };
+    console.log("🧪 Console override test - this object should be stringified:", testObj);
+  }
 };
 
 export const restoreConsole = () => {
