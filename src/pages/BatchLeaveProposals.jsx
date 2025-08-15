@@ -169,19 +169,14 @@ const BatchLeaveProposals = () => {
         )
       ]);
 
-      // Also fetch existing leave proposals to track completion status
-      const { data: existingProposals, error: proposalsError } = await Promise.race([
-        supabase
-          .from("leave_proposals")
-          .select("*")
-          .order("created_at", { ascending: false }),
-        new Promise((_, reject) =>
-          setTimeout(() => reject(new Error(`Proposals query timeout after ${timeoutMs/1000} seconds`)), timeoutMs)
-        )
-      ]);
-
-      if (proposalsError) {
-        console.warn("Warning: Could not fetch existing proposals:", proposalsError);
+      // Load completion status from localStorage instead of database
+      let existingCompletions = {};
+      try {
+        existingCompletions = JSON.parse(localStorage.getItem('completedBatchProposals') || '{}');
+        console.log("📊 Loaded completion records from localStorage:", Object.keys(existingCompletions).length);
+      } catch (storageError) {
+        console.warn("Warning: Could not load completion status from localStorage:", storageError);
+        existingCompletions = {};
       }
 
       const queryTime = Date.now() - startTime;
@@ -281,22 +276,16 @@ const BatchLeaveProposals = () => {
       console.log("📊 Final grouped requests:", groupedRequests);
       console.log("✅ Fetched", groupedRequests.length, "unit-date groups with leave requests");
 
-      // Process existing proposals to determine completion status
+      // Process existing completions to determine status
       const proposalsMap = new Map();
       const completedSet = new Set();
 
-      if (existingProposals && existingProposals.length > 0) {
-        existingProposals.forEach(proposal => {
-          const proposalKey = `${proposal.proposer_unit}|${proposal.proposal_date.split('T')[0]}`;
-          proposalsMap.set(proposalKey, proposal);
+      Object.entries(existingCompletions).forEach(([proposalKey, completionRecord]) => {
+        proposalsMap.set(proposalKey, completionRecord);
+        completedSet.add(proposalKey);
+      });
 
-          if (proposal.status === 'completed' || proposal.status === 'submitted') {
-            completedSet.add(proposalKey);
-          }
-        });
-      }
-
-      console.log("📊 Existing proposals found:", existingProposals?.length || 0);
+      console.log("📊 Completion records found:", Object.keys(existingCompletions).length);
       console.log("📊 Completed proposals:", completedSet.size);
 
       setUnitProposals(groupedRequests);
@@ -413,58 +402,45 @@ const BatchLeaveProposals = () => {
 
       if (!confirmed) return;
 
-      // Check if proposal record already exists
-      let proposalRecord = proposalRecords.get(proposalKey);
+      // Create a completion record with detailed information for persistence
+      const completionRecord = {
+        proposalKey,
+        unitName: unit.unitName,
+        proposalDate: unit.proposalDate,
+        totalEmployees: unit.totalEmployees,
+        totalRequests: unit.totalRequests,
+        totalDays: unit.totalDays,
+        completedAt: new Date().toISOString(),
+        completedBy: currentUser.id,
+        completedByName: currentUser.name || currentUser.email,
+        requestIds: unit.requests.map(req => req.id) // Store request IDs for verification
+      };
 
-      if (proposalRecord) {
-        // Update existing proposal status
-        const { error: updateError } = await supabase
-          .from("leave_proposals")
-          .update({
-            status: 'completed',
-            updated_at: new Date().toISOString()
-          })
-          .eq('id', proposalRecord.id);
+      // Store in localStorage with better structure
+      try {
+        const existingCompleted = JSON.parse(localStorage.getItem('completedBatchProposals') || '{}');
+        existingCompleted[proposalKey] = completionRecord;
+        localStorage.setItem('completedBatchProposals', JSON.stringify(existingCompleted));
 
-        if (updateError) {
-          throw updateError;
-        }
-      } else {
-        // Create new proposal record
-        const newProposal = {
-          proposal_title: `Usulan Cuti ${unit.unitName}`,
-          proposed_by: currentUser.id,
-          proposer_name: currentUser.name || currentUser.email,
-          proposer_unit: unit.unitName,
-          proposal_date: unit.proposalDate,
-          total_employees: unit.totalEmployees,
-          status: 'completed',
-          created_at: new Date().toISOString(),
-          updated_at: new Date().toISOString()
-        };
+        // Also keep a simple list for backward compatibility
+        const completedList = Object.keys(existingCompleted);
+        localStorage.setItem('completedProposals', JSON.stringify(completedList));
 
-        const { data: createdProposal, error: createError } = await supabase
-          .from("leave_proposals")
-          .insert(newProposal)
-          .select()
-          .single();
-
-        if (createError) {
-          throw createError;
-        }
-
-        proposalRecord = createdProposal;
-
-        // Update local state
-        setProposalRecords(prev => new Map(prev.set(proposalKey, proposalRecord)));
+        console.log("✅ Completion status saved to localStorage:", completionRecord);
+      } catch (storageError) {
+        console.error("Failed to save to localStorage:", storageError);
+        throw new Error("Gagal menyimpan status completion: " + storageError.message);
       }
 
       // Add to completed proposals set
       setCompletedProposals(prev => new Set([...prev, proposalKey]));
 
+      // Update local records
+      setProposalRecords(prev => new Map(prev.set(proposalKey, completionRecord)));
+
       toast({
         title: "Berhasil",
-        description: `Usulan cuti dari ${unit.unitName} telah ditandai sebagai selesai diajukan dan disimpan ke database`,
+        description: `Usulan cuti dari ${unit.unitName} telah ditandai sebagai selesai diajukan dan disimpan secara lokal`,
       });
 
     } catch (error) {
@@ -480,21 +456,21 @@ const BatchLeaveProposals = () => {
   const handleRestoreProposal = async (unit) => {
     try {
       const proposalKey = `${unit.unitName}|${unit.proposalDate}`;
-      const proposalRecord = proposalRecords.get(proposalKey);
 
-      if (proposalRecord) {
-        // Update proposal status in database
-        const { error: updateError } = await supabase
-          .from("leave_proposals")
-          .update({
-            status: 'draft',
-            updated_at: new Date().toISOString()
-          })
-          .eq('id', proposalRecord.id);
+      // Remove from localStorage
+      try {
+        const existingCompleted = JSON.parse(localStorage.getItem('completedBatchProposals') || '{}');
+        delete existingCompleted[proposalKey];
+        localStorage.setItem('completedBatchProposals', JSON.stringify(existingCompleted));
 
-        if (updateError) {
-          throw updateError;
-        }
+        // Update simple list for backward compatibility
+        const completedList = Object.keys(existingCompleted);
+        localStorage.setItem('completedProposals', JSON.stringify(completedList));
+
+        console.log("✅ Completion status removed from localStorage for:", proposalKey);
+      } catch (storageError) {
+        console.error("Failed to remove from localStorage:", storageError);
+        throw new Error("Gagal menghapus status completion: " + storageError.message);
       }
 
       // Remove from completed proposals set
@@ -502,6 +478,13 @@ const BatchLeaveProposals = () => {
         const newSet = new Set(prev);
         newSet.delete(proposalKey);
         return newSet;
+      });
+
+      // Remove from local records
+      setProposalRecords(prev => {
+        const newMap = new Map(prev);
+        newMap.delete(proposalKey);
+        return newMap;
       });
 
       toast({
@@ -591,7 +574,7 @@ const BatchLeaveProposals = () => {
       });
 
       // Fetch all leave data to ensure completeness
-      console.log("📊 Fetching complete leave data for document generation...");
+      console.log("�� Fetching complete leave data for document generation...");
       const { data: allLeaveData, error: fetchError } = await supabase
         .from("leave_requests")
         .select(`
@@ -875,6 +858,23 @@ const BatchLeaveProposals = () => {
   }, []);
 
   useEffect(() => {
+    // Load completion status from localStorage on component mount
+    try {
+      const existingCompletions = JSON.parse(localStorage.getItem('completedBatchProposals') || '{}');
+      const completedKeys = Object.keys(existingCompletions);
+      setCompletedProposals(new Set(completedKeys));
+
+      const recordsMap = new Map();
+      Object.entries(existingCompletions).forEach(([key, record]) => {
+        recordsMap.set(key, record);
+      });
+      setProposalRecords(recordsMap);
+
+      console.log("📱 Loaded", completedKeys.length, "completed proposals from localStorage");
+    } catch (error) {
+      console.warn("Could not load completion status:", error);
+    }
+
     // Stagger the requests to avoid overwhelming the network
     const timer = setTimeout(() => {
       fetchBatchProposals();
