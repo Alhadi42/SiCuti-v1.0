@@ -170,7 +170,7 @@ const ImportEmployeeDialog = ({ isOpen, onOpenChange, onImportSuccess }) => {
         toast({
           variant: "destructive",
           title: "❌ Koneksi Gagal",
-          description: result.error,
+          description: typeof result.error === 'string' ? result.error : JSON.stringify(result.error),
         });
       }
     } catch (error) {
@@ -223,7 +223,7 @@ const ImportEmployeeDialog = ({ isOpen, onOpenChange, onImportSuccess }) => {
         toast({
           variant: "destructive",
           title: "❌ Test Insert Gagal",
-          description: result1.error || result2.error,
+          description: typeof (result1.error || result2.error) === 'string' ? (result1.error || result2.error) : JSON.stringify(result1.error || result2.error),
         });
       }
     } catch (error) {
@@ -247,7 +247,7 @@ const ImportEmployeeDialog = ({ isOpen, onOpenChange, onImportSuccess }) => {
         toast({
           variant: "destructive",
           title: "❌ Test Struktur Gagal",
-          description: result.error,
+          description: typeof result.error === 'string' ? result.error : JSON.stringify(result.error),
         });
       }
     } catch (error) {
@@ -271,7 +271,7 @@ const ImportEmployeeDialog = ({ isOpen, onOpenChange, onImportSuccess }) => {
         toast({
           variant: 'destructive',
           title: '❌ Update Gagal',
-          description: result.error,
+          description: typeof result.error === 'string' ? result.error : JSON.stringify(result.error),
         });
       }
     } catch (error) {

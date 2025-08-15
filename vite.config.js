@@ -137,7 +137,9 @@ window.fetch = function(...args) {
 		})
 		.catch(error => {
 			if (!url.match(/\.html?$/i)) {
-				console.error(error);
+				// Safely log error to prevent [object Object]
+				const errorMessage = error?.message || error?.toString() || JSON.stringify(error);
+				console.error('Fetch error:', errorMessage);
 			}
 
 			throw error;

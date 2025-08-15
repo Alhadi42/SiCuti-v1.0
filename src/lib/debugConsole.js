@@ -14,66 +14,91 @@ export const initDebugConsole = () => {
   originalConsoleLog = console.log;
   originalConsoleWarn = console.warn;
 
-  // Override console.error to catch [object Object] errors
-  console.error = function (...args) {
-    // Check if any argument is [object Object] or contains it
-    const hasObjectError = args.some((arg) => {
-      const str = String(arg);
-      return (
-        str === "[object Object]" ||
-        str.includes("[object Object]") ||
-        (typeof arg === "object" && arg !== null && !arg.message && !arg.stack)
-      );
-    });
-
-    if (hasObjectError) {
-      console.group("🔍 [object Object] Error Detected!");
-      console.log("Arguments:", args);
-      console.log("Stack trace:", new Error().stack);
-      console.log("URL:", window.location.href);
-      console.log("User Agent:", navigator.userAgent);
-
-      // Try to stringify each argument safely
-      args.forEach((arg, index) => {
-        console.log(`Arg ${index}:`, {
-          type: typeof arg,
-          constructor: arg?.constructor?.name,
-          value: arg,
-          stringified: safeStringify(arg),
-        });
+  // Create enhanced console override function
+  const createEnhancedConsole = (originalFn, methodName) => {
+    return function (...args) {
+      // Check if any argument is [object Object] or contains it
+      const hasObjectError = args.some((arg) => {
+        const str = String(arg);
+        return (
+          str === "[object Object]" ||
+          str.includes("[object Object]") ||
+          (str.match(/^\[object \w+\]$/) && !str.match(/^\[object (Error|Date|Array|Function|RegExp|Promise)\]$/)) ||
+          (typeof arg === "object" && arg !== null &&
+           !Array.isArray(arg) &&
+           !(arg instanceof Error) &&
+           !(arg instanceof Date) &&
+           !(arg instanceof RegExp) &&
+           !(arg instanceof Function) &&
+           arg.constructor === Object)
+        );
       });
-      console.groupEnd();
 
-      // Send to global error handler
-      if (window.GlobalErrorHandler) {
-        window.GlobalErrorHandler.logError({
-          type: "object-object-error",
-          message: "Detected [object Object] error in console",
-          args: args.map((arg) => safeStringify(arg)),
-          url: window.location.href,
-          timestamp: new Date().toISOString(),
-        });
+      if (hasObjectError && methodName === 'error') {
+        originalConsoleLog.call(console, "🔍 [object Object] Error Detected!");
+        originalConsoleLog.call(console, "Arguments:", args.map(arg => safeStringify(arg)));
+        originalConsoleLog.call(console, "Stack trace:", new Error().stack);
+        originalConsoleLog.call(console, "URL:", window.location.href);
+
+        // Send to global error handler
+        if (window.GlobalErrorHandler) {
+          window.GlobalErrorHandler.logError({
+            type: "object-object-error",
+            message: "Detected [object Object] error in console",
+            args: args.map((arg) => safeStringify(arg)),
+            url: window.location.href,
+            timestamp: new Date().toISOString(),
+          });
+        }
       }
-    }
 
-    // Process ALL arguments to prevent any [object Object] from appearing
-    const processedArgs = args.map((arg) => {
-      const str = String(arg);
-      if (
-        str === "[object Object]" ||
-        (typeof arg === "object" && arg !== null && !arg.message && !arg.stack)
-      ) {
-        return safeStringify(arg);
-      }
-      return arg;
-    });
+      // Process ALL arguments to prevent any [object Object] from appearing
+      const processedArgs = args.map((arg) => {
+        const str = String(arg);
 
-    originalConsoleError.apply(console, processedArgs);
+        // Direct check for [object Object] string
+        if (str === "[object Object]") {
+          return safeStringify(arg);
+        }
+
+        // Check for other [object Type] patterns that aren't useful
+        if (str.match(/^\[object \w+\]$/) &&
+            !str.match(/^\[object (Error|Date|Array|Function|RegExp|Promise)\]$/)) {
+          return safeStringify(arg);
+        }
+
+        // Check for plain objects that would stringify to [object Object]
+        if (typeof arg === "object" && arg !== null &&
+            !Array.isArray(arg) &&
+            !(arg instanceof Error) &&
+            !(arg instanceof Date) &&
+            !(arg instanceof RegExp) &&
+            !(arg instanceof Function) &&
+            arg.constructor === Object) {
+          return safeStringify(arg);
+        }
+
+        return arg;
+      });
+
+      originalFn.apply(console, processedArgs);
+    };
   };
+
+  // Override all console methods
+  console.error = createEnhancedConsole(originalConsoleError, 'error');
+  console.log = createEnhancedConsole(originalConsoleLog, 'log');
+  console.warn = createEnhancedConsole(originalConsoleWarn, 'warn');
 
   console.log(
     "🔍 Debug console initialized - will catch [object Object] errors",
   );
+
+  // Immediate test to verify override is working
+  if (import.meta.env.DEV) {
+    const testObj = { test: "immediate test", value: 123 };
+    console.log("🧪 Console override test - this object should be stringified:", testObj);
+  }
 };
 
 export const restoreConsole = () => {

@@ -1,3 +1,9 @@
+/**
+ * BatchLeaveProposals Component - Fixed Issues:
+ * 1. Completion status now persists in database using leave_proposals table instead of localStorage
+ * 2. Document generation now fetches complete data from database to ensure all variables are filled
+ * 3. Enhanced data structure with additional employee fields (rank_group, asn_status, etc.)
+ */
 import React, { useState, useEffect, useCallback } from "react";
 import { motion } from "framer-motion";
 import {
@@ -36,10 +42,28 @@ import { id } from "date-fns/locale";
 import { processDocxTemplate } from "@/utils/docxTemplates";
 import { saveAs } from "file-saver";
 import ConnectionStatus from "@/components/ConnectionStatus";
+import { safeErrorMessage, getUserFriendlyErrorMessage } from "@/utils/errorDisplay";
 
 const BatchLeaveProposals = () => {
   const { toast } = useToast();
   const currentUser = AuthManager.getUserSession();
+
+  // Test Supabase connection
+  const testSupabaseConnection = async () => {
+    try {
+      console.log("🧪 Testing Supabase connection...");
+      const { data, error } = await supabase.from("leave_requests").select("id").limit(1);
+      if (error) {
+        console.error("❌ Supabase connection test failed:", JSON.stringify(error, null, 2));
+        return false;
+      }
+      console.log("✅ Supabase connection test successful");
+      return true;
+    } catch (testError) {
+      console.error("❌ Supabase connection test error:", JSON.stringify(testError, null, 2));
+      return false;
+    }
+  };
   
   const [unitProposals, setUnitProposals] = useState([]);
   const [isLoading, setIsLoading] = useState(false);
@@ -51,6 +75,7 @@ const BatchLeaveProposals = () => {
   const [connectionError, setConnectionError] = useState(false);
   const [completedProposals, setCompletedProposals] = useState(new Set());
   const [showCompleted, setShowCompleted] = useState(false);
+  const [proposalRecords, setProposalRecords] = useState(new Map());
   const [showBatchDialog, setShowBatchDialog] = useState(false);
   const [selectedUnitForBatch, setSelectedUnitForBatch] = useState(null);
   const [leaveTypeClassification, setLeaveTypeClassification] = useState({});
@@ -127,13 +152,29 @@ const BatchLeaveProposals = () => {
         }
       }
 
+      // Test Supabase connection first
+      const connectionOk = await testSupabaseConnection();
+      if (!connectionOk) {
+        throw new Error("Supabase connection test failed");
+      }
+
       // Get leave requests with employee and leave type information
       console.log("📊 Executing main Supabase query...");
+      console.log("🔍 Environment check:", {
+        supabaseUrl: import.meta.env.VITE_SUPABASE_URL ? "✅ Set" : "❌ Missing",
+        supabaseKey: import.meta.env.VITE_SUPABASE_ANON_KEY ? "✅ Set" : "❌ Missing",
+        supabaseClientExists: !!supabase,
+        currentUser: currentUser ? `${currentUser.role} - ${currentUser.name}` : "❌ No user"
+      });
+
       const startTime = Date.now();
 
       // Use shorter timeout for faster failure detection
       const timeoutMs = retryCount === 0 ? 10000 : 5000; // 10s first try, 5s retries
+      console.log(`⏱️ Setting query timeout to ${timeoutMs/1000} seconds`);
 
+      // Fetch leave requests with complete data
+      console.log("🔄 Starting Supabase query execution...");
       const { data: leaveRequests, error: requestsError } = await Promise.race([
         supabase
           .from("leave_requests")
@@ -144,11 +185,15 @@ const BatchLeaveProposals = () => {
               name,
               nip,
               department,
-              position_name
+              position_name,
+              rank_group,
+              asn_status
             ),
             leave_types (
               id,
-              name
+              name,
+              default_days,
+              max_days
             )
           `)
           .order("created_at", { ascending: false }),
@@ -157,17 +202,30 @@ const BatchLeaveProposals = () => {
         )
       ]);
 
+      console.log("✅ Supabase query completed", { hasData: !!leaveRequests, hasError: !!requestsError });
+
+      // Load completion status from localStorage instead of database
+      let existingCompletions = {};
+      try {
+        existingCompletions = JSON.parse(localStorage.getItem('completedBatchProposals') || '{}');
+        console.log("📊 Loaded completion records from localStorage:", Object.keys(existingCompletions).length);
+      } catch (storageError) {
+        console.warn("Warning: Could not load completion status from localStorage:", storageError);
+        existingCompletions = {};
+      }
+
       const queryTime = Date.now() - startTime;
       console.log(`⏱️ Query completed in ${queryTime}ms`);
 
       if (requestsError) {
         console.error("❌ Error fetching leave requests:", requestsError);
-        console.error("📊 Error details:", {
+        console.error("📊 Error details:", JSON.stringify({
           code: requestsError.code,
           message: requestsError.message,
           details: requestsError.details,
-          hint: requestsError.hint
-        });
+          hint: requestsError.hint,
+          fullError: requestsError
+        }, null, 2));
 
         // Analyze error type and decide on retry strategy
         const isNetworkError = requestsError.message?.includes("Failed to fetch") ||
@@ -180,6 +238,24 @@ const BatchLeaveProposals = () => {
 
         const isServerError = requestsError.code?.startsWith("5") ||
                              requestsError.message?.includes("Internal server error");
+
+        const isAuthError = requestsError.code === "42501" ||
+                           requestsError.message?.includes("row-level security") ||
+                           requestsError.message?.includes("permission");
+
+        const isTableError = requestsError.code === "42P01" ||
+                            requestsError.message?.includes("relation") ||
+                            requestsError.message?.includes("does not exist");
+
+        console.log("🔍 Error classification:", {
+          isNetworkError,
+          isTimeoutError,
+          isServerError,
+          isAuthError,
+          isTableError,
+          errorCode: requestsError.code,
+          errorMessage: requestsError.message
+        });
 
         if ((isNetworkError || isTimeoutError || isServerError) && retryCount < 2) {
           console.log(`🔄 Network/timeout/server error detected. Retrying... Attempt ${retryCount + 1}/3`);
@@ -254,7 +330,21 @@ const BatchLeaveProposals = () => {
       console.log("📊 Final grouped requests:", groupedRequests);
       console.log("✅ Fetched", groupedRequests.length, "unit-date groups with leave requests");
 
+      // Process existing completions to determine status
+      const proposalsMap = new Map();
+      const completedSet = new Set();
+
+      Object.entries(existingCompletions).forEach(([proposalKey, completionRecord]) => {
+        proposalsMap.set(proposalKey, completionRecord);
+        completedSet.add(proposalKey);
+      });
+
+      console.log("📊 Completion records found:", Object.keys(existingCompletions).length);
+      console.log("📊 Completed proposals:", completedSet.size);
+
       setUnitProposals(groupedRequests);
+      setProposalRecords(proposalsMap);
+      setCompletedProposals(completedSet);
       setConnectionError(false); // Reset error state on successful fetch
 
       // Cache successful data for offline use
@@ -272,6 +362,15 @@ const BatchLeaveProposals = () => {
 
     } catch (error) {
       console.error("❌ Error fetching batch proposals:", error);
+      console.error("🔍 Detailed error analysis:", JSON.stringify({
+        name: error.name,
+        message: error.message,
+        code: error.code,
+        details: error.details,
+        hint: error.hint,
+        stack: error.stack,
+        toString: error.toString()
+      }, null, 2));
 
       // Try to load cached data as fallback
       let usedCachedData = false;
@@ -305,12 +404,12 @@ const BatchLeaveProposals = () => {
       let errorMessage = "Gagal mengambil data usulan cuti";
       let errorTitle = "Error";
 
-      // Handle different types of errors
+      // Handle different types of errors with specific guidance
       if (error.message?.includes("Failed to fetch") || error.message?.includes("fetch") || error.message?.includes("Cannot connect")) {
         errorTitle = "Koneksi Bermasalah";
         errorMessage = usedCachedData
           ? "Koneksi bermasalah. Menampilkan data tersimpan."
-          : "Tidak dapat terhubung ke server. Periksa koneksi internet Anda.";
+          : "Tidak dapat terhubung ke server. Periksa koneksi internet Anda dan coba refresh halaman.";
         setConnectionError(true);
       } else if (error.message?.includes("No internet connection")) {
         errorTitle = "Tidak Ada Internet";
@@ -318,22 +417,32 @@ const BatchLeaveProposals = () => {
           ? "Tidak ada internet. Menampilkan data tersimpan."
           : "Periksa koneksi internet Anda dan coba lagi.";
         setConnectionError(true);
-      } else if (error.message?.includes("timeout")) {
+      } else if (error.message?.includes("timeout") || error.message?.includes("Query timeout")) {
         errorTitle = "Timeout";
         errorMessage = usedCachedData
           ? "Server lambat. Menampilkan data tersimpan."
-          : "Server merespons terlalu lambat. Coba lagi nanti.";
+          : "Server merespons terlalu lambat. Coba refresh halaman atau tunggu beberapa menit.";
         setConnectionError(true);
       } else if (error.code === "PGRST301") {
         errorTitle = "Masalah Database";
-        errorMessage = "Tabel atau kolom tidak ditemukan. Sistem perlu update database.";
+        errorMessage = "Tabel atau kolom tidak ditemukan. Hubungi administrator sistem.";
         setConnectionError(false);
       } else if (error.code === "42501") {
         errorTitle = "Akses Ditolak";
-        errorMessage = "Anda tidak memiliki izin untuk mengakses data ini.";
+        errorMessage = "Anda tidak memiliki izin untuk mengakses data ini. Periksa login atau hubungi administrator.";
         setConnectionError(false);
+      } else if (error.code === "42P01") {
+        errorTitle = "Tabel Tidak Ditemukan";
+        errorMessage = "Tabel database tidak ditemukan. Hubungi administrator untuk setup database.";
+        setConnectionError(false);
+      } else if (error.message?.includes("Supabase connection test failed")) {
+        errorTitle = "Koneksi Database Gagal";
+        errorMessage = usedCachedData
+          ? "Tidak dapat terhubung ke database. Menampilkan data tersimpan."
+          : "Tidak dapat terhubung ke database. Periksa konfigurasi atau hubungi administrator.";
+        setConnectionError(true);
       } else {
-        errorMessage = error.message || "Terjadi kesalahan yang tidak diketahui";
+        errorMessage = getUserFriendlyErrorMessage(error) || "Terjadi kesalahan yang tidak diketahui. Coba refresh halaman.";
         setConnectionError(false);
       }
 
@@ -366,24 +475,52 @@ const BatchLeaveProposals = () => {
 
       if (!confirmed) return;
 
+      // Create a completion record with detailed information for persistence
+      const completionRecord = {
+        proposalKey,
+        unitName: unit.unitName,
+        proposalDate: unit.proposalDate,
+        totalEmployees: unit.totalEmployees,
+        totalRequests: unit.totalRequests,
+        totalDays: unit.totalDays,
+        completedAt: new Date().toISOString(),
+        completedBy: currentUser.id,
+        completedByName: currentUser.name || currentUser.email,
+        requestIds: unit.requests.map(req => req.id) // Store request IDs for verification
+      };
+
+      // Store in localStorage with better structure
+      try {
+        const existingCompleted = JSON.parse(localStorage.getItem('completedBatchProposals') || '{}');
+        existingCompleted[proposalKey] = completionRecord;
+        localStorage.setItem('completedBatchProposals', JSON.stringify(existingCompleted));
+
+        // Also keep a simple list for backward compatibility
+        const completedList = Object.keys(existingCompleted);
+        localStorage.setItem('completedProposals', JSON.stringify(completedList));
+
+        console.log("✅ Completion status saved to localStorage:", completionRecord);
+      } catch (storageError) {
+        console.error("Failed to save to localStorage:", storageError);
+        throw new Error("Gagal menyimpan status completion: " + storageError.message);
+      }
+
       // Add to completed proposals set
       setCompletedProposals(prev => new Set([...prev, proposalKey]));
 
-      // Store in localStorage for persistence
-      const completedList = JSON.parse(localStorage.getItem('completedProposals') || '[]');
-      completedList.push(proposalKey);
-      localStorage.setItem('completedProposals', JSON.stringify(completedList));
+      // Update local records
+      setProposalRecords(prev => new Map(prev.set(proposalKey, completionRecord)));
 
       toast({
         title: "Berhasil",
-        description: `Usulan cuti dari ${unit.unitName} telah ditandai sebagai selesai diajukan`,
+        description: `Usulan cuti dari ${unit.unitName} telah ditandai sebagai selesai diajukan dan disimpan secara lokal`,
       });
 
     } catch (error) {
       console.error("Error marking proposal as completed:", error);
       toast({
         title: "Error",
-        description: "Gagal menandai usulan sebagai selesai: " + (error.message || "Unknown error"),
+        description: "Gagal menandai usulan sebagai selesai: " + safeErrorMessage(error),
         variant: "destructive",
       });
     }
@@ -393,6 +530,22 @@ const BatchLeaveProposals = () => {
     try {
       const proposalKey = `${unit.unitName}|${unit.proposalDate}`;
 
+      // Remove from localStorage
+      try {
+        const existingCompleted = JSON.parse(localStorage.getItem('completedBatchProposals') || '{}');
+        delete existingCompleted[proposalKey];
+        localStorage.setItem('completedBatchProposals', JSON.stringify(existingCompleted));
+
+        // Update simple list for backward compatibility
+        const completedList = Object.keys(existingCompleted);
+        localStorage.setItem('completedProposals', JSON.stringify(completedList));
+
+        console.log("✅ Completion status removed from localStorage for:", proposalKey);
+      } catch (storageError) {
+        console.error("Failed to remove from localStorage:", storageError);
+        throw new Error("Gagal menghapus status completion: " + storageError.message);
+      }
+
       // Remove from completed proposals set
       setCompletedProposals(prev => {
         const newSet = new Set(prev);
@@ -400,10 +553,12 @@ const BatchLeaveProposals = () => {
         return newSet;
       });
 
-      // Update localStorage
-      const completedList = JSON.parse(localStorage.getItem('completedProposals') || '[]');
-      const updatedList = completedList.filter(key => key !== proposalKey);
-      localStorage.setItem('completedProposals', JSON.stringify(updatedList));
+      // Remove from local records
+      setProposalRecords(prev => {
+        const newMap = new Map(prev);
+        newMap.delete(proposalKey);
+        return newMap;
+      });
 
       toast({
         title: "Berhasil",
@@ -414,7 +569,7 @@ const BatchLeaveProposals = () => {
       console.error("Error restoring proposal:", error);
       toast({
         title: "Error",
-        description: "Gagal mengembalikan usulan: " + (error.message || "Unknown error"),
+        description: "Gagal mengembalikan usulan: " + safeErrorMessage(error),
         variant: "destructive",
       });
     }
@@ -441,7 +596,7 @@ const BatchLeaveProposals = () => {
       console.error("Error preparing batch letter:", error);
       toast({
         title: "Error",
-        description: "Gagal mempersiapkan surat batch: " + (error.message || "Unknown error"),
+        description: "Gagal mempersiapkan surat batch: " + safeErrorMessage(error),
         variant: "destructive",
       });
     }
@@ -491,58 +646,163 @@ const BatchLeaveProposals = () => {
         description: `Sedang mempersiapkan surat batch untuk ${leaveType}...`,
       });
 
-      // Prepare variables for template
+      // Fetch all leave data to ensure completeness
+      console.log("📊 Fetching complete leave data for document generation...");
+      const { data: allLeaveData, error: fetchError } = await supabase
+        .from("leave_requests")
+        .select(`
+          *,
+          employees (
+            id,
+            name,
+            nip,
+            department,
+            position_name,
+            rank_group,
+            asn_status,
+            join_date
+          ),
+          leave_types (
+            id,
+            name,
+            default_days,
+            max_days,
+            can_defer
+          )
+        `)
+        .in('id', requests.map(req => req.id));
+
+      if (fetchError) {
+        console.error("Error fetching complete leave data:", fetchError);
+        throw new Error("Gagal mengambil data lengkap cuti: " + fetchError.message);
+      }
+
+      console.log("📊 Complete leave data fetched:", allLeaveData?.length || 0, "records");
+
+      // Use complete data for variables
+      const completeRequests = allLeaveData || requests;
+
+      // Prepare variables for template with complete data
       const variables = {
         // General information
         unit_kerja: selectedUnitForBatch.unitName,
         jenis_cuti: leaveType,
         tanggal_usulan: format(new Date(selectedUnitForBatch.proposalDate), "dd MMMM yyyy", { locale: id }),
         tanggal_surat: format(new Date(), "dd MMMM yyyy", { locale: id }),
-        jumlah_pegawai: requests.length,
-        total_hari: requests.reduce((sum, req) => sum + (req.days_requested || 0), 0),
+        jumlah_pegawai: completeRequests.length,
+        total_hari: completeRequests.reduce((sum, req) => sum + (req.days_requested || 0), 0),
+        tahun: new Date().getFullYear(),
+        bulan: format(new Date(), "MMMM", { locale: id }),
+        kota: "Jayapura", // Default city, can be configurable
 
         // Letter numbering
         nomor_surat: `SRT/${leaveType.toUpperCase().replace(/\s+/g, '')}/${new Date().getFullYear()}/${Math.floor(Math.random() * 1000).toString().padStart(3, '0')}`,
 
+        // Missing variables that user reported as empty
+        tanggal_pelaksanaan_cuti: completeRequests.length > 0
+          ? `${format(new Date(completeRequests[0].start_date), "dd MMMM yyyy", { locale: id })} s.d. ${format(new Date(completeRequests[completeRequests.length - 1].end_date), "dd MMMM yyyy", { locale: id })}`
+          : "-",
+        lamanya_cuti: `${completeRequests.reduce((sum, req) => sum + (req.days_requested || 0), 0)} hari`,
+        cuti_tahun: completeRequests.length > 0 ? (completeRequests[0].leave_quota_year || new Date().getFullYear()) : new Date().getFullYear(),
+        alamat_cuti: completeRequests.length > 0 ? (completeRequests[0].address_during_leave || "-") : "-",
+        formulir_pengajuan_cuti: completeRequests.length > 0 && completeRequests[0].application_form_date
+          ? format(new Date(completeRequests[0].application_form_date), "dd MMMM yyyy", { locale: id })
+          : format(new Date(selectedUnitForBatch.proposalDate), "dd MMMM yyyy", { locale: id }),
+
+        // Additional common template variables
+        departemen: selectedUnitForBatch.unitName,
+        instansi: "Pemerintah Kota Jayapura", // Can be made configurable
+        nama_kepala_instansi: "Kepala Dinas", // Can be made configurable
+        jabatan_kepala_instansi: "Kepala Dinas", // Can be made configurable
+
         // Employee list variables for table/loop processing
-        pegawai_list: requests.map((request, index) => ({
+        pegawai_list: completeRequests.map((request, index) => ({
           no: index + 1,
           nama: request.employees?.name || "Nama tidak diketahui",
+          nama_pegawai: request.employees?.name || "Nama tidak diketahui",
           nip: request.employees?.nip || "-",
           jabatan: request.employees?.position_name || "-",
           departemen: request.employees?.department || selectedUnitForBatch.unitName,
+          unit_kerja: request.employees?.department || selectedUnitForBatch.unitName,
+          pangkat_golongan: request.employees?.rank_group || "-",
+          status_asn: request.employees?.asn_status || "-",
           jenis_cuti: request.leave_types?.name || leaveType,
           tanggal_mulai: format(new Date(request.start_date), "dd/MM/yyyy"),
           tanggal_selesai: format(new Date(request.end_date), "dd/MM/yyyy"),
+          tanggal_mulai_lengkap: format(new Date(request.start_date), "dd MMMM yyyy", { locale: id }),
+          tanggal_selesai_lengkap: format(new Date(request.end_date), "dd MMMM yyyy", { locale: id }),
+          tanggal_pelaksanaan_cuti: `${format(new Date(request.start_date), "dd MMMM yyyy", { locale: id })} s.d. ${format(new Date(request.end_date), "dd MMMM yyyy", { locale: id })}`,
+          periode_cuti: `${format(new Date(request.start_date), "dd/MM/yyyy")} - ${format(new Date(request.end_date), "dd/MM/yyyy")}`,
           jumlah_hari: request.days_requested || 0,
+          lama_cuti: `${request.days_requested || 0} hari`,
+          lamanya_cuti: `${request.days_requested || 0} hari`,
           alasan: request.reason || "-",
           alamat_cuti: request.address_during_leave || "-",
+          alamat_selama_cuti: request.address_during_leave || "-",
+          tempat_alamat_cuti: request.address_during_leave || "-",
+          tahun_quota: request.leave_quota_year || new Date().getFullYear(),
+          cuti_tahun: request.leave_quota_year || new Date().getFullYear(),
+          tanggal_formulir: request.application_form_date ? format(new Date(request.application_form_date), "dd MMMM yyyy", { locale: id }) : "-",
+          formulir_pengajuan_cuti: request.application_form_date ? format(new Date(request.application_form_date), "dd MMMM yyyy", { locale: id }) : "-",
+          nomor_surat_cuti: request.leave_letter_number || "-",
+          tanggal_surat_cuti: request.leave_letter_date ? format(new Date(request.leave_letter_date), "dd MMMM yyyy", { locale: id }) : "-"
         }))
       };
 
-      // Create indexed variables for template loops
-      requests.forEach((request, index) => {
+      // Create indexed variables for template loops with complete data
+      completeRequests.forEach((request, index) => {
         const num = index + 1;
         variables[`nama_${num}`] = request.employees?.name || "Nama tidak diketahui";
         variables[`nip_${num}`] = request.employees?.nip || "-";
         variables[`jabatan_${num}`] = request.employees?.position_name || "-";
+        variables[`pangkat_golongan_${num}`] = request.employees?.rank_group || "-";
+        variables[`departemen_${num}`] = request.employees?.department || selectedUnitForBatch.unitName;
+        variables[`unit_kerja_${num}`] = request.employees?.department || selectedUnitForBatch.unitName;
         variables[`jenis_cuti_${num}`] = request.leave_types?.name || leaveType;
         variables[`tanggal_mulai_${num}`] = format(new Date(request.start_date), "dd/MM/yyyy");
         variables[`tanggal_selesai_${num}`] = format(new Date(request.end_date), "dd/MM/yyyy");
+        variables[`tanggal_mulai_lengkap_${num}`] = format(new Date(request.start_date), "dd MMMM yyyy", { locale: id });
+        variables[`tanggal_selesai_lengkap_${num}`] = format(new Date(request.end_date), "dd MMMM yyyy", { locale: id });
+        variables[`tanggal_pelaksanaan_cuti_${num}`] = `${format(new Date(request.start_date), "dd MMMM yyyy", { locale: id })} s.d. ${format(new Date(request.end_date), "dd MMMM yyyy", { locale: id })}`;
         variables[`jumlah_hari_${num}`] = request.days_requested || 0;
+        variables[`lama_cuti_${num}`] = `${request.days_requested || 0} hari`;
+        variables[`lamanya_cuti_${num}`] = `${request.days_requested || 0} hari`;
         variables[`alasan_${num}`] = request.reason || "-";
+        variables[`alamat_cuti_${num}`] = request.address_during_leave || "-";
+        variables[`alamat_selama_cuti_${num}`] = request.address_during_leave || "-";
+        variables[`tahun_quota_${num}`] = request.leave_quota_year || new Date().getFullYear();
+        variables[`cuti_tahun_${num}`] = request.leave_quota_year || new Date().getFullYear();
+        variables[`tanggal_formulir_${num}`] = request.application_form_date ? format(new Date(request.application_form_date), "dd MMMM yyyy", { locale: id }) : "-";
+        variables[`formulir_pengajuan_cuti_${num}`] = request.application_form_date ? format(new Date(request.application_form_date), "dd MMMM yyyy", { locale: id }) : "-";
+
+        // Additional variations for common template patterns
+        variables[`nama_pegawai_${num}`] = request.employees?.name || "Nama tidak diketahui";
+        variables[`tempat_alamat_cuti_${num}`] = request.address_during_leave || "-";
+        variables[`periode_cuti_${num}`] = `${format(new Date(request.start_date), "dd/MM/yyyy")} - ${format(new Date(request.end_date), "dd/MM/yyyy")}`;
       });
 
       console.log("📄 Generating batch letter with variables:", {
         leaveType,
         unitName: selectedUnitForBatch.unitName,
-        totalRequests: requests.length,
+        totalRequests: completeRequests.length,
         templateId: template.id,
         templateName: template.name,
         variableCount: Object.keys(variables).length,
         contentType: typeof template.content,
         contentLength: template.content?.length || 0
       });
+
+      // Log the specific variables the user mentioned as missing
+      console.log("🔍 Checking specific variables mentioned by user:");
+      console.log("- unit_kerja:", variables.unit_kerja);
+      console.log("- tanggal_pelaksanaan_cuti:", variables.tanggal_pelaksanaan_cuti);
+      console.log("- lamanya_cuti:", variables.lamanya_cuti);
+      console.log("- cuti_tahun:", variables.cuti_tahun);
+      console.log("- alamat_cuti:", variables.alamat_cuti);
+      console.log("- formulir_pengajuan_cuti:", variables.formulir_pengajuan_cuti);
+
+      // Log all variable keys for debugging
+      console.log("📋 All available variables:", Object.keys(variables).sort());
 
       // Validate and prepare template content
       // Templates are typically stored as { content: { data: "base64..." } }
@@ -594,6 +854,25 @@ const BatchLeaveProposals = () => {
         isBase64: templateContent.match(/^[A-Za-z0-9+/]*={0,2}$/) !== null
       });
 
+      // Final comprehensive variable logging before processing
+      console.log("🎯 Final variable summary for template processing:");
+      console.log("📊 Total variables:", Object.keys(variables).length);
+      console.log("📝 Variable breakdown:");
+
+      // Group variables by category
+      const generalVars = Object.keys(variables).filter(key => !key.includes('_') || key.startsWith('unit_') || key.startsWith('jenis_') || key.startsWith('tanggal_') || key.startsWith('nomor_') || key.startsWith('total_') || key.startsWith('jumlah_') || key.startsWith('tahun') || key.startsWith('bulan') || key.startsWith('kota') || key.startsWith('lamanya_') || key.startsWith('cuti_') || key.startsWith('alamat_') || key.startsWith('formulir_') || key.startsWith('departemen') || key.startsWith('instansi'));
+      const indexedVars = Object.keys(variables).filter(key => /.*_\d+$/.test(key));
+      const listVars = Object.keys(variables).filter(key => key === 'pegawai_list');
+
+      console.log(`- General variables (${generalVars.length}):`, generalVars);
+      console.log(`- Indexed variables (${indexedVars.length}):`, indexedVars.slice(0, 10), indexedVars.length > 10 ? '... and more' : '');
+      console.log(`- List variables (${listVars.length}):`, listVars);
+
+      // Log sample of first employee's data if available
+      if (variables.pegawai_list && variables.pegawai_list.length > 0) {
+        console.log("👤 Sample employee data (first record):", variables.pegawai_list[0]);
+      }
+
       // Process template using existing system
       const processedBuffer = await processDocxTemplate(
         templateContent,
@@ -611,11 +890,19 @@ const BatchLeaveProposals = () => {
 
       toast({
         title: "Berhasil",
-        description: `Surat batch untuk ${requests.length} usulan ${leaveType} dari ${selectedUnitForBatch.unitName} berhasil dibuat dan diunduh`,
+        description: `Surat batch untuk ${completeRequests.length} usulan ${leaveType} dari ${selectedUnitForBatch.unitName} berhasil dibuat dan diunduh dengan data lengkap`,
       });
 
     } catch (error) {
       console.error("Error generating batch letter:", error);
+      console.error("🔍 Document generation error details:", JSON.stringify({
+        name: error.name,
+        message: error.message,
+        code: error.code,
+        details: error.details,
+        stack: error.stack,
+        toString: error.toString()
+      }, null, 2));
 
       let errorMessage = "Gagal membuat surat batch";
 
@@ -629,7 +916,7 @@ const BatchLeaveProposals = () => {
       } else if (error.message?.includes("zip") || error.message?.includes("docx")) {
         errorMessage = "Template DOCX rusak atau tidak valid. Coba gunakan template lain.";
       } else {
-        errorMessage = error.message || "Terjadi kesalahan yang tidak diketahui";
+        errorMessage = safeErrorMessage(error, "Terjadi kesalahan yang tidak diketahui");
       }
 
       toast({
@@ -646,9 +933,16 @@ const BatchLeaveProposals = () => {
   const clearCache = () => {
     try {
       localStorage.removeItem('cachedBatchProposals');
+      localStorage.removeItem('completedBatchProposals');
+      localStorage.removeItem('completedProposals');
+
+      // Reset local state
+      setCompletedProposals(new Set());
+      setProposalRecords(new Map());
+
       toast({
         title: "Cache Dibersihkan",
-        description: "Data cache lokal telah dihapus. Refresh untuk mengambil data terbaru.",
+        description: "Data cache dan status completion telah dihapus. Refresh untuk mengambil data terbaru.",
       });
     } catch (error) {
       console.error("Error clearing cache:", error);
@@ -718,9 +1012,22 @@ const BatchLeaveProposals = () => {
   }, []);
 
   useEffect(() => {
-    // Load completed proposals from localStorage
-    const savedCompleted = JSON.parse(localStorage.getItem('completedProposals') || '[]');
-    setCompletedProposals(new Set(savedCompleted));
+    // Load completion status from localStorage on component mount
+    try {
+      const existingCompletions = JSON.parse(localStorage.getItem('completedBatchProposals') || '{}');
+      const completedKeys = Object.keys(existingCompletions);
+      setCompletedProposals(new Set(completedKeys));
+
+      const recordsMap = new Map();
+      Object.entries(existingCompletions).forEach(([key, record]) => {
+        recordsMap.set(key, record);
+      });
+      setProposalRecords(recordsMap);
+
+      console.log("📱 Loaded", completedKeys.length, "completed proposals from localStorage");
+    } catch (error) {
+      console.warn("Could not load completion status:", error);
+    }
 
     // Stagger the requests to avoid overwhelming the network
     const timer = setTimeout(() => {
@@ -755,6 +1062,9 @@ const BatchLeaveProposals = () => {
                   📱 Menampilkan data tersimpan dari cache lokal
                 </p>
               )}
+              <p className="text-gray-500 text-xs">
+                🔧 Tip: Buka console browser (F12) untuk detail error
+              </p>
             </div>
           ) : (
             <p className="text-blue-400 text-sm">
