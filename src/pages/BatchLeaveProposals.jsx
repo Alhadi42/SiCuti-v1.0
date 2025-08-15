@@ -686,12 +686,13 @@ const BatchLeaveProposals = () => {
       console.log("📄 Generating batch letter with variables:", {
         leaveType,
         unitName: selectedUnitForBatch.unitName,
-        totalRequests: requests.length,
+        totalRequests: completeRequests.length,
         templateId: template.id,
         templateName: template.name,
         variableCount: Object.keys(variables).length,
         contentType: typeof template.content,
-        contentLength: template.content?.length || 0
+        contentLength: template.content?.length || 0,
+        sampleVariables: Object.keys(variables).slice(0, 10)
       });
 
       // Validate and prepare template content
