@@ -22,7 +22,7 @@ export const initDebugConsole = () => {
       return (
         str === "[object Object]" ||
         str.includes("[object Object]") ||
-        (typeof arg === "object" && arg !== null && !arg.message && !arg.stack)
+        (typeof arg === "object" && arg !== null && !arg.message && !arg.stack && !Array.isArray(arg) && !(arg instanceof Error) && !(arg instanceof Date) && Object.keys(arg).length > 0)
       );
     });
 
