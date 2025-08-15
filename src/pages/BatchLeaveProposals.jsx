@@ -716,9 +716,20 @@ const BatchLeaveProposals = () => {
         templateName: template.name,
         variableCount: Object.keys(variables).length,
         contentType: typeof template.content,
-        contentLength: template.content?.length || 0,
-        sampleVariables: Object.keys(variables).slice(0, 10)
+        contentLength: template.content?.length || 0
       });
+
+      // Log the specific variables the user mentioned as missing
+      console.log("🔍 Checking specific variables mentioned by user:");
+      console.log("- unit_kerja:", variables.unit_kerja);
+      console.log("- tanggal_pelaksanaan_cuti:", variables.tanggal_pelaksanaan_cuti);
+      console.log("- lamanya_cuti:", variables.lamanya_cuti);
+      console.log("- cuti_tahun:", variables.cuti_tahun);
+      console.log("- alamat_cuti:", variables.alamat_cuti);
+      console.log("- formulir_pengajuan_cuti:", variables.formulir_pengajuan_cuti);
+
+      // Log all variable keys for debugging
+      console.log("📋 All available variables:", Object.keys(variables).sort());
 
       // Validate and prepare template content
       // Templates are typically stored as { content: { data: "base64..." } }
