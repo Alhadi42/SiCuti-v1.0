@@ -77,6 +77,18 @@ export class GlobalErrorHandler {
   };
 
   static handleError = (event) => {
+    // Suppress harmless ResizeObserver errors
+    if (
+      event.message?.includes("ResizeObserver loop") ||
+      event.message?.includes("ResizeObserver loop completed with undelivered notifications")
+    ) {
+      // Log only in development for debugging
+      if (import.meta.env.DEV) {
+        console.warn("🔄 ResizeObserver loop (harmless):", event.message);
+      }
+      return;
+    }
+
     const error = {
       type: "javascript",
       message: event.message,
