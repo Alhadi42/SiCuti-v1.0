@@ -184,12 +184,13 @@ const BatchLeaveProposals = () => {
 
       if (requestsError) {
         console.error("❌ Error fetching leave requests:", requestsError);
-        console.error("📊 Error details:", {
+        console.error("📊 Error details:", JSON.stringify({
           code: requestsError.code,
           message: requestsError.message,
           details: requestsError.details,
-          hint: requestsError.hint
-        });
+          hint: requestsError.hint,
+          fullError: requestsError
+        }, null, 2));
 
         // Analyze error type and decide on retry strategy
         const isNetworkError = requestsError.message?.includes("Failed to fetch") ||
