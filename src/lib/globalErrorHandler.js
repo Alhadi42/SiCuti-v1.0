@@ -13,15 +13,53 @@ const safeStringifyError = (error) => {
     return error;
   }
 
+  // Handle Error objects
+  if (error instanceof Error) {
+    const parts = [`Error: ${error.message}`];
+    if (error.name && error.name !== 'Error') parts.unshift(`${error.name}:`);
+    if (error.code) parts.push(`Code: ${error.code}`);
+    if (error.details) parts.push(`Details: ${error.details}`);
+    if (error.hint) parts.push(`Hint: ${error.hint}`);
+    return parts.join(' ');
+  }
+
+  // Handle objects with error-like properties
   if (error.message) {
-    return error.message;
+    const parts = [error.message];
+    if (error.code) parts.push(`(Code: ${error.code})`);
+    if (error.details) parts.push(`(Details: ${error.details})`);
+    return parts.join(' ');
   }
 
   if (typeof error === "object") {
+    // Handle special Supabase error format
+    if (error.code || error.details || error.hint) {
+      const parts = [];
+      if (error.message) parts.push(error.message);
+      if (error.code) parts.push(`Code: ${error.code}`);
+      if (error.details) parts.push(`Details: ${error.details}`);
+      if (error.hint) parts.push(`Hint: ${error.hint}`);
+      return parts.join(' | ');
+    }
+
     try {
-      return JSON.stringify(error, null, 2);
+      // Handle circular references
+      const seen = new WeakSet();
+      return JSON.stringify(error, (key, value) => {
+        if (typeof value === "object" && value !== null) {
+          if (seen.has(value)) {
+            return "[Circular Reference]";
+          }
+          seen.add(value);
+        }
+        return value;
+      }, 2);
     } catch (e) {
-      return String(error);
+      // If JSON.stringify fails, create a descriptive string
+      const constructor = error.constructor?.name || "Object";
+      const keys = Object.keys(error).slice(0, 3);
+      const preview = keys.length > 0 ? ` {${keys.join(', ')}}` : '';
+      return `[${constructor}${preview}]`;
     }
   }
 
