@@ -275,7 +275,27 @@ const BatchLeaveProposals = () => {
       console.log("📊 Final grouped requests:", groupedRequests);
       console.log("✅ Fetched", groupedRequests.length, "unit-date groups with leave requests");
 
+      // Process existing proposals to determine completion status
+      const proposalsMap = new Map();
+      const completedSet = new Set();
+
+      if (existingProposals && existingProposals.length > 0) {
+        existingProposals.forEach(proposal => {
+          const proposalKey = `${proposal.proposer_unit}|${proposal.proposal_date.split('T')[0]}`;
+          proposalsMap.set(proposalKey, proposal);
+
+          if (proposal.status === 'completed' || proposal.status === 'submitted') {
+            completedSet.add(proposalKey);
+          }
+        });
+      }
+
+      console.log("📊 Existing proposals found:", existingProposals?.length || 0);
+      console.log("📊 Completed proposals:", completedSet.size);
+
       setUnitProposals(groupedRequests);
+      setProposalRecords(proposalsMap);
+      setCompletedProposals(completedSet);
       setConnectionError(false); // Reset error state on successful fetch
 
       // Cache successful data for offline use
