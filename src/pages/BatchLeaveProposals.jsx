@@ -869,10 +869,6 @@ const BatchLeaveProposals = () => {
   }, []);
 
   useEffect(() => {
-    // Load completed proposals from localStorage
-    const savedCompleted = JSON.parse(localStorage.getItem('completedProposals') || '[]');
-    setCompletedProposals(new Set(savedCompleted));
-
     // Stagger the requests to avoid overwhelming the network
     const timer = setTimeout(() => {
       fetchBatchProposals();
