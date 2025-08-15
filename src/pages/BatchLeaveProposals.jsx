@@ -151,6 +151,12 @@ const BatchLeaveProposals = () => {
         }
       }
 
+      // Test Supabase connection first
+      const connectionOk = await testSupabaseConnection();
+      if (!connectionOk) {
+        throw new Error("Supabase connection test failed");
+      }
+
       // Get leave requests with employee and leave type information
       console.log("📊 Executing main Supabase query...");
       console.log("🔍 Environment check:", {
