@@ -627,25 +627,38 @@ const BatchLeaveProposals = () => {
         jenis_cuti: leaveType,
         tanggal_usulan: format(new Date(selectedUnitForBatch.proposalDate), "dd MMMM yyyy", { locale: id }),
         tanggal_surat: format(new Date(), "dd MMMM yyyy", { locale: id }),
-        jumlah_pegawai: requests.length,
-        total_hari: requests.reduce((sum, req) => sum + (req.days_requested || 0), 0),
+        jumlah_pegawai: completeRequests.length,
+        total_hari: completeRequests.reduce((sum, req) => sum + (req.days_requested || 0), 0),
+        tahun: new Date().getFullYear(),
+        bulan: format(new Date(), "MMMM", { locale: id }),
+        kota: "Jayapura", // Default city, can be configurable
 
         // Letter numbering
         nomor_surat: `SRT/${leaveType.toUpperCase().replace(/\s+/g, '')}/${new Date().getFullYear()}/${Math.floor(Math.random() * 1000).toString().padStart(3, '0')}`,
 
         // Employee list variables for table/loop processing
-        pegawai_list: requests.map((request, index) => ({
+        pegawai_list: completeRequests.map((request, index) => ({
           no: index + 1,
           nama: request.employees?.name || "Nama tidak diketahui",
           nip: request.employees?.nip || "-",
           jabatan: request.employees?.position_name || "-",
           departemen: request.employees?.department || selectedUnitForBatch.unitName,
+          pangkat_golongan: request.employees?.rank_group || "-",
+          status_asn: request.employees?.asn_status || "-",
           jenis_cuti: request.leave_types?.name || leaveType,
           tanggal_mulai: format(new Date(request.start_date), "dd/MM/yyyy"),
           tanggal_selesai: format(new Date(request.end_date), "dd/MM/yyyy"),
+          tanggal_mulai_lengkap: format(new Date(request.start_date), "dd MMMM yyyy", { locale: id }),
+          tanggal_selesai_lengkap: format(new Date(request.end_date), "dd MMMM yyyy", { locale: id }),
           jumlah_hari: request.days_requested || 0,
+          lama_cuti: request.days_requested || 0,
           alasan: request.reason || "-",
           alamat_cuti: request.address_during_leave || "-",
+          alamat_selama_cuti: request.address_during_leave || "-",
+          tahun_quota: request.leave_quota_year || new Date().getFullYear(),
+          tanggal_formulir: request.application_form_date ? format(new Date(request.application_form_date), "dd MMMM yyyy", { locale: id }) : "-",
+          nomor_surat_cuti: request.leave_letter_number || "-",
+          tanggal_surat_cuti: request.leave_letter_date ? format(new Date(request.leave_letter_date), "dd MMMM yyyy", { locale: id }) : "-"
         }))
       };
 
