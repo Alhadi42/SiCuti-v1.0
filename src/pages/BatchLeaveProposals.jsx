@@ -832,6 +832,14 @@ const BatchLeaveProposals = () => {
 
     } catch (error) {
       console.error("Error generating batch letter:", error);
+      console.error("🔍 Document generation error details:", JSON.stringify({
+        name: error.name,
+        message: error.message,
+        code: error.code,
+        details: error.details,
+        stack: error.stack,
+        toString: error.toString()
+      }, null, 2));
 
       let errorMessage = "Gagal membuat surat batch";
 
