@@ -442,7 +442,7 @@ const BatchLeaveProposals = () => {
           : "Tidak dapat terhubung ke database. Periksa konfigurasi atau hubungi administrator.";
         setConnectionError(true);
       } else {
-        errorMessage = error.message || "Terjadi kesalahan yang tidak diketahui. Coba refresh halaman.";
+        errorMessage = getUserFriendlyErrorMessage(error) || "Terjadi kesalahan yang tidak diketahui. Coba refresh halaman.";
         setConnectionError(false);
       }
 
