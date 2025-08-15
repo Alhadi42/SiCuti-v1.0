@@ -46,6 +46,23 @@ import ConnectionStatus from "@/components/ConnectionStatus";
 const BatchLeaveProposals = () => {
   const { toast } = useToast();
   const currentUser = AuthManager.getUserSession();
+
+  // Test Supabase connection
+  const testSupabaseConnection = async () => {
+    try {
+      console.log("🧪 Testing Supabase connection...");
+      const { data, error } = await supabase.from("leave_requests").select("id").limit(1);
+      if (error) {
+        console.error("❌ Supabase connection test failed:", JSON.stringify(error, null, 2));
+        return false;
+      }
+      console.log("✅ Supabase connection test successful");
+      return true;
+    } catch (testError) {
+      console.error("❌ Supabase connection test error:", JSON.stringify(testError, null, 2));
+      return false;
+    }
+  };
   
   const [unitProposals, setUnitProposals] = useState([]);
   const [isLoading, setIsLoading] = useState(false);
