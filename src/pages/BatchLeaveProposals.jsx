@@ -136,12 +136,21 @@ const BatchLeaveProposals = () => {
 
       // Get leave requests with employee and leave type information
       console.log("📊 Executing main Supabase query...");
+      console.log("🔍 Environment check:", {
+        supabaseUrl: import.meta.env.VITE_SUPABASE_URL ? "✅ Set" : "❌ Missing",
+        supabaseKey: import.meta.env.VITE_SUPABASE_ANON_KEY ? "✅ Set" : "❌ Missing",
+        supabaseClientExists: !!supabase,
+        currentUser: currentUser ? `${currentUser.role} - ${currentUser.name}` : "❌ No user"
+      });
+
       const startTime = Date.now();
 
       // Use shorter timeout for faster failure detection
       const timeoutMs = retryCount === 0 ? 10000 : 5000; // 10s first try, 5s retries
+      console.log(`⏱️ Setting query timeout to ${timeoutMs/1000} seconds`);
 
       // Fetch leave requests with complete data
+      console.log("🔄 Starting Supabase query execution...");
       const { data: leaveRequests, error: requestsError } = await Promise.race([
         supabase
           .from("leave_requests")
@@ -168,6 +177,8 @@ const BatchLeaveProposals = () => {
           setTimeout(() => reject(new Error(`Query timeout after ${timeoutMs/1000} seconds`)), timeoutMs)
         )
       ]);
+
+      console.log("✅ Supabase query completed", { hasData: !!leaveRequests, hasError: !!requestsError });
 
       // Load completion status from localStorage instead of database
       let existingCompletions = {};
