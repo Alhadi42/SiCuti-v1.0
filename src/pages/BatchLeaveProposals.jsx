@@ -407,17 +407,58 @@ const BatchLeaveProposals = () => {
 
       if (!confirmed) return;
 
+      // Check if proposal record already exists
+      let proposalRecord = proposalRecords.get(proposalKey);
+
+      if (proposalRecord) {
+        // Update existing proposal status
+        const { error: updateError } = await supabase
+          .from("leave_proposals")
+          .update({
+            status: 'completed',
+            updated_at: new Date().toISOString()
+          })
+          .eq('id', proposalRecord.id);
+
+        if (updateError) {
+          throw updateError;
+        }
+      } else {
+        // Create new proposal record
+        const newProposal = {
+          proposal_title: `Usulan Cuti ${unit.unitName}`,
+          proposed_by: currentUser.id,
+          proposer_name: currentUser.name || currentUser.email,
+          proposer_unit: unit.unitName,
+          proposal_date: unit.proposalDate,
+          total_employees: unit.totalEmployees,
+          status: 'completed',
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString()
+        };
+
+        const { data: createdProposal, error: createError } = await supabase
+          .from("leave_proposals")
+          .insert(newProposal)
+          .select()
+          .single();
+
+        if (createError) {
+          throw createError;
+        }
+
+        proposalRecord = createdProposal;
+
+        // Update local state
+        setProposalRecords(prev => new Map(prev.set(proposalKey, proposalRecord)));
+      }
+
       // Add to completed proposals set
       setCompletedProposals(prev => new Set([...prev, proposalKey]));
 
-      // Store in localStorage for persistence
-      const completedList = JSON.parse(localStorage.getItem('completedProposals') || '[]');
-      completedList.push(proposalKey);
-      localStorage.setItem('completedProposals', JSON.stringify(completedList));
-
       toast({
         title: "Berhasil",
-        description: `Usulan cuti dari ${unit.unitName} telah ditandai sebagai selesai diajukan`,
+        description: `Usulan cuti dari ${unit.unitName} telah ditandai sebagai selesai diajukan dan disimpan ke database`,
       });
 
     } catch (error) {
