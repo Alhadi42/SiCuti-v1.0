@@ -151,7 +151,7 @@ export const testResizeObserverSuppression = () => {
  * Run all tests
  */
 export const runAllErrorTests = () => {
-  console.log("🚀 Starting comprehensive error handling tests...");
+  console.log("��� Starting comprehensive error handling tests...");
   
   const errorResults = testErrorHandling();
   testConsoleOverride();
@@ -166,8 +166,17 @@ if (import.meta.env.DEV && typeof window !== 'undefined') {
   // Run tests after a short delay to ensure all systems are initialized
   setTimeout(() => {
     console.log("🔧 Auto-running error handling tests in development mode...");
+
+    // Quick test for console override
+    console.log("🧪 Quick console override test:");
+    const testObj = { test: "value", nested: { data: "example" } };
+    console.log("Testing object:", testObj);
+    console.error("Testing error with object:", testObj);
+    console.warn("Testing warn with object:", testObj);
+
+    // Run full tests
     runAllErrorTests();
-  }, 2000);
+  }, 1000);
 }
 
 export default {
