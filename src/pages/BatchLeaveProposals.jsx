@@ -916,7 +916,7 @@ const BatchLeaveProposals = () => {
       } else if (error.message?.includes("zip") || error.message?.includes("docx")) {
         errorMessage = "Template DOCX rusak atau tidak valid. Coba gunakan template lain.";
       } else {
-        errorMessage = error.message || "Terjadi kesalahan yang tidak diketahui";
+        errorMessage = safeErrorMessage(error, "Terjadi kesalahan yang tidak diketahui");
       }
 
       toast({
