@@ -781,6 +781,25 @@ const BatchLeaveProposals = () => {
         isBase64: templateContent.match(/^[A-Za-z0-9+/]*={0,2}$/) !== null
       });
 
+      // Final comprehensive variable logging before processing
+      console.log("🎯 Final variable summary for template processing:");
+      console.log("📊 Total variables:", Object.keys(variables).length);
+      console.log("📝 Variable breakdown:");
+
+      // Group variables by category
+      const generalVars = Object.keys(variables).filter(key => !key.includes('_') || key.startsWith('unit_') || key.startsWith('jenis_') || key.startsWith('tanggal_') || key.startsWith('nomor_') || key.startsWith('total_') || key.startsWith('jumlah_') || key.startsWith('tahun') || key.startsWith('bulan') || key.startsWith('kota') || key.startsWith('lamanya_') || key.startsWith('cuti_') || key.startsWith('alamat_') || key.startsWith('formulir_') || key.startsWith('departemen') || key.startsWith('instansi'));
+      const indexedVars = Object.keys(variables).filter(key => /.*_\d+$/.test(key));
+      const listVars = Object.keys(variables).filter(key => key === 'pegawai_list');
+
+      console.log(`- General variables (${generalVars.length}):`, generalVars);
+      console.log(`- Indexed variables (${indexedVars.length}):`, indexedVars.slice(0, 10), indexedVars.length > 10 ? '... and more' : '');
+      console.log(`- List variables (${listVars.length}):`, listVars);
+
+      // Log sample of first employee's data if available
+      if (variables.pegawai_list && variables.pegawai_list.length > 0) {
+        console.log("👤 Sample employee data (first record):", variables.pegawai_list[0]);
+      }
+
       // Process template using existing system
       const processedBuffer = await processDocxTemplate(
         templateContent,
