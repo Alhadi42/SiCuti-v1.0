@@ -309,6 +309,15 @@ const BatchLeaveProposals = () => {
 
     } catch (error) {
       console.error("❌ Error fetching batch proposals:", error);
+      console.error("🔍 Detailed error analysis:", JSON.stringify({
+        name: error.name,
+        message: error.message,
+        code: error.code,
+        details: error.details,
+        hint: error.hint,
+        stack: error.stack,
+        toString: error.toString()
+      }, null, 2));
 
       // Try to load cached data as fallback
       let usedCachedData = false;
