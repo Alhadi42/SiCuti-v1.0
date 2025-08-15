@@ -625,6 +625,23 @@ const BatchLeaveProposals = () => {
         // Letter numbering
         nomor_surat: `SRT/${leaveType.toUpperCase().replace(/\s+/g, '')}/${new Date().getFullYear()}/${Math.floor(Math.random() * 1000).toString().padStart(3, '0')}`,
 
+        // Missing variables that user reported as empty
+        tanggal_pelaksanaan_cuti: completeRequests.length > 0
+          ? `${format(new Date(completeRequests[0].start_date), "dd MMMM yyyy", { locale: id })} s.d. ${format(new Date(completeRequests[completeRequests.length - 1].end_date), "dd MMMM yyyy", { locale: id })}`
+          : "-",
+        lamanya_cuti: `${completeRequests.reduce((sum, req) => sum + (req.days_requested || 0), 0)} hari`,
+        cuti_tahun: completeRequests.length > 0 ? (completeRequests[0].leave_quota_year || new Date().getFullYear()) : new Date().getFullYear(),
+        alamat_cuti: completeRequests.length > 0 ? (completeRequests[0].address_during_leave || "-") : "-",
+        formulir_pengajuan_cuti: completeRequests.length > 0 && completeRequests[0].application_form_date
+          ? format(new Date(completeRequests[0].application_form_date), "dd MMMM yyyy", { locale: id })
+          : format(new Date(selectedUnitForBatch.proposalDate), "dd MMMM yyyy", { locale: id }),
+
+        // Additional common template variables
+        departemen: selectedUnitForBatch.unitName,
+        instansi: "Pemerintah Kota Jayapura", // Can be made configurable
+        nama_kepala_instansi: "Kepala Dinas", // Can be made configurable
+        jabatan_kepala_instansi: "Kepala Dinas", // Can be made configurable
+
         // Employee list variables for table/loop processing
         pegawai_list: completeRequests.map((request, index) => ({
           no: index + 1,
