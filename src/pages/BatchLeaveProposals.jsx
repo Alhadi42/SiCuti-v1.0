@@ -42,6 +42,7 @@ import { id } from "date-fns/locale";
 import { processDocxTemplate } from "@/utils/docxTemplates";
 import { saveAs } from "file-saver";
 import ConnectionStatus from "@/components/ConnectionStatus";
+import { safeErrorMessage, getUserFriendlyErrorMessage } from "@/utils/errorDisplay";
 
 const BatchLeaveProposals = () => {
   const { toast } = useToast();
