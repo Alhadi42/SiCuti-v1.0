@@ -574,7 +574,7 @@ const BatchLeaveProposals = () => {
       });
 
       // Fetch all leave data to ensure completeness
-      console.log("�� Fetching complete leave data for document generation...");
+      console.log("📊 Fetching complete leave data for document generation...");
       const { data: allLeaveData, error: fetchError } = await supabase
         .from("leave_requests")
         .select(`
@@ -786,9 +786,16 @@ const BatchLeaveProposals = () => {
   const clearCache = () => {
     try {
       localStorage.removeItem('cachedBatchProposals');
+      localStorage.removeItem('completedBatchProposals');
+      localStorage.removeItem('completedProposals');
+
+      // Reset local state
+      setCompletedProposals(new Set());
+      setProposalRecords(new Map());
+
       toast({
         title: "Cache Dibersihkan",
-        description: "Data cache lokal telah dihapus. Refresh untuk mengambil data terbaru.",
+        description: "Data cache dan status completion telah dihapus. Refresh untuk mengambil data terbaru.",
       });
     } catch (error) {
       console.error("Error clearing cache:", error);
