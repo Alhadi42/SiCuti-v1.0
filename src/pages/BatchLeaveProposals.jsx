@@ -662,17 +662,25 @@ const BatchLeaveProposals = () => {
         }))
       };
 
-      // Create indexed variables for template loops
-      requests.forEach((request, index) => {
+      // Create indexed variables for template loops with complete data
+      completeRequests.forEach((request, index) => {
         const num = index + 1;
         variables[`nama_${num}`] = request.employees?.name || "Nama tidak diketahui";
         variables[`nip_${num}`] = request.employees?.nip || "-";
         variables[`jabatan_${num}`] = request.employees?.position_name || "-";
+        variables[`pangkat_golongan_${num}`] = request.employees?.rank_group || "-";
+        variables[`departemen_${num}`] = request.employees?.department || selectedUnitForBatch.unitName;
         variables[`jenis_cuti_${num}`] = request.leave_types?.name || leaveType;
         variables[`tanggal_mulai_${num}`] = format(new Date(request.start_date), "dd/MM/yyyy");
         variables[`tanggal_selesai_${num}`] = format(new Date(request.end_date), "dd/MM/yyyy");
+        variables[`tanggal_mulai_lengkap_${num}`] = format(new Date(request.start_date), "dd MMMM yyyy", { locale: id });
+        variables[`tanggal_selesai_lengkap_${num}`] = format(new Date(request.end_date), "dd MMMM yyyy", { locale: id });
         variables[`jumlah_hari_${num}`] = request.days_requested || 0;
+        variables[`lama_cuti_${num}`] = request.days_requested || 0;
         variables[`alasan_${num}`] = request.reason || "-";
+        variables[`alamat_cuti_${num}`] = request.address_during_leave || "-";
+        variables[`tahun_quota_${num}`] = request.leave_quota_year || new Date().getFullYear();
+        variables[`tanggal_formulir_${num}`] = request.application_form_date ? format(new Date(request.application_form_date), "dd MMMM yyyy", { locale: id }) : "-";
       });
 
       console.log("📄 Generating batch letter with variables:", {
