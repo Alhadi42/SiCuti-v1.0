@@ -1061,6 +1061,9 @@ const BatchLeaveProposals = () => {
                   📱 Menampilkan data tersimpan dari cache lokal
                 </p>
               )}
+              <p className="text-gray-500 text-xs">
+                🔧 Tip: Buka console browser (F12) untuk detail error
+              </p>
             </div>
           ) : (
             <p className="text-blue-400 text-sm">
