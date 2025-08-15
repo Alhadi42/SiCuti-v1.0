@@ -135,6 +135,7 @@ const BatchLeaveProposals = () => {
       // Use shorter timeout for faster failure detection
       const timeoutMs = retryCount === 0 ? 10000 : 5000; // 10s first try, 5s retries
 
+      // Fetch leave requests with complete data
       const { data: leaveRequests, error: requestsError } = await Promise.race([
         supabase
           .from("leave_requests")
@@ -145,11 +146,15 @@ const BatchLeaveProposals = () => {
               name,
               nip,
               department,
-              position_name
+              position_name,
+              rank_group,
+              asn_status
             ),
             leave_types (
               id,
-              name
+              name,
+              default_days,
+              max_days
             )
           `)
           .order("created_at", { ascending: false }),
@@ -157,6 +162,21 @@ const BatchLeaveProposals = () => {
           setTimeout(() => reject(new Error(`Query timeout after ${timeoutMs/1000} seconds`)), timeoutMs)
         )
       ]);
+
+      // Also fetch existing leave proposals to track completion status
+      const { data: existingProposals, error: proposalsError } = await Promise.race([
+        supabase
+          .from("leave_proposals")
+          .select("*")
+          .order("created_at", { ascending: false }),
+        new Promise((_, reject) =>
+          setTimeout(() => reject(new Error(`Proposals query timeout after ${timeoutMs/1000} seconds`)), timeoutMs)
+        )
+      ]);
+
+      if (proposalsError) {
+        console.warn("Warning: Could not fetch existing proposals:", proposalsError);
+      }
 
       const queryTime = Date.now() - startTime;
       console.log(`⏱️ Query completed in ${queryTime}ms`);
@@ -296,7 +316,7 @@ const BatchLeaveProposals = () => {
           }
         }
       } catch (cacheError) {
-        console.warn("��️ Failed to load cached data:", cacheError);
+        console.warn("⚠️ Failed to load cached data:", cacheError);
       }
 
       if (!usedCachedData) {
