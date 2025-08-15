@@ -474,6 +474,22 @@ const BatchLeaveProposals = () => {
   const handleRestoreProposal = async (unit) => {
     try {
       const proposalKey = `${unit.unitName}|${unit.proposalDate}`;
+      const proposalRecord = proposalRecords.get(proposalKey);
+
+      if (proposalRecord) {
+        // Update proposal status in database
+        const { error: updateError } = await supabase
+          .from("leave_proposals")
+          .update({
+            status: 'draft',
+            updated_at: new Date().toISOString()
+          })
+          .eq('id', proposalRecord.id);
+
+        if (updateError) {
+          throw updateError;
+        }
+      }
 
       // Remove from completed proposals set
       setCompletedProposals(prev => {
@@ -481,11 +497,6 @@ const BatchLeaveProposals = () => {
         newSet.delete(proposalKey);
         return newSet;
       });
-
-      // Update localStorage
-      const completedList = JSON.parse(localStorage.getItem('completedProposals') || '[]');
-      const updatedList = completedList.filter(key => key !== proposalKey);
-      localStorage.setItem('completedProposals', JSON.stringify(updatedList));
 
       toast({
         title: "Berhasil",
