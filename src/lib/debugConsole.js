@@ -49,14 +49,29 @@ export const initDebugConsole = () => {
       // Process ALL arguments to prevent any [object Object] from appearing
       const processedArgs = args.map((arg) => {
         const str = String(arg);
-        // Check if the string representation is [object Object] or similar
-        if (str === "[object Object]" || str.match(/^\[object \w+\]$/) && str !== "[object Error]" && str !== "[object Date]" && str !== "[object Array]") {
+
+        // Direct check for [object Object] string
+        if (str === "[object Object]") {
           return safeStringify(arg);
         }
-        // Also check for plain objects that don't have useful toString methods
-        if (typeof arg === "object" && arg !== null && !Array.isArray(arg) && !(arg instanceof Error) && !(arg instanceof Date) && arg.constructor === Object) {
+
+        // Check for other [object Type] patterns that aren't useful
+        if (str.match(/^\[object \w+\]$/) &&
+            !str.match(/^\[object (Error|Date|Array|Function|RegExp|Promise)\]$/)) {
           return safeStringify(arg);
         }
+
+        // Check for plain objects that would stringify to [object Object]
+        if (typeof arg === "object" && arg !== null &&
+            !Array.isArray(arg) &&
+            !(arg instanceof Error) &&
+            !(arg instanceof Date) &&
+            !(arg instanceof RegExp) &&
+            !(arg instanceof Function) &&
+            arg.constructor === Object) {
+          return safeStringify(arg);
+        }
+
         return arg;
       });
 
