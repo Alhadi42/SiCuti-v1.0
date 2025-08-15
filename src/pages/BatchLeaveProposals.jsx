@@ -238,6 +238,24 @@ const BatchLeaveProposals = () => {
         const isServerError = requestsError.code?.startsWith("5") ||
                              requestsError.message?.includes("Internal server error");
 
+        const isAuthError = requestsError.code === "42501" ||
+                           requestsError.message?.includes("row-level security") ||
+                           requestsError.message?.includes("permission");
+
+        const isTableError = requestsError.code === "42P01" ||
+                            requestsError.message?.includes("relation") ||
+                            requestsError.message?.includes("does not exist");
+
+        console.log("🔍 Error classification:", {
+          isNetworkError,
+          isTimeoutError,
+          isServerError,
+          isAuthError,
+          isTableError,
+          errorCode: requestsError.code,
+          errorMessage: requestsError.message
+        });
+
         if ((isNetworkError || isTimeoutError || isServerError) && retryCount < 2) {
           console.log(`🔄 Network/timeout/server error detected. Retrying... Attempt ${retryCount + 1}/3`);
           const backoffDelay = Math.min(2000 * Math.pow(2, retryCount), 6000); // Exponential backoff, max 6s
