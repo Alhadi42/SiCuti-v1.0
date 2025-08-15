@@ -14,33 +14,7 @@ import "@/utils/errorTestUtility.js";
 TempoDevtools.init();
 initDebugConsole();
 
-// Additional safeguard against [object Object] errors
-const originalLog = console.log;
-const originalError = console.error;
-const originalWarn = console.warn;
-
-const safeConsoleOutput = (originalFn, methodName) => {
-  return function(...args) {
-    const safeArgs = args.map(arg => {
-      if (typeof arg === 'object' && arg !== null && !arg.message && !arg.stack) {
-        try {
-          return JSON.stringify(arg, null, 2);
-        } catch (e) {
-          return `[${arg.constructor?.name || 'Object'}]`;
-        }
-      }
-      return arg;
-    });
-    originalFn.apply(console, safeArgs);
-  };
-};
-
-// Override console methods in development only
-if (import.meta.env.DEV) {
-  console.log = safeConsoleOutput(originalLog, 'log');
-  console.error = safeConsoleOutput(originalError, 'error');
-  console.warn = safeConsoleOutput(originalWarn, 'warn');
-}
+// Console override is now handled by debugConsole.js
 
 console.log("Supabase instance:", supabase);
 
