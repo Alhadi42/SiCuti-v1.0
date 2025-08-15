@@ -51,6 +51,7 @@ const BatchLeaveProposals = () => {
   const [connectionError, setConnectionError] = useState(false);
   const [completedProposals, setCompletedProposals] = useState(new Set());
   const [showCompleted, setShowCompleted] = useState(false);
+  const [proposalRecords, setProposalRecords] = useState(new Map());
   const [showBatchDialog, setShowBatchDialog] = useState(false);
   const [selectedUnitForBatch, setSelectedUnitForBatch] = useState(null);
   const [leaveTypeClassification, setLeaveTypeClassification] = useState({});
@@ -295,7 +296,7 @@ const BatchLeaveProposals = () => {
           }
         }
       } catch (cacheError) {
-        console.warn("⚠️ Failed to load cached data:", cacheError);
+        console.warn("��️ Failed to load cached data:", cacheError);
       }
 
       if (!usedCachedData) {
