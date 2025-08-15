@@ -1,3 +1,9 @@
+/**
+ * BatchLeaveProposals Component - Fixed Issues:
+ * 1. Completion status now persists in database using leave_proposals table instead of localStorage
+ * 2. Document generation now fetches complete data from database to ensure all variables are filled
+ * 3. Enhanced data structure with additional employee fields (rank_group, asn_status, etc.)
+ */
 import React, { useState, useEffect, useCallback } from "react";
 import { motion } from "framer-motion";
 import {
