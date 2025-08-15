@@ -403,12 +403,12 @@ const BatchLeaveProposals = () => {
       let errorMessage = "Gagal mengambil data usulan cuti";
       let errorTitle = "Error";
 
-      // Handle different types of errors
+      // Handle different types of errors with specific guidance
       if (error.message?.includes("Failed to fetch") || error.message?.includes("fetch") || error.message?.includes("Cannot connect")) {
         errorTitle = "Koneksi Bermasalah";
         errorMessage = usedCachedData
           ? "Koneksi bermasalah. Menampilkan data tersimpan."
-          : "Tidak dapat terhubung ke server. Periksa koneksi internet Anda.";
+          : "Tidak dapat terhubung ke server. Periksa koneksi internet Anda dan coba refresh halaman.";
         setConnectionError(true);
       } else if (error.message?.includes("No internet connection")) {
         errorTitle = "Tidak Ada Internet";
@@ -416,22 +416,32 @@ const BatchLeaveProposals = () => {
           ? "Tidak ada internet. Menampilkan data tersimpan."
           : "Periksa koneksi internet Anda dan coba lagi.";
         setConnectionError(true);
-      } else if (error.message?.includes("timeout")) {
+      } else if (error.message?.includes("timeout") || error.message?.includes("Query timeout")) {
         errorTitle = "Timeout";
         errorMessage = usedCachedData
           ? "Server lambat. Menampilkan data tersimpan."
-          : "Server merespons terlalu lambat. Coba lagi nanti.";
+          : "Server merespons terlalu lambat. Coba refresh halaman atau tunggu beberapa menit.";
         setConnectionError(true);
       } else if (error.code === "PGRST301") {
         errorTitle = "Masalah Database";
-        errorMessage = "Tabel atau kolom tidak ditemukan. Sistem perlu update database.";
+        errorMessage = "Tabel atau kolom tidak ditemukan. Hubungi administrator sistem.";
         setConnectionError(false);
       } else if (error.code === "42501") {
         errorTitle = "Akses Ditolak";
-        errorMessage = "Anda tidak memiliki izin untuk mengakses data ini.";
+        errorMessage = "Anda tidak memiliki izin untuk mengakses data ini. Periksa login atau hubungi administrator.";
         setConnectionError(false);
+      } else if (error.code === "42P01") {
+        errorTitle = "Tabel Tidak Ditemukan";
+        errorMessage = "Tabel database tidak ditemukan. Hubungi administrator untuk setup database.";
+        setConnectionError(false);
+      } else if (error.message?.includes("Supabase connection test failed")) {
+        errorTitle = "Koneksi Database Gagal";
+        errorMessage = usedCachedData
+          ? "Tidak dapat terhubung ke database. Menampilkan data tersimpan."
+          : "Tidak dapat terhubung ke database. Periksa konfigurasi atau hubungi administrator.";
+        setConnectionError(true);
       } else {
-        errorMessage = error.message || "Terjadi kesalahan yang tidak diketahui";
+        errorMessage = error.message || "Terjadi kesalahan yang tidak diketahui. Coba refresh halaman.";
         setConnectionError(false);
       }
 
