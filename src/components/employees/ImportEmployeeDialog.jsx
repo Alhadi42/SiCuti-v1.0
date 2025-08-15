@@ -247,7 +247,7 @@ const ImportEmployeeDialog = ({ isOpen, onOpenChange, onImportSuccess }) => {
         toast({
           variant: "destructive",
           title: "❌ Test Struktur Gagal",
-          description: result.error,
+          description: typeof result.error === 'string' ? result.error : JSON.stringify(result.error),
         });
       }
     } catch (error) {
