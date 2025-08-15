@@ -223,7 +223,7 @@ const ImportEmployeeDialog = ({ isOpen, onOpenChange, onImportSuccess }) => {
         toast({
           variant: "destructive",
           title: "❌ Test Insert Gagal",
-          description: result1.error || result2.error,
+          description: typeof (result1.error || result2.error) === 'string' ? (result1.error || result2.error) : JSON.stringify(result1.error || result2.error),
         });
       }
     } catch (error) {
