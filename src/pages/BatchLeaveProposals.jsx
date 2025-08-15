@@ -584,7 +584,43 @@ const BatchLeaveProposals = () => {
         description: `Sedang mempersiapkan surat batch untuk ${leaveType}...`,
       });
 
-      // Prepare variables for template
+      // Fetch all leave data to ensure completeness
+      console.log("📊 Fetching complete leave data for document generation...");
+      const { data: allLeaveData, error: fetchError } = await supabase
+        .from("leave_requests")
+        .select(`
+          *,
+          employees (
+            id,
+            name,
+            nip,
+            department,
+            position_name,
+            rank_group,
+            asn_status,
+            join_date
+          ),
+          leave_types (
+            id,
+            name,
+            default_days,
+            max_days,
+            can_defer
+          )
+        `)
+        .in('id', requests.map(req => req.id));
+
+      if (fetchError) {
+        console.error("Error fetching complete leave data:", fetchError);
+        throw new Error("Gagal mengambil data lengkap cuti: " + fetchError.message);
+      }
+
+      console.log("📊 Complete leave data fetched:", allLeaveData?.length || 0, "records");
+
+      // Use complete data for variables
+      const completeRequests = allLeaveData || requests;
+
+      // Prepare variables for template with complete data
       const variables = {
         // General information
         unit_kerja: selectedUnitForBatch.unitName,
