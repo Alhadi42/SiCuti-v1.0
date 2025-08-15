@@ -23,8 +23,14 @@ export const initDebugConsole = () => {
         return (
           str === "[object Object]" ||
           str.includes("[object Object]") ||
-          (str.match(/^\[object \w+\]$/) && str !== "[object Error]" && str !== "[object Date]" && str !== "[object Array]") ||
-          (typeof arg === "object" && arg !== null && !Array.isArray(arg) && !(arg instanceof Error) && !(arg instanceof Date) && arg.constructor === Object)
+          (str.match(/^\[object \w+\]$/) && !str.match(/^\[object (Error|Date|Array|Function|RegExp|Promise)\]$/)) ||
+          (typeof arg === "object" && arg !== null &&
+           !Array.isArray(arg) &&
+           !(arg instanceof Error) &&
+           !(arg instanceof Date) &&
+           !(arg instanceof RegExp) &&
+           !(arg instanceof Function) &&
+           arg.constructor === Object)
         );
       });
 
