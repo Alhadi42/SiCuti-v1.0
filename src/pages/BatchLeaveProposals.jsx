@@ -569,7 +569,7 @@ const BatchLeaveProposals = () => {
       console.error("Error restoring proposal:", error);
       toast({
         title: "Error",
-        description: "Gagal mengembalikan usulan: " + (error.message || "Unknown error"),
+        description: "Gagal mengembalikan usulan: " + safeErrorMessage(error),
         variant: "destructive",
       });
     }
@@ -843,7 +843,7 @@ const BatchLeaveProposals = () => {
 
       // Ensure it's base64 format
       if (!templateContent.includes(',') && !templateContent.match(/^[A-Za-z0-9+/]*={0,2}$/)) {
-        console.log("���️ Content doesn't appear to be base64, wrapping...");
+        console.log("⚠️ Content doesn't appear to be base64, wrapping...");
         templateContent = `data:application/vnd.openxmlformats-officedocument.wordprocessingml.document;base64,${templateContent}`;
       }
 
