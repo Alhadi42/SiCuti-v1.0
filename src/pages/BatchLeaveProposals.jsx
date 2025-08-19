@@ -811,6 +811,11 @@ const BatchLeaveProposals = () => {
         nama_kepala_instansi: "Kepala Dinas", // Can be made configurable
         jabatan_kepala_instansi: "Kepala Dinas", // Can be made configurable
 
+        // Additional comprehensive variables for complete coverage
+        total_pegawai_asn: completeRequests.filter(req => req.employees?.asn_status?.toLowerCase().includes('asn')).length,
+        total_pegawai_non_asn: completeRequests.filter(req => !req.employees?.asn_status?.toLowerCase().includes('asn')).length,
+        rata_rata_hari_cuti: completeRequests.length > 0 ? Math.round(completeRequests.reduce((sum, req) => sum + (req.days_requested || 0), 0) / completeRequests.length) : 0,
+
         // Employee list variables for table/loop processing
         pegawai_list: completeRequests.map((request, index) => ({
           no: index + 1,
