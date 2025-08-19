@@ -7,18 +7,23 @@ let originalConsoleLog;
 let originalConsoleWarn;
 
 export const initDebugConsole = () => {
-  if (import.meta.env.PROD) return;
+  // Always initialize in development, even if already done
+  console.log("🔍 Initializing debug console...");
 
-  // Prevent multiple initializations
-  if (originalConsoleError) {
-    console.log("🔍 Debug console already initialized");
+  if (import.meta.env.PROD) {
+    console.log("🔍 Production mode - debug console disabled");
     return;
   }
 
-  // Store original methods
-  originalConsoleError = console.error;
-  originalConsoleLog = console.log;
-  originalConsoleWarn = console.warn;
+  // Store original methods (or use existing stored versions)
+  if (!originalConsoleError) {
+    originalConsoleError = console.error;
+    originalConsoleLog = console.log;
+    originalConsoleWarn = console.warn;
+    console.log("🔍 Stored original console methods");
+  } else {
+    console.log("🔍 Using previously stored console methods");
+  }
 
   // Create enhanced console override function
   const createEnhancedConsole = (originalFn, methodName) => {
@@ -60,16 +65,23 @@ export const initDebugConsole = () => {
 
       // Process ALL arguments to prevent any [object Object] from appearing
       const processedArgs = args.map((arg) => {
+        // Handle null and undefined first
+        if (arg === null || arg === undefined) {
+          return arg;
+        }
+
         const str = String(arg);
 
         // Direct check for [object Object] string
         if (str === "[object Object]") {
+          console.log("🔍 Caught [object Object], converting:", arg);
           return safeStringify(arg);
         }
 
         // Check for other [object Type] patterns that aren't useful
         if (str.match(/^\[object \w+\]$/) &&
             !str.match(/^\[object (Error|Date|Array|Function|RegExp|Promise)\]$/)) {
+          console.log("🔍 Caught [object Type], converting:", str);
           return safeStringify(arg);
         }
 
@@ -81,6 +93,7 @@ export const initDebugConsole = () => {
             !(arg instanceof RegExp) &&
             !(arg instanceof Function) &&
             arg.constructor === Object) {
+          console.log("🔍 Caught plain object, converting:");
           return safeStringify(arg);
         }
 
@@ -103,12 +116,16 @@ export const initDebugConsole = () => {
   // Set flag to indicate initialization is complete
   window._debugConsoleInitialized = true;
 
-  // Run a basic test to verify the override is working
-  if (import.meta.env.DEV) {
-    setTimeout(() => {
-      const testObj = { test: "verification test", status: "initialized" };
-      console.log("✅ Console override verification - this object should be stringified:", testObj);
-    }, 10);
+  // Immediate test to verify the override is working
+  const testObj = { test: "verification test", status: "initialized" };
+  console.log("✅ Console override verification - this object should be stringified:", testObj);
+
+  // Test error case specifically
+  console.error("Test error with object:", testObj);
+
+  // If we still see [object Object], the override isn't working
+  if (String(testObj) === "[object Object]") {
+    console.warn("⚠️ Debug console override may not be working properly");
   }
 };
 
