@@ -124,11 +124,11 @@ const BatchLeaveProposals = () => {
       }
 
       // Skip connectivity test on first attempt to avoid double network calls
-      if (retryCount > 0) {
+      if (retryCount > 0 && navigator.onLine) {
         try {
           console.log("🔌 Testing basic connectivity...");
           const controller = new AbortController();
-          const timeoutId = setTimeout(() => controller.abort(), 3000); // 3 second timeout
+          const timeoutId = setTimeout(() => controller.abort(), 5000); // 5 second timeout for retry
 
           const connectivityTest = await fetch(import.meta.env.VITE_SUPABASE_URL + '/rest/v1/', {
             method: 'HEAD',
@@ -146,13 +146,14 @@ const BatchLeaveProposals = () => {
           console.log("✅ Basic connectivity OK");
         } catch (connectError) {
           console.error("❌ Connectivity test failed:", connectError);
-          if (retryCount < 2) {
+          if (retryCount < 2 && navigator.onLine) {
             console.log(`🔄 Retrying... Attempt ${retryCount + 1}/3`);
             await new Promise(resolve => setTimeout(resolve, 3000));
             return fetchBatchProposals(retryCount + 1);
           }
-          // Don't throw here, let the main query handle the error
-          console.log("⚠️ Connectivity test failed, proceeding with main query anyway");
+          // If offline or max retries reached, proceed to try cached data
+          console.log("⚠️ Connectivity test failed, will try cached data");
+          setConnectionError(true);
         }
       }
 
@@ -389,16 +390,22 @@ const BatchLeaveProposals = () => {
         if (cachedData) {
           const { data, timestamp, userRole } = JSON.parse(cachedData);
           const cacheAge = Date.now() - timestamp;
-          const maxCacheAge = 1000 * 60 * 30; // 30 minutes
+          const maxCacheAge = 1000 * 60 * 60; // 1 hour for offline mode
 
           if (cacheAge < maxCacheAge && userRole === currentUser?.role && data?.length > 0) {
             console.log("📱 Using cached data as fallback");
             setUnitProposals(data);
+
+            // Also set empty completion state to avoid errors
+            setCompletedProposals(new Set());
+            setProposalRecords(new Map());
+
             usedCachedData = true;
 
+            const ageMinutes = Math.round(cacheAge / 1000 / 60);
             toast({
               title: "Mode Offline",
-              description: `Menampilkan data tersimpan (${Math.round(cacheAge / 1000 / 60)} menit yang lalu)`,
+              description: `Menampilkan data tersimpan (${ageMinutes} menit yang lalu). Status completion tidak tersedia dalam mode offline.`,
               variant: "default",
             });
           }
@@ -409,6 +416,8 @@ const BatchLeaveProposals = () => {
 
       if (!usedCachedData) {
         setUnitProposals([]);
+        setCompletedProposals(new Set());
+        setProposalRecords(new Map());
       }
 
       let errorMessage = "Gagal mengambil data usulan cuti";
@@ -421,7 +430,7 @@ const BatchLeaveProposals = () => {
           ? "Koneksi bermasalah. Menampilkan data tersimpan."
           : "Tidak dapat terhubung ke server. Periksa koneksi internet Anda dan coba refresh halaman.";
         setConnectionError(true);
-      } else if (error.message?.includes("No internet connection")) {
+      } else if (error.message?.includes("No internet connection") || !navigator.onLine) {
         errorTitle = "Tidak Ada Internet";
         errorMessage = usedCachedData
           ? "Tidak ada internet. Menampilkan data tersimpan."
