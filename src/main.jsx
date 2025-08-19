@@ -9,12 +9,20 @@ import { initDebugConsole } from "@/lib/debugConsole.js";
 import "@/utils/errorUtils.js";
 import "@/lib/productionOptimizer.js";
 import "@/lib/healthChecker.js";
-import "@/utils/errorTestUtility.js";
-import "@/utils/consoleTest.js";
-import "@/utils/immediateConsoleTest.js";
 
-TempoDevtools.init();
+// Initialize debug console FIRST to prevent [object Object] errors
 initDebugConsole();
+TempoDevtools.init();
+
+// Import test utilities AFTER console override is initialized
+if (import.meta.env.DEV) {
+  // Delay test imports to ensure console override is working
+  setTimeout(() => {
+    import("@/utils/errorTestUtility.js");
+    import("@/utils/consoleTest.js");
+    import("@/utils/immediateConsoleTest.js");
+  }, 100);
+}
 
 // Console override is now handled by debugConsole.js
 
