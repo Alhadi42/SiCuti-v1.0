@@ -9,6 +9,12 @@ let originalConsoleWarn;
 export const initDebugConsole = () => {
   if (import.meta.env.PROD) return;
 
+  // Prevent multiple initializations
+  if (originalConsoleError) {
+    console.log("🔍 Debug console already initialized");
+    return;
+  }
+
   // Store original methods
   originalConsoleError = console.error;
   originalConsoleLog = console.log;
@@ -94,10 +100,15 @@ export const initDebugConsole = () => {
     "🔍 Debug console initialized - will catch [object Object] errors",
   );
 
-  // Immediate test to verify override is working
+  // Set flag to indicate initialization is complete
+  window._debugConsoleInitialized = true;
+
+  // Run a basic test to verify the override is working
   if (import.meta.env.DEV) {
-    const testObj = { test: "immediate test", value: 123 };
-    console.log("🧪 Console override test - this object should be stringified:", testObj);
+    setTimeout(() => {
+      const testObj = { test: "verification test", status: "initialized" };
+      console.log("✅ Console override verification - this object should be stringified:", testObj);
+    }, 10);
   }
 };
 
