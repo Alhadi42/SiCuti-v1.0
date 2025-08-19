@@ -708,6 +708,14 @@ function DocxSuratKeterangan() {
         nip_atasan: leaveRequest.nip_atasan || signatory?.nip || "NIP Atasan",
         jabatan_atasan:
           leaveRequest.jabatan_atasan || signatory?.jabatan || "Jabatan Atasan",
+
+        // ADDED: Missing variables that might be empty
+        pangkat_golongan: leaveRequest.employees?.rank_group || leaveRequest.pangkat_golongan || "Pangkat tidak tersedia",
+        status_asn: leaveRequest.employees?.asn_status || leaveRequest.status_asn || "Status ASN tidak tersedia",
+        durasi_hari_terbilang: workingDays > 0 ? numberToWords(workingDays) : numberToWords(totalDays),
+        nomor_surat_referensi: leaveRequest.reference_number || leaveRequest.nomor_surat_referensi || "REF tidak tersedia",
+        tempat_lahir: leaveRequest.employees?.tempat_lahir || leaveRequest.tempat_lahir || "Tempat lahir tidak tersedia",
+        tanggal_lahir: leaveRequest.employees?.tanggal_lahir ? formatDateLong(leaveRequest.employees.tanggal_lahir) : leaveRequest.tanggal_lahir || "Tanggal lahir tidak tersedia",
         tanggal_surat: (() => {
           console.log("=== TANGGAL SURAT DEBUG ===");
           console.log("leaveRequest.leave_letter_date:", leaveRequest.leave_letter_date);
@@ -774,6 +782,14 @@ function DocxSuratKeterangan() {
       unit_kerja: leaveRequest.unit_kerja || "Unit Kerja tidak tersedia",
       jenis_cuti: leaveRequest.jenis_cuti || "Cuti Tahunan",
       alasan: leaveRequest.alasan || "Keperluan pribadi",
+
+      // ADDED: Missing variables for form mode
+      pangkat_golongan: leaveRequest.pangkat_golongan || "Pangkat tidak tersedia",
+      status_asn: leaveRequest.status_asn || "Status ASN tidak tersedia",
+      durasi_hari_terbilang: workingDays > 0 ? numberToWords(workingDays) : numberToWords(totalDays),
+      nomor_surat_referensi: leaveRequest.reference_number || "REF tidak tersedia",
+      tempat_lahir: leaveRequest.tempat_lahir || "Tempat lahir tidak tersedia",
+      tanggal_lahir: leaveRequest.tanggal_lahir || "Tanggal lahir tidak tersedia",
       tanggal_mulai: formatDate(sampleStartDate),
       tanggal_selesai: formatDate(sampleEndDate),
       tanggal_cuti: formatTanggalCuti(sampleStartDate, sampleEndDate),
@@ -1555,7 +1571,7 @@ function DocxSuratKeterangan() {
                                 template
                               </li>
                               <li>
-                                • Variabel kosong akan dibiarkan kosong jika
+                                ��� Variabel kosong akan dibiarkan kosong jika
                                 pegawai kurang dari 30
                               </li>
                             </ul>
