@@ -161,29 +161,32 @@ export const runAllErrorTests = () => {
   return errorResults;
 };
 
-// Auto-run tests in development mode
+// Disable auto-run tests to prevent spam - tests available manually
 if (import.meta.env.DEV && typeof window !== 'undefined') {
-  // Wait for debug console to be properly initialized
-  const waitAndRunTests = () => {
-    if (window._debugConsoleInitialized) {
-      console.log("🔧 Auto-running error handling tests in development mode...");
+  console.log("🔧 Error handling tests available via runAllErrorTests() - auto-run disabled");
 
-      // Quick test for console override
-      console.log("🧪 Quick console override test:");
-      const testObj = { test: "value", nested: { data: "example" } };
-      console.log("Testing object:", testObj);
-      console.error("Testing error with object:", testObj);
-      console.warn("Testing warn with object:", testObj);
+  // Only run if explicitly requested via URL parameter
+  if (window.location.search.includes('runErrorTests=true')) {
+    const waitAndRunTests = () => {
+      if (window._debugConsoleInitialized) {
+        console.log("🔧 Running error handling tests due to URL parameter...");
 
-      // Run full tests
-      runAllErrorTests();
-    } else {
-      setTimeout(waitAndRunTests, 100);
-    }
-  };
+        // Quick test for console override
+        console.log("🧪 Quick console override test:");
+        const testObj = { test: "value", nested: { data: "example" } };
+        console.log("Testing object:", testObj);
+        console.error("Testing error with object:", testObj);
+        console.warn("Testing warn with object:", testObj);
 
-  // Start after a delay to ensure everything is loaded
-  setTimeout(waitAndRunTests, 500);
+        // Run full tests
+        runAllErrorTests();
+      } else {
+        setTimeout(waitAndRunTests, 100);
+      }
+    };
+
+    setTimeout(waitAndRunTests, 500);
+  }
 }
 
 export default {
