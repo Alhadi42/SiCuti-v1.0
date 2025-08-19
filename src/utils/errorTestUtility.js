@@ -163,20 +163,27 @@ export const runAllErrorTests = () => {
 
 // Auto-run tests in development mode
 if (import.meta.env.DEV && typeof window !== 'undefined') {
-  // Run tests after a short delay to ensure all systems are initialized
-  setTimeout(() => {
-    console.log("🔧 Auto-running error handling tests in development mode...");
+  // Wait for debug console to be properly initialized
+  const waitAndRunTests = () => {
+    if (window._debugConsoleInitialized) {
+      console.log("🔧 Auto-running error handling tests in development mode...");
 
-    // Quick test for console override
-    console.log("🧪 Quick console override test:");
-    const testObj = { test: "value", nested: { data: "example" } };
-    console.log("Testing object:", testObj);
-    console.error("Testing error with object:", testObj);
-    console.warn("Testing warn with object:", testObj);
+      // Quick test for console override
+      console.log("🧪 Quick console override test:");
+      const testObj = { test: "value", nested: { data: "example" } };
+      console.log("Testing object:", testObj);
+      console.error("Testing error with object:", testObj);
+      console.warn("Testing warn with object:", testObj);
 
-    // Run full tests
-    runAllErrorTests();
-  }, 1000);
+      // Run full tests
+      runAllErrorTests();
+    } else {
+      setTimeout(waitAndRunTests, 100);
+    }
+  };
+
+  // Start after a delay to ensure everything is loaded
+  setTimeout(waitAndRunTests, 500);
 }
 
 export default {
