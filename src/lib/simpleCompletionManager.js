@@ -120,32 +120,9 @@ export const markSimpleProposalAsCompleted = async (unitName, proposalDate, requ
       source: 'simple'
     };
 
-    // Try to create a database record if possible (best effort)
-    try {
-      const { error: insertError } = await supabase
-        .from('leave_proposals')
-        .insert({
-          proposal_title: `Usulan Cuti ${unitName} - ${new Date(proposalDate).toLocaleDateString('id-ID')}`,
-          proposed_by: currentUser.id,
-          proposer_name: currentUser.name || currentUser.email,
-          proposer_unit: unitName,
-          proposal_date: proposalDate,
-          total_employees: requestsData.length,
-          status: 'completed',
-          completed_by: currentUser.id,
-          completed_at: new Date().toISOString(),
-          notes: `Selesai diajukan oleh ${currentUser.name || currentUser.email} pada ${new Date().toLocaleString('id-ID')}`
-        });
-
-      if (!insertError) {
-        console.log('✅ Successfully created database record for completion');
-        completionRecord.source = 'database';
-      } else {
-        console.warn('⚠️ Could not create database record, using localStorage:', insertError.code);
-      }
-    } catch (dbError) {
-      console.warn('⚠️ Database insert failed, using localStorage:', dbError);
-    }
+    // Skip database operations to avoid RLS issues - use localStorage only
+    console.log('💾 Using localStorage-only storage to avoid RLS restrictions');
+    completionRecord.source = 'localStorage';
 
     // Always store in localStorage as backup/primary storage
     const existingCompleted = JSON.parse(localStorage.getItem('completedBatchProposals') || '{}');
@@ -173,27 +150,8 @@ export const restoreSimpleProposal = async (unitName, proposalDate) => {
 
     const proposalKey = getProposalKey(unitName, proposalDate);
 
-    // Try to update database record if it exists
-    try {
-      const { error: updateError } = await supabase
-        .from('leave_proposals')
-        .update({
-          status: 'pending',
-          completed_by: null,
-          completed_at: null,
-          notes: `Dikembalikan ke status aktif oleh ${currentUser.name || currentUser.email} pada ${new Date().toLocaleString('id-ID')}`
-        })
-        .eq('proposer_unit', unitName)
-        .eq('proposal_date', proposalDate);
-
-      if (!updateError) {
-        console.log('✅ Successfully updated database record');
-      } else {
-        console.warn('⚠️ Could not update database record:', updateError.code);
-      }
-    } catch (dbError) {
-      console.warn('⚠️ Database update failed:', dbError);
-    }
+    // Skip database operations to avoid RLS issues - use localStorage only
+    console.log('💾 Using localStorage-only storage to avoid RLS restrictions');
 
     // Remove from localStorage
     const existingCompleted = JSON.parse(localStorage.getItem('completedBatchProposals') || '{}');
