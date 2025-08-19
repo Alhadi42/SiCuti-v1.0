@@ -121,6 +121,50 @@ const BatchLeaveProposals = () => {
         setConnectionError(true);
         // Don't throw immediately, try to use cached data instead
         console.log("📱 Attempting to load cached data...");
+
+        // Try to load cached data immediately when offline
+        try {
+          const cachedData = localStorage.getItem('cachedBatchProposals');
+          if (cachedData) {
+            const { data, timestamp, userRole } = JSON.parse(cachedData);
+            const cacheAge = Date.now() - timestamp;
+            const maxCacheAge = 1000 * 60 * 60; // 1 hour for offline mode
+
+            if (cacheAge < maxCacheAge && userRole === currentUser?.role && data?.length > 0) {
+              console.log("📱 Using cached data (offline mode)");
+              setUnitProposals(data);
+              setCompletedProposals(new Set());
+              setProposalRecords(new Map());
+
+              const ageMinutes = Math.round(cacheAge / 1000 / 60);
+              toast({
+                title: "Mode Offline",
+                description: `Perangkat offline. Menampilkan data tersimpan (${ageMinutes} menit yang lalu).`,
+                variant: "default",
+              });
+
+              return; // Exit early, don't attempt network requests
+            }
+          }
+
+          // No usable cached data
+          console.log("⚠️ No usable cached data available for offline mode");
+          setUnitProposals([]);
+          setCompletedProposals(new Set());
+          setProposalRecords(new Map());
+
+          toast({
+            title: "Tidak Ada Internet",
+            description: "Perangkat offline dan tidak ada data tersimpan. Hubungkan ke internet untuk memuat data.",
+            variant: "destructive",
+          });
+
+          return; // Exit early, don't attempt network requests
+
+        } catch (cacheError) {
+          console.warn("⚠️ Failed to load cached data in offline mode:", cacheError);
+          // Continue to network attempt even though we're offline (will fail gracefully)
+        }
       }
 
       // Skip connectivity test on first attempt to avoid double network calls
@@ -227,6 +271,7 @@ const BatchLeaveProposals = () => {
                               requestsError.message?.includes("fetch") ||
                               requestsError.message?.includes("Network") ||
                               requestsError.message?.includes("network") ||
+                              requestsError.message?.includes("TypeError: fetch") ||
                               requestsError.code === "NETWORK_ERROR" ||
                               !navigator.onLine;
 
@@ -254,12 +299,14 @@ const BatchLeaveProposals = () => {
           errorMessage: requestsError.message
         });
 
-        if ((isNetworkError || isTimeoutError || isServerError) && retryCount < 2) {
+        if ((isNetworkError || isTimeoutError || isServerError) && retryCount < 2 && navigator.onLine) {
           console.log(`🔄 Network/timeout/server error detected. Retrying... Attempt ${retryCount + 1}/3`);
           const backoffDelay = Math.min(2000 * Math.pow(2, retryCount), 6000); // Exponential backoff, max 6s
           console.log(`⏳ Waiting ${backoffDelay}ms before retry...`);
           await new Promise(resolve => setTimeout(resolve, backoffDelay));
           return fetchBatchProposals(retryCount + 1);
+        } else if ((isNetworkError || isTimeoutError) && !navigator.onLine) {
+          console.log("🚫 Device went offline during request, skipping retry");
         }
 
         throw requestsError;
