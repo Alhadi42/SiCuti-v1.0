@@ -902,6 +902,12 @@ const BatchLeaveProposals = () => {
       console.log("- alamat_cuti:", variables.alamat_cuti);
       console.log("- formulir_pengajuan_cuti:", variables.formulir_pengajuan_cuti);
 
+      // Log the NEWLY ADDED variables that were reported missing:
+      console.log("🔧 NEWLY ADDED VARIABLES (user reported as missing):");
+      console.log("- tanggal_formulir_pengajuan:", variables.tanggal_formulir_pengajuan);
+      console.log("- tanggal_cuti:", variables.tanggal_cuti);
+      console.log("- jatah_cuti_tahun:", variables.jatah_cuti_tahun);
+
       // Log all variable keys for debugging
       console.log("📋 All available variables:", Object.keys(variables).sort());
 
