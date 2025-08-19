@@ -841,7 +841,10 @@ const BatchLeaveProposals = () => {
           tanggal_formulir: request.application_form_date ? format(new Date(request.application_form_date), "dd MMMM yyyy", { locale: id }) : "-",
           formulir_pengajuan_cuti: request.application_form_date ? format(new Date(request.application_form_date), "dd MMMM yyyy", { locale: id }) : "-",
           nomor_surat_cuti: request.leave_letter_number || "-",
-          tanggal_surat_cuti: request.leave_letter_date ? format(new Date(request.leave_letter_date), "dd MMMM yyyy", { locale: id }) : "-"
+          tanggal_surat_cuti: request.leave_letter_date ? format(new Date(request.leave_letter_date), "dd MMMM yyyy", { locale: id }) : "-",
+          // Additional comprehensive variables
+          durasi_hari_terbilang: numberToWords(request.days_requested || 0),
+          nomor_surat_referensi: request.reference_number || "REF tidak tersedia"
         }))
       };
 
@@ -880,6 +883,10 @@ const BatchLeaveProposals = () => {
         variables[`nama_pegawai_${num}`] = request.employees?.name || "Nama tidak diketahui";
         variables[`tempat_alamat_cuti_${num}`] = request.address_during_leave || "-";
         variables[`periode_cuti_${num}`] = `${format(new Date(request.start_date), "dd/MM/yyyy")} - ${format(new Date(request.end_date), "dd/MM/yyyy")}`;
+        // Additional indexed variables for complete coverage
+        variables[`durasi_hari_terbilang_${num}`] = numberToWords(request.days_requested || 0);
+        variables[`nomor_surat_referensi_${num}`] = request.reference_number || "REF tidak tersedia";
+        variables[`status_asn_${num}`] = request.employees?.asn_status || "Status ASN tidak tersedia";
       });
 
       console.log("📄 Generating batch letter with variables:", {
