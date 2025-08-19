@@ -5,6 +5,7 @@
 let originalConsoleError;
 let originalConsoleLog;
 let originalConsoleWarn;
+let isProcessing = false; // Recursion protection
 
 export const initDebugConsole = () => {
   // Always initialize in development, even if already done
@@ -28,7 +29,15 @@ export const initDebugConsole = () => {
   // Create enhanced console override function
   const createEnhancedConsole = (originalFn, methodName) => {
     return function (...args) {
-      // Check if any argument is [object Object] or contains it
+      // Prevent infinite recursion
+      if (isProcessing) {
+        return originalFn.apply(console, args);
+      }
+
+      isProcessing = true;
+
+      try {
+        // Check if any argument is [object Object] or contains it
       const hasObjectError = args.some((arg) => {
         const str = String(arg);
         return (
@@ -97,11 +106,12 @@ export const initDebugConsole = () => {
         return arg;
       });
 
-      try {
         originalFn.apply(console, processedArgs);
       } catch (recursionError) {
-        // Prevent infinite recursion - use original method directly
-        originalConsoleError.call(console, "Debug console recursion detected:", methodName);
+        // Fallback to original method
+        originalFn.apply(console, args);
+      } finally {
+        isProcessing = false;
       }
     };
   };
