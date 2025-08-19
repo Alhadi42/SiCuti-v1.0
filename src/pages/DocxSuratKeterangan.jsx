@@ -1030,6 +1030,14 @@ function DocxSuratKeterangan() {
           employeeData.tanggal_formulir_pengajuan || "";
         batchData[`alasan_${index}`] = employeeData.alasan || "";
 
+        // ADDED: Missing indexed variables for batch mode
+        batchData[`pangkat_golongan_${index}`] = employeeData.pangkat_golongan || "Pangkat tidak tersedia";
+        batchData[`status_asn_${index}`] = employeeData.status_asn || "Status ASN tidak tersedia";
+        batchData[`durasi_hari_terbilang_${index}`] = employeeData.durasi_hari_terbilang || "";
+        batchData[`nomor_surat_referensi_${index}`] = employeeData.nomor_surat_referensi || "REF tidak tersedia";
+        batchData[`tempat_lahir_${index}`] = employeeData.tempat_lahir || "Tempat lahir tidak tersedia";
+        batchData[`tanggal_lahir_${index}`] = employeeData.tanggal_lahir || "Tanggal lahir tidak tersedia";
+
         console.log(`✓ Employee ${index} data filled successfully`);
       } else {
         // No employee for this slot, fill with empty strings
@@ -1049,6 +1057,14 @@ function DocxSuratKeterangan() {
         batchData[`alamat_selama_cuti_${index}`] = "";
         batchData[`tanggal_formulir_pengajuan_${index}`] = "";
         batchData[`alasan_${index}`] = "";
+
+        // ADDED: Missing indexed variables for empty slots
+        batchData[`pangkat_golongan_${index}`] = "";
+        batchData[`status_asn_${index}`] = "";
+        batchData[`durasi_hari_terbilang_${index}`] = "";
+        batchData[`nomor_surat_referensi_${index}`] = "";
+        batchData[`tempat_lahir_${index}`] = "";
+        batchData[`tanggal_lahir_${index}`] = "";
       }
     }
 
@@ -1571,7 +1587,7 @@ function DocxSuratKeterangan() {
                                 template
                               </li>
                               <li>
-                                ��� Variabel kosong akan dibiarkan kosong jika
+                                • Variabel kosong akan dibiarkan kosong jika
                                 pegawai kurang dari 30
                               </li>
                             </ul>
