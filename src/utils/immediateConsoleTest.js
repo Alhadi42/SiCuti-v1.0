@@ -55,7 +55,14 @@ const runImmediateTest = () => {
   }
 };
 
-// Start waiting for initialization
-setTimeout(waitForDebugConsole, 100);
+// Disable automatic test execution to prevent error spam
+// Tests can be run manually via window.testConsole.all()
+console.log('📝 Console tests available via window.testConsole - automatic execution disabled');
+
+// Only run if explicitly requested
+if (window.location.search.includes('runConsoleTests=true')) {
+  console.log('🏃 Running console tests due to URL parameter...');
+  setTimeout(waitForDebugConsole, 100);
+}
 
 export default {};
