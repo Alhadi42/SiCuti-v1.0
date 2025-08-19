@@ -6,13 +6,23 @@ let originalConsoleError;
 let originalConsoleLog;
 let originalConsoleWarn;
 let isProcessing = false; // Recursion protection
+let errorCount = 0; // Error tracking
+let isDisabled = false; // Emergency disable
 
 export const initDebugConsole = () => {
-  // Always initialize in development, even if already done
-  console.log("🔍 Initializing debug console...");
+  // Check if disabled due to previous errors
+  if (isDisabled) {
+    return;
+  }
+
+  // Use original console for initialization message
+  if (originalConsoleLog) {
+    originalConsoleLog.call(console, "🔍 Re-initializing debug console...");
+  } else {
+    console.log("🔍 Initializing debug console...");
+  }
 
   if (import.meta.env.PROD) {
-    console.log("🔍 Production mode - debug console disabled");
     return;
   }
 
@@ -108,6 +118,13 @@ export const initDebugConsole = () => {
 
         originalFn.apply(console, processedArgs);
       } catch (recursionError) {
+        errorCount++;
+        if (errorCount > 3) {
+          // Emergency disable after too many errors
+          isDisabled = true;
+          restoreConsole();
+          originalConsoleError.call(console, "🚨 Debug console disabled due to errors");
+        }
         // Fallback to original method
         originalFn.apply(console, args);
       } finally {
