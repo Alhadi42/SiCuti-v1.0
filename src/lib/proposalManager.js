@@ -107,20 +107,48 @@ export const markProposalAsCompleted = async (unitName, proposalDate, leaveReque
     // Find or create the proposal
     let proposal = await createOrFindProposal(unitName, proposalDate, leaveRequests);
 
-    // Update the proposal status to completed
-    const { data: updatedProposal, error: updateError } = await supabase
-      .from('leave_proposals')
-      .update({
-        status: 'completed',
-        completed_by: currentUser.id,
-        completed_at: new Date().toISOString(),
-        notes: proposal.notes ? 
-          `${proposal.notes}\n\nSelesai diajukan oleh ${currentUser.name || currentUser.email} pada ${new Date().toLocaleString('id-ID')}` :
-          `Selesai diajukan oleh ${currentUser.name || currentUser.email} pada ${new Date().toLocaleString('id-ID')}`
-      })
-      .eq('id', proposal.id)
-      .select()
-      .single();
+    // Try to update with new columns first, fall back if columns don't exist
+    let updateData = {
+      status: 'completed',
+      notes: proposal.notes ?
+        `${proposal.notes}\n\nSelesai diajukan oleh ${currentUser.name || currentUser.email} pada ${new Date().toLocaleString('id-ID')}` :
+        `Selesai diajukan oleh ${currentUser.name || currentUser.email} pada ${new Date().toLocaleString('id-ID')}`
+    };
+
+    // Try to add completed_by and completed_at if they exist
+    try {
+      updateData.completed_by = currentUser.id;
+      updateData.completed_at = new Date().toISOString();
+
+      var { data: updatedProposal, error: updateError } = await supabase
+        .from('leave_proposals')
+        .update(updateData)
+        .eq('id', proposal.id)
+        .select()
+        .single();
+
+    } catch (firstAttemptError) {
+      // If the update failed due to missing columns, try without them
+      if (firstAttemptError.code === '42703') {
+        console.warn('⚠️ Database missing completed_by/completed_at columns, updating without them');
+
+        updateData = {
+          status: 'completed',
+          notes: proposal.notes ?
+            `${proposal.notes}\n\nSelesai diajukan oleh ${currentUser.name || currentUser.email} pada ${new Date().toLocaleString('id-ID')}` :
+            `Selesai diajukan oleh ${currentUser.name || currentUser.email} pada ${new Date().toLocaleString('id-ID')}`
+        };
+
+        var { data: updatedProposal, error: updateError } = await supabase
+          .from('leave_proposals')
+          .update(updateData)
+          .eq('id', proposal.id)
+          .select()
+          .single();
+      } else {
+        throw firstAttemptError;
+      }
+    }
 
     if (updateError) {
       throw updateError;
@@ -160,20 +188,48 @@ export const restoreProposal = async (unitName, proposalDate) => {
       throw findError;
     }
 
-    // Update the proposal status back to pending
-    const { data: updatedProposal, error: updateError } = await supabase
-      .from('leave_proposals')
-      .update({
-        status: 'pending',
-        completed_by: null,
-        completed_at: null,
-        notes: proposal.notes ? 
-          `${proposal.notes}\n\nDikembalikan ke status aktif oleh ${currentUser.name || currentUser.email} pada ${new Date().toLocaleString('id-ID')}` :
-          `Dikembalikan ke status aktif oleh ${currentUser.name || currentUser.email} pada ${new Date().toLocaleString('id-ID')}`
-      })
-      .eq('id', proposal.id)
-      .select()
-      .single();
+    // Try to update with new columns first, fall back if columns don't exist
+    let updateData = {
+      status: 'pending',
+      notes: proposal.notes ?
+        `${proposal.notes}\n\nDikembalikan ke status aktif oleh ${currentUser.name || currentUser.email} pada ${new Date().toLocaleString('id-ID')}` :
+        `Dikembalikan ke status aktif oleh ${currentUser.name || currentUser.email} pada ${new Date().toLocaleString('id-ID')}`
+    };
+
+    // Try to clear completed_by and completed_at if they exist
+    try {
+      updateData.completed_by = null;
+      updateData.completed_at = null;
+
+      var { data: updatedProposal, error: updateError } = await supabase
+        .from('leave_proposals')
+        .update(updateData)
+        .eq('id', proposal.id)
+        .select()
+        .single();
+
+    } catch (firstAttemptError) {
+      // If the update failed due to missing columns, try without them
+      if (firstAttemptError.code === '42703') {
+        console.warn('⚠️ Database missing completed_by/completed_at columns, updating without them');
+
+        updateData = {
+          status: 'pending',
+          notes: proposal.notes ?
+            `${proposal.notes}\n\nDikembalikan ke status aktif oleh ${currentUser.name || currentUser.email} pada ${new Date().toLocaleString('id-ID')}` :
+            `Dikembalikan ke status aktif oleh ${currentUser.name || currentUser.email} pada ${new Date().toLocaleString('id-ID')}`
+        };
+
+        var { data: updatedProposal, error: updateError } = await supabase
+          .from('leave_proposals')
+          .update(updateData)
+          .eq('id', proposal.id)
+          .select()
+          .single();
+      } else {
+        throw firstAttemptError;
+      }
+    }
 
     if (updateError) {
       throw updateError;
@@ -219,13 +275,42 @@ export const getProposalsWithStatus = async () => {
  */
 export const isProposalCompleted = async (unitName, proposalDate) => {
   try {
-    const { data: proposal, error } = await supabase
+    // First, try the new query with completed_at and completed_by columns
+    let selectQuery = 'id, status, completed_at, completed_by';
+    let { data: proposal, error } = await supabase
       .from('leave_proposals')
-      .select('id, status, completed_at, completed_by')
+      .select(selectQuery)
       .eq('proposer_unit', unitName)
       .eq('proposal_date', proposalDate)
       .eq('status', 'completed')
       .single();
+
+    // If we get a "column does not exist" error, fall back to basic query
+    if (error && error.code === '42703' && error.message?.includes('completed_at')) {
+      console.warn('⚠️ Database missing completed_at/completed_by columns, using fallback query');
+
+      // Fallback: just check for completed status without the new columns
+      const fallbackResult = await supabase
+        .from('leave_proposals')
+        .select('id, status, updated_at')
+        .eq('proposer_unit', unitName)
+        .eq('proposal_date', proposalDate)
+        .eq('status', 'completed')
+        .single();
+
+      if (fallbackResult.error) {
+        if (fallbackResult.error.code === 'PGRST116') {
+          return false; // No completed proposal found
+        }
+        throw fallbackResult.error;
+      }
+
+      return {
+        isCompleted: true,
+        completedAt: fallbackResult.data.updated_at, // Use updated_at as fallback
+        completedBy: null // Not available without the column
+      };
+    }
 
     if (error) {
       if (error.code === 'PGRST116') {
@@ -241,7 +326,7 @@ export const isProposalCompleted = async (unitName, proposalDate) => {
     };
 
   } catch (error) {
-    console.error('Error checking proposal completion status:', error);
+    console.error('Error checking proposal completion status:', JSON.stringify(error, null, 2));
     return false;
   }
 };
