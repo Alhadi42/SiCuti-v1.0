@@ -129,35 +129,54 @@ const safeStringify = (obj) => {
   if (obj === undefined) return "undefined";
   if (typeof obj === "string") return obj;
   if (typeof obj === "number" || typeof obj === "boolean") return String(obj);
+  if (typeof obj === "function") return `[Function: ${obj.name || "anonymous"}]`;
 
   if (obj instanceof Error) {
     return `Error: ${obj.message}${obj.stack ? "\nStack: " + obj.stack : ""}`;
+  }
+
+  if (obj instanceof Date) {
+    return `Date: ${obj.toISOString()}`;
+  }
+
+  if (obj instanceof RegExp) {
+    return `RegExp: ${obj.toString()}`;
   }
 
   if (typeof obj === "object") {
     // Handle arrays
     if (Array.isArray(obj)) {
       try {
-        return `Array[${obj.length}]: ${JSON.stringify(obj.slice(0, 3))}${obj.length > 3 ? "..." : ""}`;
+        if (obj.length === 0) return "[]";
+        const preview = obj.slice(0, 3).map(item => {
+          if (typeof item === "object" && item !== null) {
+            return typeof item === "object" ? "{...}" : String(item);
+          }
+          return item;
+        });
+        return `Array[${obj.length}]: [${preview.join(", ")}${obj.length > 3 ? ", ..." : ""}]`;
       } catch (e) {
         return `Array[${obj.length}]`;
       }
     }
 
-    // Handle objects with specific properties we care about
-    if (obj.message || obj.code || obj.details) {
+    // Handle objects with specific error-like properties first
+    if (obj.message || obj.code || obj.details || obj.error) {
       const parts = [];
       if (obj.message) parts.push(`message: "${obj.message}"`);
       if (obj.code) parts.push(`code: "${obj.code}"`);
       if (obj.details) parts.push(`details: "${obj.details}"`);
       if (obj.hint) parts.push(`hint: "${obj.hint}"`);
-      return `{${parts.join(", ")}}`;
+      if (obj.error && typeof obj.error === "string") parts.push(`error: "${obj.error}"`);
+      if (parts.length > 0) {
+        return `{${parts.join(", ")}}`;
+      }
     }
 
     // Try to stringify with circular reference handling
     try {
       const seen = new WeakSet();
-      return JSON.stringify(
+      const result = JSON.stringify(
         obj,
         (key, value) => {
           if (typeof value === "object" && value !== null) {
@@ -166,23 +185,42 @@ const safeStringify = (obj) => {
             }
             seen.add(value);
           }
+          // Handle functions in objects
+          if (typeof value === "function") {
+            return `[Function: ${value.name || "anonymous"}]`;
+          }
           return value;
         },
         2,
       );
+
+      // If result is too long, truncate it
+      if (result.length > 1000) {
+        return result.substring(0, 1000) + "... (truncated)";
+      }
+
+      return result;
     } catch (e) {
       // If JSON.stringify fails, build a simple representation
-      const constructor = obj.constructor?.name || "Object";
-      const keys = Object.keys(obj).slice(0, 3);
-      const keyStr =
-        keys.length > 0
-          ? ` {${keys.join(", ")}${Object.keys(obj).length > 3 ? "..." : ""}}`
-          : "";
-      return `[${constructor}${keyStr}]`;
+      try {
+        const constructor = obj.constructor?.name || "Object";
+        const keys = Object.keys(obj).slice(0, 5);
+        const keyStr = keys.length > 0
+          ? ` {${keys.join(", ")}${Object.keys(obj).length > 5 ? "..." : ""}}`
+          : " {}";
+        return `[${constructor}${keyStr}]`;
+      } catch (e2) {
+        return "[Object - unable to inspect]";
+      }
     }
   }
 
-  return String(obj);
+  // Fallback for any other type
+  try {
+    return String(obj);
+  } catch (e) {
+    return "[Unknown - unable to convert]";
+  }
 };
 
 export default { initDebugConsole, restoreConsole };
