@@ -31,7 +31,7 @@ export const initDebugConsole = () => {
     originalConsoleError = console.error;
     originalConsoleLog = console.log;
     originalConsoleWarn = console.warn;
-    console.log("🔍 Stored original console methods");
+    console.log("��� Stored original console methods");
   } else {
     console.log("🔍 Using previously stored console methods");
   }
@@ -169,7 +169,23 @@ export const restoreConsole = () => {
   if (originalConsoleWarn) {
     console.warn = originalConsoleWarn;
   }
+
+  // Reset state
+  isProcessing = false;
+  isDisabled = false;
+  errorCount = 0;
 };
+
+export const emergencyDisableDebugConsole = () => {
+  isDisabled = true;
+  restoreConsole();
+  console.log("🚨 Debug console emergency disabled");
+};
+
+// Make emergency function available globally
+if (typeof window !== 'undefined') {
+  window.emergencyDisableDebugConsole = emergencyDisableDebugConsole;
+}
 
 const safeStringify = (obj) => {
   if (obj === null) return "null";
