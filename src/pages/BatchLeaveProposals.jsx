@@ -119,7 +119,8 @@ const BatchLeaveProposals = () => {
       if (!navigator.onLine) {
         console.log("🚫 Device is offline");
         setConnectionError(true);
-        throw new Error("No internet connection");
+        // Don't throw immediately, try to use cached data instead
+        console.log("📱 Attempting to load cached data...");
       }
 
       // Skip connectivity test on first attempt to avoid double network calls
@@ -172,8 +173,8 @@ const BatchLeaveProposals = () => {
 
       const startTime = Date.now();
 
-      // Use shorter timeout for faster failure detection
-      const timeoutMs = retryCount === 0 ? 10000 : 5000; // 10s first try, 5s retries
+      // Use more reasonable timeouts based on network conditions
+      const timeoutMs = retryCount === 0 ? 15000 : 8000; // 15s first try, 8s retries
       console.log(`⏱️ Setting query timeout to ${timeoutMs/1000} seconds`);
 
       // Fetch leave requests with complete data
@@ -207,32 +208,6 @@ const BatchLeaveProposals = () => {
 
       console.log("✅ Supabase query completed", { hasData: !!leaveRequests, hasError: !!requestsError });
 
-      // Load completion status from database
-      const completedProposalsMap = new Map();
-      const completedSet = new Set();
-
-      // Check completion status for each unit-date group
-      for (const group of groupedRequests) {
-        try {
-          const completionStatus = await isProposalCompleted(group.unitName, group.proposalDate);
-          if (completionStatus.isCompleted) {
-            const proposalKey = `${group.unitName}|${group.proposalDate}`;
-            completedSet.add(proposalKey);
-            completedProposalsMap.set(proposalKey, {
-              proposalKey,
-              unitName: group.unitName,
-              proposalDate: group.proposalDate,
-              completedAt: completionStatus.completedAt,
-              completedBy: completionStatus.completedBy
-            });
-          }
-        } catch (statusError) {
-          console.warn(`Could not check completion status for ${group.unitName}|${group.proposalDate}:`, statusError);
-        }
-      }
-
-      console.log("📊 Loaded completion records from database:", completedSet.size);
-
       const queryTime = Date.now() - startTime;
       console.log(`⏱️ Query completed in ${queryTime}ms`);
 
@@ -250,7 +225,9 @@ const BatchLeaveProposals = () => {
         const isNetworkError = requestsError.message?.includes("Failed to fetch") ||
                               requestsError.message?.includes("fetch") ||
                               requestsError.message?.includes("Network") ||
-                              requestsError.code === "NETWORK_ERROR";
+                              requestsError.message?.includes("network") ||
+                              requestsError.code === "NETWORK_ERROR" ||
+                              !navigator.onLine;
 
         const isTimeoutError = requestsError.message?.includes("timeout") ||
                               requestsError.message?.includes("Query timeout");
@@ -348,6 +325,32 @@ const BatchLeaveProposals = () => {
       console.log("📊 Unit-date requests map:", unitDateRequestsMap);
       console.log("📊 Final grouped requests:", groupedRequests);
       console.log("✅ Fetched", groupedRequests.length, "unit-date groups with leave requests");
+
+      // Load completion status from database - AFTER groupedRequests is defined
+      const completedProposalsMap = new Map();
+      const completedSet = new Set();
+
+      // Check completion status for each unit-date group
+      for (const group of groupedRequests) {
+        try {
+          const completionStatus = await isProposalCompleted(group.unitName, group.proposalDate);
+          if (completionStatus.isCompleted) {
+            const proposalKey = `${group.unitName}|${group.proposalDate}`;
+            completedSet.add(proposalKey);
+            completedProposalsMap.set(proposalKey, {
+              proposalKey,
+              unitName: group.unitName,
+              proposalDate: group.proposalDate,
+              completedAt: completionStatus.completedAt,
+              completedBy: completionStatus.completedBy
+            });
+          }
+        } catch (statusError) {
+          console.warn(`Could not check completion status for ${group.unitName}|${group.proposalDate}:`, statusError);
+        }
+      }
+
+      console.log("📊 Loaded completion records from database:", completedSet.size);
 
       setUnitProposals(groupedRequests);
       setProposalRecords(completedProposalsMap);
@@ -1038,7 +1041,7 @@ const BatchLeaveProposals = () => {
       ]);
 
       if (error) {
-        console.error("Error from Supabase:", error);
+        console.error("Error from Supabase:", JSON.stringify(error, null, 2));
 
         // Retry logic for templates
         if (error.message?.includes("Failed to fetch") && retryCount < 1) {
@@ -1058,6 +1061,11 @@ const BatchLeaveProposals = () => {
 
       // Don't show error toast for template loading - it's not critical
       console.log("ℹ️ Templates unavailable - batch letters will be disabled");
+
+      // If it's specifically a timeout, mention it in console but don't spam user
+      if (error.message?.includes('timeout')) {
+        console.log("⏰ Template loading timed out - this is usually due to slow network");
+      }
     } finally {
       setLoadingTemplates(false);
     }
