@@ -785,7 +785,7 @@ const BatchLeaveProposals = () => {
         // Letter numbering
         nomor_surat: `SRT/${leaveType.toUpperCase().replace(/\s+/g, '')}/${new Date().getFullYear()}/${Math.floor(Math.random() * 1000).toString().padStart(3, '0')}`,
 
-        // Missing variables that user reported as empty
+        // Missing variables that user reported as empty - FIXED
         tanggal_pelaksanaan_cuti: completeRequests.length > 0
           ? `${format(new Date(completeRequests[0].start_date), "dd MMMM yyyy", { locale: id })} s.d. ${format(new Date(completeRequests[completeRequests.length - 1].end_date), "dd MMMM yyyy", { locale: id })}`
           : "-",
@@ -795,6 +795,15 @@ const BatchLeaveProposals = () => {
         formulir_pengajuan_cuti: completeRequests.length > 0 && completeRequests[0].application_form_date
           ? format(new Date(completeRequests[0].application_form_date), "dd MMMM yyyy", { locale: id })
           : format(new Date(selectedUnitForBatch.proposalDate), "dd MMMM yyyy", { locale: id }),
+
+        // USER REPORTED MISSING VARIABLES - ADDED:
+        tanggal_formulir_pengajuan: completeRequests.length > 0 && completeRequests[0].application_form_date
+          ? format(new Date(completeRequests[0].application_form_date), "dd MMMM yyyy", { locale: id })
+          : format(new Date(selectedUnitForBatch.proposalDate), "dd MMMM yyyy", { locale: id }),
+        tanggal_cuti: completeRequests.length > 0
+          ? `${format(new Date(completeRequests[0].start_date), "dd MMMM yyyy", { locale: id })} s.d. ${format(new Date(completeRequests[completeRequests.length - 1].end_date), "dd MMMM yyyy", { locale: id })}`
+          : "-",
+        jatah_cuti_tahun: completeRequests.length > 0 ? (completeRequests[0].leave_quota_year || new Date().getFullYear()) : new Date().getFullYear(),
 
         // Additional common template variables
         departemen: selectedUnitForBatch.unitName,
@@ -861,6 +870,11 @@ const BatchLeaveProposals = () => {
         variables[`cuti_tahun_${num}`] = request.leave_quota_year || new Date().getFullYear();
         variables[`tanggal_formulir_${num}`] = request.application_form_date ? format(new Date(request.application_form_date), "dd MMMM yyyy", { locale: id }) : "-";
         variables[`formulir_pengajuan_cuti_${num}`] = request.application_form_date ? format(new Date(request.application_form_date), "dd MMMM yyyy", { locale: id }) : "-";
+
+        // USER REPORTED MISSING VARIABLES - ADDED FOR INDEXED:
+        variables[`tanggal_formulir_pengajuan_${num}`] = request.application_form_date ? format(new Date(request.application_form_date), "dd MMMM yyyy", { locale: id }) : "-";
+        variables[`tanggal_cuti_${num}`] = `${format(new Date(request.start_date), "dd MMMM yyyy", { locale: id })} s.d. ${format(new Date(request.end_date), "dd MMMM yyyy", { locale: id })}`;
+        variables[`jatah_cuti_tahun_${num}`] = request.leave_quota_year || new Date().getFullYear();
 
         // Additional variations for common template patterns
         variables[`nama_pegawai_${num}`] = request.employees?.name || "Nama tidak diketahui";
