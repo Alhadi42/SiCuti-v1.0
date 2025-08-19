@@ -44,7 +44,7 @@ import { processDocxTemplate } from "@/utils/docxTemplates";
 import { saveAs } from "file-saver";
 import ConnectionStatus from "@/components/ConnectionStatus";
 import { safeErrorMessage, getUserFriendlyErrorMessage } from "@/utils/errorDisplay";
-import { markProposalAsCompleted, restoreProposal, isProposalCompleted, migrateLocalStorageToDatabase } from "@/lib/proposalManager";
+import { markSimpleProposalAsCompleted, restoreSimpleProposal, isSimpleProposalCompleted } from "@/lib/simpleCompletionManager";
 import DatabaseHealthChecker from "@/components/DatabaseHealthChecker";
 
 const BatchLeaveProposals = () => {
@@ -387,21 +387,23 @@ const BatchLeaveProposals = () => {
         // Check completion status for each unit-date group
         for (const group of groupedRequests) {
           try {
-            const completionStatus = await isProposalCompleted(group.unitName, group.proposalDate);
-            if (completionStatus.isCompleted) {
-              const proposalKey = `${group.unitName}|${group.proposalDate}`;
-              completedSet.add(proposalKey);
-              completedProposalsMap.set(proposalKey, {
-                proposalKey,
-                unitName: group.unitName,
-                proposalDate: group.proposalDate,
-                completedAt: completionStatus.completedAt,
-                completedBy: completionStatus.completedBy
-              });
-            }
-          } catch (statusError) {
-            console.warn(`Could not check completion status for ${group.unitName}|${group.proposalDate}:`, statusError);
+          const completionStatus = await isSimpleProposalCompleted(group.unitName, group.proposalDate);
+          if (completionStatus && completionStatus.isCompleted) {
+            const proposalKey = `${group.unitName}|${group.proposalDate}`;
+            completedSet.add(proposalKey);
+            completedProposalsMap.set(proposalKey, {
+              proposalKey,
+              unitName: group.unitName,
+              proposalDate: group.proposalDate,
+              completedAt: completionStatus.completedAt,
+              completedBy: completionStatus.completedBy,
+              source: completionStatus.source
+            });
           }
+        } catch (statusError) {
+          // Only log actual errors, not expected cases
+          console.warn(`Could not check completion status for ${group.unitName}|${group.proposalDate}:`, statusError.message || statusError);
+        }
         }
       } else {
         console.log("📊 No proposal groups to check for completion status");
@@ -550,9 +552,9 @@ const BatchLeaveProposals = () => {
 
       if (!confirmed) return;
 
-      // Mark as completed in database
-      console.log('🔄 Marking proposal as completed in database...');
-      const completedProposal = await markProposalAsCompleted(
+      // Mark as completed using simple manager
+      console.log('🔄 Marking proposal as completed...');
+      const completedProposal = await markSimpleProposalAsCompleted(
         unit.unitName,
         unit.proposalDate,
         unit.requests
@@ -566,8 +568,8 @@ const BatchLeaveProposals = () => {
         totalEmployees: unit.totalEmployees,
         totalRequests: unit.totalRequests,
         totalDays: unit.totalDays,
-        completedAt: completedProposal.completed_at,
-        completedBy: completedProposal.completed_by,
+        completedAt: completedProposal.completedAt,
+        completedBy: completedProposal.completedBy,
         completedByName: currentUser.name || currentUser.email,
         requestIds: unit.requests.map(req => req.id),
         proposalId: completedProposal.id
@@ -579,10 +581,11 @@ const BatchLeaveProposals = () => {
 
       toast({
         title: "Berhasil",
-        description: `Usulan cuti dari ${unit.unitName} telah ditandai sebagai selesai diajukan dan disimpan di database`,
+        description: `Usulan cuti dari ${unit.unitName} telah ditandai sebagai selesai diajukan`,
+        duration: 3000,
       });
 
-      console.log('✅ Proposal marked as completed:', completedProposal.id);
+      console.log('✅ Proposal marked as completed:', completedProposal.proposalKey);
 
     } catch (error) {
       console.error("Error marking proposal as completed:", error);
@@ -590,8 +593,8 @@ const BatchLeaveProposals = () => {
       let errorMessage = "Gagal menandai usulan sebagai selesai";
       if (error.message?.includes('User not authenticated')) {
         errorMessage = "Anda harus login untuk menandai usulan sebagai selesai";
-      } else if (error.message?.includes('permission')) {
-        errorMessage = "Anda tidak memiliki izin untuk menandai usulan sebagai selesai";
+      } else if (error.code === '42501') {
+        errorMessage = "Fitur ini akan menggunakan penyimpanan lokal karena ada pembatasan database";
       } else {
         errorMessage = `Gagal menandai usulan sebagai selesai: ${safeErrorMessage(error)}`;
       }
@@ -615,9 +618,9 @@ const BatchLeaveProposals = () => {
 
       if (!confirmed) return;
 
-      // Restore in database
-      console.log('🔄 Restoring proposal in database...');
-      const restoredProposal = await restoreProposal(unit.unitName, unit.proposalDate);
+      // Restore using simple manager
+      console.log('🔄 Restoring proposal...');
+      const restoredProposal = await restoreSimpleProposal(unit.unitName, unit.proposalDate);
 
       // Update local state
       setCompletedProposals(prev => {
@@ -637,18 +640,16 @@ const BatchLeaveProposals = () => {
         description: `Usulan cuti dari ${unit.unitName} telah dikembalikan ke daftar aktif`,
       });
 
-      console.log('✅ Proposal restored:', restoredProposal.id);
+      console.log('✅ Proposal restored:', restoredProposal.success);
 
     } catch (error) {
       console.error("Error restoring proposal:", error);
 
       let errorMessage = "Gagal mengembalikan usulan";
-      if (error.message?.includes('Proposal not found')) {
-        errorMessage = "Usulan tidak ditemukan di database";
-      } else if (error.message?.includes('User not authenticated')) {
+      if (error.message?.includes('User not authenticated')) {
         errorMessage = "Anda harus login untuk mengembalikan usulan";
-      } else if (error.message?.includes('permission')) {
-        errorMessage = "Anda tidak memiliki izin untuk mengembalikan usulan";
+      } else if (error.code === '42501') {
+        errorMessage = "Fitur ini menggunakan penyimpanan lokal karena ada pembatasan database";
       } else {
         errorMessage = `Gagal mengembalikan usulan: ${safeErrorMessage(error)}`;
       }
@@ -1028,46 +1029,14 @@ const BatchLeaveProposals = () => {
 
       toast({
         title: "Cache Dibersihkan",
-        description: "Data cache lokal telah dihapus. Status completion sekarang disimpan di database. Refresh untuk mengambil data terbaru.",
+        description: "Data cache lokal telah dihapus. Refresh untuk mengambil data terbaru.",
       });
     } catch (error) {
       console.error("Error clearing cache:", error);
     }
   };
 
-  const handleMigrateData = async () => {
-    try {
-      setIsMigrating(true);
-
-      const result = await migrateLocalStorageToDatabase();
-
-      if (result.migrated > 0) {
-        toast({
-          title: "Migrasi Berhasil",
-          description: `${result.migrated} usulan yang sudah selesai berhasil dipindahkan ke database. ${result.errors > 0 ? `${result.errors} gagal dipindahkan.` : 'Refresh halaman untuk melihat perubahan.'}`,
-        });
-
-        // Refresh data after migration
-        setTimeout(() => {
-          fetchBatchProposals();
-        }, 1000);
-      } else {
-        toast({
-          title: "Tidak Ada Data",
-          description: "Tidak ada data completion di localStorage yang perlu dipindahkan.",
-        });
-      }
-    } catch (error) {
-      console.error('Migration error:', error);
-      toast({
-        title: "Error Migrasi",
-        description: `Gagal memindahkan data: ${safeErrorMessage(error)}`,
-        variant: "destructive",
-      });
-    } finally {
-      setIsMigrating(false);
-    }
-  };
+  // Migration feature removed since we're using simple completion manager
 
   // Filter units based on search, selection, and completion status
   const filteredUnits = unitProposals.filter(unit => {
@@ -1201,22 +1170,15 @@ const BatchLeaveProposals = () => {
         <div className="flex items-center space-x-3">
           <ConnectionStatus onRetry={() => fetchBatchProposals(0)} />
 
-          {/* Migration Button - only show if localStorage data exists */}
-          {localStorage.getItem('completedBatchProposals') && (
-            <Button
-              onClick={handleMigrateData}
-              variant="outline"
-              className="border-blue-600 text-blue-400 hover:bg-blue-900/20 hover:text-blue-300"
-              disabled={isMigrating}
-            >
-              {isMigrating ? (
-                <RefreshCw className="w-4 h-4 mr-2 animate-spin" />
-              ) : (
-                <Database className="w-4 h-4 mr-2" />
-              )}
-              {isMigrating ? 'Memindahkan...' : 'Pindahkan ke DB'}
-            </Button>
-          )}
+          {/* Info about storage method */}
+          <Button
+            variant="ghost"
+            className="text-slate-400 cursor-default"
+            disabled
+          >
+            <Database className="w-4 h-4 mr-2" />
+            Status tersimpan lokal
+          </Button>
 
           <Button
             onClick={() => fetchBatchProposals(0)}
