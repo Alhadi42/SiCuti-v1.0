@@ -31,10 +31,17 @@ const DatabaseHealthChecker = ({ onHealthCheck }) => {
       if (error) {
         if (error.code === '42703' && error.message?.includes('completed_at')) {
           setHealthStatus({
-            healthy: false,
+            healthy: 'warning',
             missingColumns: ['completed_at', 'completed_by'],
-            issue: 'Missing completion tracking columns',
+            issue: 'Missing completion tracking columns - using localStorage fallback',
             needsSetup: true
+          });
+        } else if (error.code === '42501') {
+          setHealthStatus({
+            healthy: 'warning',
+            issue: 'Database access restricted - using localStorage fallback',
+            needsSetup: false,
+            rlsIssue: true
           });
         } else {
           setHealthStatus({
@@ -114,7 +121,7 @@ SELECT 'Database update completed successfully!' as result;`;
     return null; // Still checking
   }
 
-  if (healthStatus.healthy) {
+  if (healthStatus.healthy === true) {
     return (
       <Card className="bg-green-900/20 border-green-700/50 mb-4">
         <CardContent className="p-4">
@@ -122,9 +129,29 @@ SELECT 'Database update completed successfully!' as result;`;
             <CheckCircle className="w-5 h-5 text-green-400" />
             <span className="text-green-400 font-medium">Database is healthy</span>
             <Badge variant="outline" className="text-green-400 border-green-400">
-              All columns available
+              Full database features available
             </Badge>
           </div>
+        </CardContent>
+      </Card>
+    );
+  }
+
+  if (healthStatus.healthy === 'warning') {
+    return (
+      <Card className="bg-blue-900/20 border-blue-700/50 mb-4">
+        <CardContent className="p-4">
+          <div className="flex items-center space-x-2">
+            <AlertTriangle className="w-5 h-5 text-blue-400" />
+            <span className="text-blue-400 font-medium">Using fallback mode</span>
+            <Badge variant="outline" className="text-blue-400 border-blue-400">
+              {healthStatus.rlsIssue ? 'localStorage storage' : 'Limited features'}
+            </Badge>
+          </div>
+          <p className="text-blue-300 text-sm mt-2">
+            {healthStatus.issue}
+            {healthStatus.rlsIssue && ' (This is expected with current security settings)'}
+          </p>
         </CardContent>
       </Card>
     );
@@ -158,10 +185,13 @@ SELECT 'Database update completed successfully!' as result;`;
         <div className="space-y-4">
           <div>
             <p className="text-yellow-300 mb-2">
-              The batch proposal completion feature requires additional database columns that are not yet installed.
+              The batch proposal completion feature has limited database access and is using localStorage fallback.
             </p>
             <p className="text-yellow-200 text-sm">
-              Missing columns: {healthStatus.missingColumns?.join(', ')}
+              {healthStatus.missingColumns ?
+                `Missing columns: ${healthStatus.missingColumns.join(', ')}` :
+                'Database access restrictions detected'
+              }
             </p>
           </div>
 
@@ -212,8 +242,8 @@ SELECT 'Database update completed successfully!' as result;`;
               
               <div className="mt-3 p-3 bg-blue-900/20 border border-blue-600/30 rounded">
                 <p className="text-blue-300 text-sm">
-                  <strong>Note:</strong> The feature will work with limited functionality until these columns are added. 
-                  Completion status will be stored locally only.
+                  <strong>Note:</strong> The feature works using localStorage storage for completion status.
+                  This ensures functionality while avoiding database restrictions.
                 </p>
               </div>
             </div>
