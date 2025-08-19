@@ -45,6 +45,7 @@ import { saveAs } from "file-saver";
 import ConnectionStatus from "@/components/ConnectionStatus";
 import { safeErrorMessage, getUserFriendlyErrorMessage } from "@/utils/errorDisplay";
 import { markProposalAsCompleted, restoreProposal, isProposalCompleted, migrateLocalStorageToDatabase } from "@/lib/proposalManager";
+import DatabaseHealthChecker from "@/components/DatabaseHealthChecker";
 
 const BatchLeaveProposals = () => {
   const { toast } = useToast();
@@ -87,6 +88,7 @@ const BatchLeaveProposals = () => {
   const [availableTemplates, setAvailableTemplates] = useState([]);
   const [selectedTemplate, setSelectedTemplate] = useState(null);
   const [loadingTemplates, setLoadingTemplates] = useState(true);
+  const [databaseHealthy, setDatabaseHealthy] = useState(null);
 
   // Check user permission
   if (!currentUser || currentUser.role !== 'master_admin') {
@@ -1228,6 +1230,9 @@ const BatchLeaveProposals = () => {
         </div>
       </motion.div>
 
+
+      {/* Database Health Check */}
+      <DatabaseHealthChecker onHealthCheck={setDatabaseHealthy} />
 
       {/* Filters */}
       <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.2 }}>
