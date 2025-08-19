@@ -89,7 +89,14 @@ export const createOrFindProposal = async (unitName, proposalDate, leaveRequests
     return newProposal;
 
   } catch (error) {
-    console.error('Error creating/finding proposal:', error);
+    console.error('Error creating/finding proposal:', {
+      code: error.code,
+      message: error.message,
+      details: error.details,
+      hint: error.hint,
+      unitName,
+      proposalDate
+    });
     throw error;
   }
 };
@@ -158,7 +165,14 @@ export const markProposalAsCompleted = async (unitName, proposalDate, leaveReque
     return updatedProposal;
 
   } catch (error) {
-    console.error('Error marking proposal as completed:', error);
+    console.error('Error marking proposal as completed:', {
+      code: error.code,
+      message: error.message,
+      details: error.details,
+      hint: error.hint,
+      unitName,
+      proposalDate
+    });
     throw error;
   }
 };
@@ -239,7 +253,14 @@ export const restoreProposal = async (unitName, proposalDate) => {
     return updatedProposal;
 
   } catch (error) {
-    console.error('Error restoring proposal:', error);
+    console.error('Error restoring proposal:', {
+      code: error.code,
+      message: error.message,
+      details: error.details,
+      hint: error.hint,
+      unitName,
+      proposalDate
+    });
     throw error;
   }
 };
@@ -314,8 +335,18 @@ export const isProposalCompleted = async (unitName, proposalDate) => {
 
     if (error) {
       if (error.code === 'PGRST116') {
-        return false; // No completed proposal found
+        // This is normal - just means no completed proposal exists
+        return false;
       }
+
+      // Only log actual errors, not expected "no results" cases
+      console.error('Error checking proposal completion status:', {
+        code: error.code,
+        message: error.message,
+        details: error.details,
+        unitName,
+        proposalDate
+      });
       throw error;
     }
 
@@ -326,7 +357,16 @@ export const isProposalCompleted = async (unitName, proposalDate) => {
     };
 
   } catch (error) {
-    console.error('Error checking proposal completion status:', JSON.stringify(error, null, 2));
+    // Only log if it's not a "no results found" case
+    if (error.code !== 'PGRST116') {
+      console.error('Error checking proposal completion status:', {
+        code: error.code,
+        message: error.message,
+        details: error.details,
+        unitName,
+        proposalDate
+      });
+    }
     return false;
   }
 };
