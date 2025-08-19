@@ -10,8 +10,14 @@ import "@/utils/errorUtils.js";
 import "@/lib/productionOptimizer.js";
 import "@/lib/healthChecker.js";
 
-// Initialize debug console FIRST to prevent [object Object] errors
-initDebugConsole();
+// Initialize debug console with error handling
+try {
+  initDebugConsole();
+} catch (debugError) {
+  console.error("Failed to initialize debug console:", debugError);
+  // Continue without debug console
+}
+
 TempoDevtools.init();
 
 // Import test utilities AFTER console override is initialized
