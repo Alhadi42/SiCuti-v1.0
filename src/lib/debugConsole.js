@@ -74,14 +74,12 @@ export const initDebugConsole = () => {
 
         // Direct check for [object Object] string
         if (str === "[object Object]") {
-          console.log("🔍 Caught [object Object], converting:", arg);
           return safeStringify(arg);
         }
 
         // Check for other [object Type] patterns that aren't useful
         if (str.match(/^\[object \w+\]$/) &&
             !str.match(/^\[object (Error|Date|Array|Function|RegExp|Promise)\]$/)) {
-          console.log("🔍 Caught [object Type], converting:", str);
           return safeStringify(arg);
         }
 
@@ -93,14 +91,18 @@ export const initDebugConsole = () => {
             !(arg instanceof RegExp) &&
             !(arg instanceof Function) &&
             arg.constructor === Object) {
-          console.log("🔍 Caught plain object, converting:");
           return safeStringify(arg);
         }
 
         return arg;
       });
 
-      originalFn.apply(console, processedArgs);
+      try {
+        originalFn.apply(console, processedArgs);
+      } catch (recursionError) {
+        // Prevent infinite recursion - use original method directly
+        originalConsoleError.call(console, "Debug console recursion detected:", methodName);
+      }
     };
   };
 
@@ -116,17 +118,18 @@ export const initDebugConsole = () => {
   // Set flag to indicate initialization is complete
   window._debugConsoleInitialized = true;
 
-  // Immediate test to verify the override is working
+  // Use original methods for verification to avoid recursion
   const testObj = { test: "verification test", status: "initialized" };
-  console.log("✅ Console override verification - this object should be stringified:", testObj);
+  originalConsoleLog.call(console, "✅ Console override verification - this object should be stringified:", safeStringify(testObj));
 
-  // Test error case specifically
-  console.error("Test error with object:", testObj);
-
-  // If we still see [object Object], the override isn't working
-  if (String(testObj) === "[object Object]") {
-    console.warn("⚠️ Debug console override may not be working properly");
-  }
+  // Test with a simple, safe test
+  setTimeout(() => {
+    try {
+      console.log("Safe test:", { simple: "test" });
+    } catch (testError) {
+      originalConsoleError.call(console, "Console override test failed:", testError);
+    }
+  }, 100);
 };
 
 export const restoreConsole = () => {
