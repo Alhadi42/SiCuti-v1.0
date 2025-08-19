@@ -19,7 +19,8 @@ import {
   CheckCircle,
   Clock,
   Download,
-  Layers
+  Layers,
+  Database
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -43,6 +44,7 @@ import { processDocxTemplate } from "@/utils/docxTemplates";
 import { saveAs } from "file-saver";
 import ConnectionStatus from "@/components/ConnectionStatus";
 import { safeErrorMessage, getUserFriendlyErrorMessage } from "@/utils/errorDisplay";
+import { markProposalAsCompleted, restoreProposal, isProposalCompleted, migrateLocalStorageToDatabase } from "@/lib/proposalManager";
 
 const BatchLeaveProposals = () => {
   const { toast } = useToast();
@@ -76,6 +78,7 @@ const BatchLeaveProposals = () => {
   const [completedProposals, setCompletedProposals] = useState(new Set());
   const [showCompleted, setShowCompleted] = useState(false);
   const [proposalRecords, setProposalRecords] = useState(new Map());
+  const [isMigrating, setIsMigrating] = useState(false);
   const [showBatchDialog, setShowBatchDialog] = useState(false);
   const [selectedUnitForBatch, setSelectedUnitForBatch] = useState(null);
   const [leaveTypeClassification, setLeaveTypeClassification] = useState({});
@@ -204,15 +207,31 @@ const BatchLeaveProposals = () => {
 
       console.log("✅ Supabase query completed", { hasData: !!leaveRequests, hasError: !!requestsError });
 
-      // Load completion status from localStorage instead of database
-      let existingCompletions = {};
-      try {
-        existingCompletions = JSON.parse(localStorage.getItem('completedBatchProposals') || '{}');
-        console.log("📊 Loaded completion records from localStorage:", Object.keys(existingCompletions).length);
-      } catch (storageError) {
-        console.warn("Warning: Could not load completion status from localStorage:", storageError);
-        existingCompletions = {};
+      // Load completion status from database
+      const completedProposalsMap = new Map();
+      const completedSet = new Set();
+
+      // Check completion status for each unit-date group
+      for (const group of groupedRequests) {
+        try {
+          const completionStatus = await isProposalCompleted(group.unitName, group.proposalDate);
+          if (completionStatus.isCompleted) {
+            const proposalKey = `${group.unitName}|${group.proposalDate}`;
+            completedSet.add(proposalKey);
+            completedProposalsMap.set(proposalKey, {
+              proposalKey,
+              unitName: group.unitName,
+              proposalDate: group.proposalDate,
+              completedAt: completionStatus.completedAt,
+              completedBy: completionStatus.completedBy
+            });
+          }
+        } catch (statusError) {
+          console.warn(`Could not check completion status for ${group.unitName}|${group.proposalDate}:`, statusError);
+        }
       }
+
+      console.log("📊 Loaded completion records from database:", completedSet.size);
 
       const queryTime = Date.now() - startTime;
       console.log(`⏱️ Query completed in ${queryTime}ms`);
@@ -330,20 +349,8 @@ const BatchLeaveProposals = () => {
       console.log("📊 Final grouped requests:", groupedRequests);
       console.log("✅ Fetched", groupedRequests.length, "unit-date groups with leave requests");
 
-      // Process existing completions to determine status
-      const proposalsMap = new Map();
-      const completedSet = new Set();
-
-      Object.entries(existingCompletions).forEach(([proposalKey, completionRecord]) => {
-        proposalsMap.set(proposalKey, completionRecord);
-        completedSet.add(proposalKey);
-      });
-
-      console.log("📊 Completion records found:", Object.keys(existingCompletions).length);
-      console.log("📊 Completed proposals:", completedSet.size);
-
       setUnitProposals(groupedRequests);
-      setProposalRecords(proposalsMap);
+      setProposalRecords(completedProposalsMap);
       setCompletedProposals(completedSet);
       setConnectionError(false); // Reset error state on successful fetch
 
@@ -470,12 +477,20 @@ const BatchLeaveProposals = () => {
 
       // Show confirmation dialog
       const confirmed = window.confirm(
-        `Apakah Anda yakin ingin menandai usulan cuti dari ${unit.unitName} tanggal ${format(new Date(unit.proposalDate), "dd MMMM yyyy", { locale: id })} sebagai "Selesai di Ajukan"?\n\nUsulan ini akan disembunyikan dari daftar.`
+        `Apakah Anda yakin ingin menandai usulan cuti dari ${unit.unitName} tanggal ${format(new Date(unit.proposalDate), "dd MMMM yyyy", { locale: id })} sebagai "Selesai di Ajukan"?\n\nUsulan ini akan disimpan di database dan disembunyikan dari daftar.`
       );
 
       if (!confirmed) return;
 
-      // Create a completion record with detailed information for persistence
+      // Mark as completed in database
+      console.log('🔄 Marking proposal as completed in database...');
+      const completedProposal = await markProposalAsCompleted(
+        unit.unitName,
+        unit.proposalDate,
+        unit.requests
+      );
+
+      // Create completion record for local state
       const completionRecord = {
         proposalKey,
         unitName: unit.unitName,
@@ -483,44 +498,39 @@ const BatchLeaveProposals = () => {
         totalEmployees: unit.totalEmployees,
         totalRequests: unit.totalRequests,
         totalDays: unit.totalDays,
-        completedAt: new Date().toISOString(),
-        completedBy: currentUser.id,
+        completedAt: completedProposal.completed_at,
+        completedBy: completedProposal.completed_by,
         completedByName: currentUser.name || currentUser.email,
-        requestIds: unit.requests.map(req => req.id) // Store request IDs for verification
+        requestIds: unit.requests.map(req => req.id),
+        proposalId: completedProposal.id
       };
 
-      // Store in localStorage with better structure
-      try {
-        const existingCompleted = JSON.parse(localStorage.getItem('completedBatchProposals') || '{}');
-        existingCompleted[proposalKey] = completionRecord;
-        localStorage.setItem('completedBatchProposals', JSON.stringify(existingCompleted));
-
-        // Also keep a simple list for backward compatibility
-        const completedList = Object.keys(existingCompleted);
-        localStorage.setItem('completedProposals', JSON.stringify(completedList));
-
-        console.log("✅ Completion status saved to localStorage:", completionRecord);
-      } catch (storageError) {
-        console.error("Failed to save to localStorage:", storageError);
-        throw new Error("Gagal menyimpan status completion: " + storageError.message);
-      }
-
-      // Add to completed proposals set
+      // Update local state
       setCompletedProposals(prev => new Set([...prev, proposalKey]));
-
-      // Update local records
       setProposalRecords(prev => new Map(prev.set(proposalKey, completionRecord)));
 
       toast({
         title: "Berhasil",
-        description: `Usulan cuti dari ${unit.unitName} telah ditandai sebagai selesai diajukan dan disimpan secara lokal`,
+        description: `Usulan cuti dari ${unit.unitName} telah ditandai sebagai selesai diajukan dan disimpan di database`,
       });
+
+      console.log('✅ Proposal marked as completed:', completedProposal.id);
 
     } catch (error) {
       console.error("Error marking proposal as completed:", error);
+
+      let errorMessage = "Gagal menandai usulan sebagai selesai";
+      if (error.message?.includes('User not authenticated')) {
+        errorMessage = "Anda harus login untuk menandai usulan sebagai selesai";
+      } else if (error.message?.includes('permission')) {
+        errorMessage = "Anda tidak memiliki izin untuk menandai usulan sebagai selesai";
+      } else {
+        errorMessage = `Gagal menandai usulan sebagai selesai: ${safeErrorMessage(error)}`;
+      }
+
       toast({
         title: "Error",
-        description: "Gagal menandai usulan sebagai selesai: " + safeErrorMessage(error),
+        description: errorMessage,
         variant: "destructive",
       });
     }
@@ -530,30 +540,24 @@ const BatchLeaveProposals = () => {
     try {
       const proposalKey = `${unit.unitName}|${unit.proposalDate}`;
 
-      // Remove from localStorage
-      try {
-        const existingCompleted = JSON.parse(localStorage.getItem('completedBatchProposals') || '{}');
-        delete existingCompleted[proposalKey];
-        localStorage.setItem('completedBatchProposals', JSON.stringify(existingCompleted));
+      // Show confirmation dialog
+      const confirmed = window.confirm(
+        `Apakah Anda yakin ingin mengembalikan usulan cuti dari ${unit.unitName} tanggal ${format(new Date(unit.proposalDate), "dd MMMM yyyy", { locale: id })} ke status aktif?`
+      );
 
-        // Update simple list for backward compatibility
-        const completedList = Object.keys(existingCompleted);
-        localStorage.setItem('completedProposals', JSON.stringify(completedList));
+      if (!confirmed) return;
 
-        console.log("✅ Completion status removed from localStorage for:", proposalKey);
-      } catch (storageError) {
-        console.error("Failed to remove from localStorage:", storageError);
-        throw new Error("Gagal menghapus status completion: " + storageError.message);
-      }
+      // Restore in database
+      console.log('🔄 Restoring proposal in database...');
+      const restoredProposal = await restoreProposal(unit.unitName, unit.proposalDate);
 
-      // Remove from completed proposals set
+      // Update local state
       setCompletedProposals(prev => {
         const newSet = new Set(prev);
         newSet.delete(proposalKey);
         return newSet;
       });
 
-      // Remove from local records
       setProposalRecords(prev => {
         const newMap = new Map(prev);
         newMap.delete(proposalKey);
@@ -565,11 +569,25 @@ const BatchLeaveProposals = () => {
         description: `Usulan cuti dari ${unit.unitName} telah dikembalikan ke daftar aktif`,
       });
 
+      console.log('✅ Proposal restored:', restoredProposal.id);
+
     } catch (error) {
       console.error("Error restoring proposal:", error);
+
+      let errorMessage = "Gagal mengembalikan usulan";
+      if (error.message?.includes('Proposal not found')) {
+        errorMessage = "Usulan tidak ditemukan di database";
+      } else if (error.message?.includes('User not authenticated')) {
+        errorMessage = "Anda harus login untuk mengembalikan usulan";
+      } else if (error.message?.includes('permission')) {
+        errorMessage = "Anda tidak memiliki izin untuk mengembalikan usulan";
+      } else {
+        errorMessage = `Gagal mengembalikan usulan: ${safeErrorMessage(error)}`;
+      }
+
       toast({
         title: "Error",
-        description: "Gagal mengembalikan usulan: " + safeErrorMessage(error),
+        description: errorMessage,
         variant: "destructive",
       });
     }
@@ -942,10 +960,44 @@ const BatchLeaveProposals = () => {
 
       toast({
         title: "Cache Dibersihkan",
-        description: "Data cache dan status completion telah dihapus. Refresh untuk mengambil data terbaru.",
+        description: "Data cache lokal telah dihapus. Status completion sekarang disimpan di database. Refresh untuk mengambil data terbaru.",
       });
     } catch (error) {
       console.error("Error clearing cache:", error);
+    }
+  };
+
+  const handleMigrateData = async () => {
+    try {
+      setIsMigrating(true);
+
+      const result = await migrateLocalStorageToDatabase();
+
+      if (result.migrated > 0) {
+        toast({
+          title: "Migrasi Berhasil",
+          description: `${result.migrated} usulan yang sudah selesai berhasil dipindahkan ke database. ${result.errors > 0 ? `${result.errors} gagal dipindahkan.` : 'Refresh halaman untuk melihat perubahan.'}`,
+        });
+
+        // Refresh data after migration
+        setTimeout(() => {
+          fetchBatchProposals();
+        }, 1000);
+      } else {
+        toast({
+          title: "Tidak Ada Data",
+          description: "Tidak ada data completion di localStorage yang perlu dipindahkan.",
+        });
+      }
+    } catch (error) {
+      console.error('Migration error:', error);
+      toast({
+        title: "Error Migrasi",
+        description: `Gagal memindahkan data: ${safeErrorMessage(error)}`,
+        variant: "destructive",
+      });
+    } finally {
+      setIsMigrating(false);
     }
   };
 
@@ -1012,22 +1064,23 @@ const BatchLeaveProposals = () => {
   }, []);
 
   useEffect(() => {
-    // Load completion status from localStorage on component mount
-    try {
-      const existingCompletions = JSON.parse(localStorage.getItem('completedBatchProposals') || '{}');
-      const completedKeys = Object.keys(existingCompletions);
-      setCompletedProposals(new Set(completedKeys));
+    // Check for localStorage data and offer migration
+    const checkForMigration = () => {
+      const localData = localStorage.getItem('completedBatchProposals');
+      if (localData) {
+        try {
+          const parsed = JSON.parse(localData);
+          const count = Object.keys(parsed).length;
+          if (count > 0) {
+            console.log(`📱 Found ${count} completed proposals in localStorage - migration available`);
+          }
+        } catch (error) {
+          console.warn('Could not parse localStorage data:', error);
+        }
+      }
+    };
 
-      const recordsMap = new Map();
-      Object.entries(existingCompletions).forEach(([key, record]) => {
-        recordsMap.set(key, record);
-      });
-      setProposalRecords(recordsMap);
-
-      console.log("📱 Loaded", completedKeys.length, "completed proposals from localStorage");
-    } catch (error) {
-      console.warn("Could not load completion status:", error);
-    }
+    checkForMigration();
 
     // Stagger the requests to avoid overwhelming the network
     const timer = setTimeout(() => {
@@ -1074,6 +1127,24 @@ const BatchLeaveProposals = () => {
         </div>
         <div className="flex items-center space-x-3">
           <ConnectionStatus onRetry={() => fetchBatchProposals(0)} />
+
+          {/* Migration Button - only show if localStorage data exists */}
+          {localStorage.getItem('completedBatchProposals') && (
+            <Button
+              onClick={handleMigrateData}
+              variant="outline"
+              className="border-blue-600 text-blue-400 hover:bg-blue-900/20 hover:text-blue-300"
+              disabled={isMigrating}
+            >
+              {isMigrating ? (
+                <RefreshCw className="w-4 h-4 mr-2 animate-spin" />
+              ) : (
+                <Database className="w-4 h-4 mr-2" />
+              )}
+              {isMigrating ? 'Memindahkan...' : 'Pindahkan ke DB'}
+            </Button>
+          )}
+
           <Button
             onClick={() => fetchBatchProposals(0)}
             variant="outline"
