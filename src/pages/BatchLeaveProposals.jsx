@@ -378,24 +378,31 @@ const BatchLeaveProposals = () => {
       const completedProposalsMap = new Map();
       const completedSet = new Set();
 
-      // Check completion status for each unit-date group
-      for (const group of groupedRequests) {
-        try {
-          const completionStatus = await isProposalCompleted(group.unitName, group.proposalDate);
-          if (completionStatus.isCompleted) {
-            const proposalKey = `${group.unitName}|${group.proposalDate}`;
-            completedSet.add(proposalKey);
-            completedProposalsMap.set(proposalKey, {
-              proposalKey,
-              unitName: group.unitName,
-              proposalDate: group.proposalDate,
-              completedAt: completionStatus.completedAt,
-              completedBy: completionStatus.completedBy
-            });
+      // Only check completion status if we have valid grouped requests
+      if (groupedRequests && groupedRequests.length > 0) {
+        console.log("🔍 Checking completion status for", groupedRequests.length, "proposal groups...");
+
+        // Check completion status for each unit-date group
+        for (const group of groupedRequests) {
+          try {
+            const completionStatus = await isProposalCompleted(group.unitName, group.proposalDate);
+            if (completionStatus.isCompleted) {
+              const proposalKey = `${group.unitName}|${group.proposalDate}`;
+              completedSet.add(proposalKey);
+              completedProposalsMap.set(proposalKey, {
+                proposalKey,
+                unitName: group.unitName,
+                proposalDate: group.proposalDate,
+                completedAt: completionStatus.completedAt,
+                completedBy: completionStatus.completedBy
+              });
+            }
+          } catch (statusError) {
+            console.warn(`Could not check completion status for ${group.unitName}|${group.proposalDate}:`, statusError);
           }
-        } catch (statusError) {
-          console.warn(`Could not check completion status for ${group.unitName}|${group.proposalDate}:`, statusError);
         }
+      } else {
+        console.log("📊 No proposal groups to check for completion status");
       }
 
       console.log("📊 Loaded completion records from database:", completedSet.size);
