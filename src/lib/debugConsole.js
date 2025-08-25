@@ -44,15 +44,25 @@ export const initDebugConsole = () => {
         return originalFn.apply(console, args);
       }
 
-      // Suppress ResizeObserver errors at console level
+      // Comprehensive ResizeObserver error suppression at console level
+      const resizeObserverPatterns = [
+        'ResizeObserver loop',
+        'ResizeObserver loop completed with undelivered notifications',
+        'ResizeObserver: loop completed with undelivered notifications',
+        'ResizeObserver: loop limit exceeded',
+        'ResizeObserver loop limit exceeded',
+        'loop completed with undelivered notifications',
+        'ResizeObserver callback',
+        'ResizeObserver.observe'
+      ];
+
       if (args.some(arg => {
-        const str = String(arg);
-        return str.includes("ResizeObserver loop") ||
-               str.includes("ResizeObserver loop completed with undelivered notifications");
+        const str = String(arg).toLowerCase();
+        return resizeObserverPatterns.some(pattern => str.includes(pattern.toLowerCase()));
       })) {
         // Log only in development for debugging
-        if (import.meta.env.DEV && methodName === 'warn') {
-          originalConsoleLog.call(console, "🔄 ResizeObserver loop suppressed (harmless):", ...args);
+        if (import.meta.env.DEV && (methodName === 'warn' || methodName === 'error')) {
+          originalConsoleLog.call(console, "🔄 ResizeObserver suppressed:", ...args);
         }
         return; // Suppress the error completely
       }
