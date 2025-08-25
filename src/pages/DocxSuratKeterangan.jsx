@@ -708,6 +708,14 @@ function DocxSuratKeterangan() {
         nip_atasan: leaveRequest.nip_atasan || signatory?.nip || "NIP Atasan",
         jabatan_atasan:
           leaveRequest.jabatan_atasan || signatory?.jabatan || "Jabatan Atasan",
+
+        // ADDED: Missing variables that might be empty
+        pangkat_golongan: leaveRequest.employees?.rank_group || leaveRequest.pangkat_golongan || "Pangkat tidak tersedia",
+        status_asn: leaveRequest.employees?.asn_status || leaveRequest.status_asn || "Status ASN tidak tersedia",
+        durasi_hari_terbilang: workingDays > 0 ? numberToWords(workingDays) : numberToWords(totalDays),
+        nomor_surat_referensi: leaveRequest.reference_number || leaveRequest.nomor_surat_referensi || "REF tidak tersedia",
+        tempat_lahir: leaveRequest.employees?.tempat_lahir || leaveRequest.tempat_lahir || "Tempat lahir tidak tersedia",
+        tanggal_lahir: leaveRequest.employees?.tanggal_lahir ? formatDateLong(leaveRequest.employees.tanggal_lahir) : leaveRequest.tanggal_lahir || "Tanggal lahir tidak tersedia",
         tanggal_surat: (() => {
           console.log("=== TANGGAL SURAT DEBUG ===");
           console.log("leaveRequest.leave_letter_date:", leaveRequest.leave_letter_date);
@@ -774,6 +782,14 @@ function DocxSuratKeterangan() {
       unit_kerja: leaveRequest.unit_kerja || "Unit Kerja tidak tersedia",
       jenis_cuti: leaveRequest.jenis_cuti || "Cuti Tahunan",
       alasan: leaveRequest.alasan || "Keperluan pribadi",
+
+      // ADDED: Missing variables for form mode
+      pangkat_golongan: leaveRequest.pangkat_golongan || "Pangkat tidak tersedia",
+      status_asn: leaveRequest.status_asn || "Status ASN tidak tersedia",
+      durasi_hari_terbilang: workingDays > 0 ? numberToWords(workingDays) : numberToWords(totalDays),
+      nomor_surat_referensi: leaveRequest.reference_number || "REF tidak tersedia",
+      tempat_lahir: leaveRequest.tempat_lahir || "Tempat lahir tidak tersedia",
+      tanggal_lahir: leaveRequest.tanggal_lahir || "Tanggal lahir tidak tersedia",
       tanggal_mulai: formatDate(sampleStartDate),
       tanggal_selesai: formatDate(sampleEndDate),
       tanggal_cuti: formatTanggalCuti(sampleStartDate, sampleEndDate),
@@ -1014,6 +1030,14 @@ function DocxSuratKeterangan() {
           employeeData.tanggal_formulir_pengajuan || "";
         batchData[`alasan_${index}`] = employeeData.alasan || "";
 
+        // ADDED: Missing indexed variables for batch mode
+        batchData[`pangkat_golongan_${index}`] = employeeData.pangkat_golongan || "Pangkat tidak tersedia";
+        batchData[`status_asn_${index}`] = employeeData.status_asn || "Status ASN tidak tersedia";
+        batchData[`durasi_hari_terbilang_${index}`] = employeeData.durasi_hari_terbilang || "";
+        batchData[`nomor_surat_referensi_${index}`] = employeeData.nomor_surat_referensi || "REF tidak tersedia";
+        batchData[`tempat_lahir_${index}`] = employeeData.tempat_lahir || "Tempat lahir tidak tersedia";
+        batchData[`tanggal_lahir_${index}`] = employeeData.tanggal_lahir || "Tanggal lahir tidak tersedia";
+
         console.log(`✓ Employee ${index} data filled successfully`);
       } else {
         // No employee for this slot, fill with empty strings
@@ -1033,6 +1057,14 @@ function DocxSuratKeterangan() {
         batchData[`alamat_selama_cuti_${index}`] = "";
         batchData[`tanggal_formulir_pengajuan_${index}`] = "";
         batchData[`alasan_${index}`] = "";
+
+        // ADDED: Missing indexed variables for empty slots
+        batchData[`pangkat_golongan_${index}`] = "";
+        batchData[`status_asn_${index}`] = "";
+        batchData[`durasi_hari_terbilang_${index}`] = "";
+        batchData[`nomor_surat_referensi_${index}`] = "";
+        batchData[`tempat_lahir_${index}`] = "";
+        batchData[`tanggal_lahir_${index}`] = "";
       }
     }
 

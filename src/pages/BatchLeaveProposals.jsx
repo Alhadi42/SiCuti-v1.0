@@ -19,7 +19,8 @@ import {
   CheckCircle,
   Clock,
   Download,
-  Layers
+  Layers,
+  Database
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -43,6 +44,60 @@ import { processDocxTemplate } from "@/utils/docxTemplates";
 import { saveAs } from "file-saver";
 import ConnectionStatus from "@/components/ConnectionStatus";
 import { safeErrorMessage, getUserFriendlyErrorMessage } from "@/utils/errorDisplay";
+import { markSimpleProposalAsCompleted, restoreSimpleProposal, isSimpleProposalCompleted } from "@/lib/simpleCompletionManager";
+import DatabaseHealthChecker from "@/components/DatabaseHealthChecker";
+
+// Convert number to Indonesian words
+const numberToWords = (num) => {
+  if (num === 0) return "nol";
+
+  const ones = [
+    "",
+    "satu",
+    "dua",
+    "tiga",
+    "empat",
+    "lima",
+    "enam",
+    "tujuh",
+    "delapan",
+    "sembilan",
+  ];
+  const teens = [
+    "sepuluh",
+    "sebelas",
+    "dua belas",
+    "tiga belas",
+    "empat belas",
+    "lima belas",
+    "enam belas",
+    "tujuh belas",
+    "delapan belas",
+    "sembilan belas",
+  ];
+  const tens = [
+    "",
+    "",
+    "dua puluh",
+    "tiga puluh",
+    "empat puluh",
+    "lima puluh",
+    "enam puluh",
+    "tujuh puluh",
+    "delapan puluh",
+    "sembilan puluh",
+  ];
+
+  if (num < 10) return ones[num];
+  if (num < 20) return teens[num - 10];
+  if (num < 100) {
+    const ten = Math.floor(num / 10);
+    const one = num % 10;
+    return tens[ten] + (one > 0 ? " " + ones[one] : "");
+  }
+
+  return num.toString(); // For larger numbers, just return the number
+};
 
 const BatchLeaveProposals = () => {
   const { toast } = useToast();
@@ -76,6 +131,7 @@ const BatchLeaveProposals = () => {
   const [completedProposals, setCompletedProposals] = useState(new Set());
   const [showCompleted, setShowCompleted] = useState(false);
   const [proposalRecords, setProposalRecords] = useState(new Map());
+  const [isMigrating, setIsMigrating] = useState(false);
   const [showBatchDialog, setShowBatchDialog] = useState(false);
   const [selectedUnitForBatch, setSelectedUnitForBatch] = useState(null);
   const [leaveTypeClassification, setLeaveTypeClassification] = useState({});
@@ -84,6 +140,7 @@ const BatchLeaveProposals = () => {
   const [availableTemplates, setAvailableTemplates] = useState([]);
   const [selectedTemplate, setSelectedTemplate] = useState(null);
   const [loadingTemplates, setLoadingTemplates] = useState(true);
+  const [databaseHealthy, setDatabaseHealthy] = useState(null);
 
   // Check user permission
   if (!currentUser || currentUser.role !== 'master_admin') {
@@ -116,15 +173,60 @@ const BatchLeaveProposals = () => {
       if (!navigator.onLine) {
         console.log("🚫 Device is offline");
         setConnectionError(true);
-        throw new Error("No internet connection");
+        // Don't throw immediately, try to use cached data instead
+        console.log("📱 Attempting to load cached data...");
+
+        // Try to load cached data immediately when offline
+        try {
+          const cachedData = localStorage.getItem('cachedBatchProposals');
+          if (cachedData) {
+            const { data, timestamp, userRole } = JSON.parse(cachedData);
+            const cacheAge = Date.now() - timestamp;
+            const maxCacheAge = 1000 * 60 * 60; // 1 hour for offline mode
+
+            if (cacheAge < maxCacheAge && userRole === currentUser?.role && data?.length > 0) {
+              console.log("📱 Using cached data (offline mode)");
+              setUnitProposals(data);
+              setCompletedProposals(new Set());
+              setProposalRecords(new Map());
+
+              const ageMinutes = Math.round(cacheAge / 1000 / 60);
+              toast({
+                title: "Mode Offline",
+                description: `Perangkat offline. Menampilkan data tersimpan (${ageMinutes} menit yang lalu).`,
+                variant: "default",
+              });
+
+              return; // Exit early, don't attempt network requests
+            }
+          }
+
+          // No usable cached data
+          console.log("⚠️ No usable cached data available for offline mode");
+          setUnitProposals([]);
+          setCompletedProposals(new Set());
+          setProposalRecords(new Map());
+
+          toast({
+            title: "Tidak Ada Internet",
+            description: "Perangkat offline dan tidak ada data tersimpan. Hubungkan ke internet untuk memuat data.",
+            variant: "destructive",
+          });
+
+          return; // Exit early, don't attempt network requests
+
+        } catch (cacheError) {
+          console.warn("⚠️ Failed to load cached data in offline mode:", cacheError);
+          // Continue to network attempt even though we're offline (will fail gracefully)
+        }
       }
 
       // Skip connectivity test on first attempt to avoid double network calls
-      if (retryCount > 0) {
+      if (retryCount > 0 && navigator.onLine) {
         try {
           console.log("🔌 Testing basic connectivity...");
           const controller = new AbortController();
-          const timeoutId = setTimeout(() => controller.abort(), 3000); // 3 second timeout
+          const timeoutId = setTimeout(() => controller.abort(), 5000); // 5 second timeout for retry
 
           const connectivityTest = await fetch(import.meta.env.VITE_SUPABASE_URL + '/rest/v1/', {
             method: 'HEAD',
@@ -142,13 +244,14 @@ const BatchLeaveProposals = () => {
           console.log("✅ Basic connectivity OK");
         } catch (connectError) {
           console.error("❌ Connectivity test failed:", connectError);
-          if (retryCount < 2) {
+          if (retryCount < 2 && navigator.onLine) {
             console.log(`🔄 Retrying... Attempt ${retryCount + 1}/3`);
             await new Promise(resolve => setTimeout(resolve, 3000));
             return fetchBatchProposals(retryCount + 1);
           }
-          // Don't throw here, let the main query handle the error
-          console.log("⚠️ Connectivity test failed, proceeding with main query anyway");
+          // If offline or max retries reached, proceed to try cached data
+          console.log("⚠️ Connectivity test failed, will try cached data");
+          setConnectionError(true);
         }
       }
 
@@ -169,8 +272,8 @@ const BatchLeaveProposals = () => {
 
       const startTime = Date.now();
 
-      // Use shorter timeout for faster failure detection
-      const timeoutMs = retryCount === 0 ? 10000 : 5000; // 10s first try, 5s retries
+      // Use more reasonable timeouts based on network conditions
+      const timeoutMs = retryCount === 0 ? 15000 : 8000; // 15s first try, 8s retries
       console.log(`⏱️ Setting query timeout to ${timeoutMs/1000} seconds`);
 
       // Fetch leave requests with complete data
@@ -204,16 +307,6 @@ const BatchLeaveProposals = () => {
 
       console.log("✅ Supabase query completed", { hasData: !!leaveRequests, hasError: !!requestsError });
 
-      // Load completion status from localStorage instead of database
-      let existingCompletions = {};
-      try {
-        existingCompletions = JSON.parse(localStorage.getItem('completedBatchProposals') || '{}');
-        console.log("📊 Loaded completion records from localStorage:", Object.keys(existingCompletions).length);
-      } catch (storageError) {
-        console.warn("Warning: Could not load completion status from localStorage:", storageError);
-        existingCompletions = {};
-      }
-
       const queryTime = Date.now() - startTime;
       console.log(`⏱️ Query completed in ${queryTime}ms`);
 
@@ -231,7 +324,10 @@ const BatchLeaveProposals = () => {
         const isNetworkError = requestsError.message?.includes("Failed to fetch") ||
                               requestsError.message?.includes("fetch") ||
                               requestsError.message?.includes("Network") ||
-                              requestsError.code === "NETWORK_ERROR";
+                              requestsError.message?.includes("network") ||
+                              requestsError.message?.includes("TypeError: fetch") ||
+                              requestsError.code === "NETWORK_ERROR" ||
+                              !navigator.onLine;
 
         const isTimeoutError = requestsError.message?.includes("timeout") ||
                               requestsError.message?.includes("Query timeout");
@@ -257,12 +353,14 @@ const BatchLeaveProposals = () => {
           errorMessage: requestsError.message
         });
 
-        if ((isNetworkError || isTimeoutError || isServerError) && retryCount < 2) {
+        if ((isNetworkError || isTimeoutError || isServerError) && retryCount < 2 && navigator.onLine) {
           console.log(`🔄 Network/timeout/server error detected. Retrying... Attempt ${retryCount + 1}/3`);
           const backoffDelay = Math.min(2000 * Math.pow(2, retryCount), 6000); // Exponential backoff, max 6s
           console.log(`⏳ Waiting ${backoffDelay}ms before retry...`);
           await new Promise(resolve => setTimeout(resolve, backoffDelay));
           return fetchBatchProposals(retryCount + 1);
+        } else if ((isNetworkError || isTimeoutError) && !navigator.onLine) {
+          console.log("🚫 Device went offline during request, skipping retry");
         }
 
         throw requestsError;
@@ -330,20 +428,43 @@ const BatchLeaveProposals = () => {
       console.log("📊 Final grouped requests:", groupedRequests);
       console.log("✅ Fetched", groupedRequests.length, "unit-date groups with leave requests");
 
-      // Process existing completions to determine status
-      const proposalsMap = new Map();
+      // Load completion status from database - AFTER groupedRequests is defined
+      const completedProposalsMap = new Map();
       const completedSet = new Set();
 
-      Object.entries(existingCompletions).forEach(([proposalKey, completionRecord]) => {
-        proposalsMap.set(proposalKey, completionRecord);
-        completedSet.add(proposalKey);
-      });
+      // Only check completion status if we have valid grouped requests
+      if (groupedRequests && groupedRequests.length > 0) {
+        console.log("🔍 Checking completion status for", groupedRequests.length, "proposal groups...");
 
-      console.log("📊 Completion records found:", Object.keys(existingCompletions).length);
-      console.log("📊 Completed proposals:", completedSet.size);
+        // Check completion status for each unit-date group
+        for (const group of groupedRequests) {
+          try {
+          const completionStatus = await isSimpleProposalCompleted(group.unitName, group.proposalDate);
+          if (completionStatus && completionStatus.isCompleted) {
+            const proposalKey = `${group.unitName}|${group.proposalDate}`;
+            completedSet.add(proposalKey);
+            completedProposalsMap.set(proposalKey, {
+              proposalKey,
+              unitName: group.unitName,
+              proposalDate: group.proposalDate,
+              completedAt: completionStatus.completedAt,
+              completedBy: completionStatus.completedBy,
+              source: completionStatus.source
+            });
+          }
+        } catch (statusError) {
+          // Only log actual errors, not expected cases
+          console.warn(`Could not check completion status for ${group.unitName}|${group.proposalDate}:`, statusError.message || statusError);
+        }
+        }
+      } else {
+        console.log("📊 No proposal groups to check for completion status");
+      }
+
+      console.log("📊 Loaded completion records from database:", completedSet.size);
 
       setUnitProposals(groupedRequests);
-      setProposalRecords(proposalsMap);
+      setProposalRecords(completedProposalsMap);
       setCompletedProposals(completedSet);
       setConnectionError(false); // Reset error state on successful fetch
 
@@ -379,16 +500,22 @@ const BatchLeaveProposals = () => {
         if (cachedData) {
           const { data, timestamp, userRole } = JSON.parse(cachedData);
           const cacheAge = Date.now() - timestamp;
-          const maxCacheAge = 1000 * 60 * 30; // 30 minutes
+          const maxCacheAge = 1000 * 60 * 60; // 1 hour for offline mode
 
           if (cacheAge < maxCacheAge && userRole === currentUser?.role && data?.length > 0) {
             console.log("📱 Using cached data as fallback");
             setUnitProposals(data);
+
+            // Also set empty completion state to avoid errors
+            setCompletedProposals(new Set());
+            setProposalRecords(new Map());
+
             usedCachedData = true;
 
+            const ageMinutes = Math.round(cacheAge / 1000 / 60);
             toast({
               title: "Mode Offline",
-              description: `Menampilkan data tersimpan (${Math.round(cacheAge / 1000 / 60)} menit yang lalu)`,
+              description: `Menampilkan data tersimpan (${ageMinutes} menit yang lalu). Status completion tidak tersedia dalam mode offline.`,
               variant: "default",
             });
           }
@@ -399,6 +526,8 @@ const BatchLeaveProposals = () => {
 
       if (!usedCachedData) {
         setUnitProposals([]);
+        setCompletedProposals(new Set());
+        setProposalRecords(new Map());
       }
 
       let errorMessage = "Gagal mengambil data usulan cuti";
@@ -411,7 +540,7 @@ const BatchLeaveProposals = () => {
           ? "Koneksi bermasalah. Menampilkan data tersimpan."
           : "Tidak dapat terhubung ke server. Periksa koneksi internet Anda dan coba refresh halaman.";
         setConnectionError(true);
-      } else if (error.message?.includes("No internet connection")) {
+      } else if (error.message?.includes("No internet connection") || !navigator.onLine) {
         errorTitle = "Tidak Ada Internet";
         errorMessage = usedCachedData
           ? "Tidak ada internet. Menampilkan data tersimpan."
@@ -470,12 +599,20 @@ const BatchLeaveProposals = () => {
 
       // Show confirmation dialog
       const confirmed = window.confirm(
-        `Apakah Anda yakin ingin menandai usulan cuti dari ${unit.unitName} tanggal ${format(new Date(unit.proposalDate), "dd MMMM yyyy", { locale: id })} sebagai "Selesai di Ajukan"?\n\nUsulan ini akan disembunyikan dari daftar.`
+        `Apakah Anda yakin ingin menandai usulan cuti dari ${unit.unitName} tanggal ${format(new Date(unit.proposalDate), "dd MMMM yyyy", { locale: id })} sebagai "Selesai di Ajukan"?\n\nUsulan ini akan disimpan di database dan disembunyikan dari daftar.`
       );
 
       if (!confirmed) return;
 
-      // Create a completion record with detailed information for persistence
+      // Mark as completed using simple manager
+      console.log('🔄 Marking proposal as completed...');
+      const completedProposal = await markSimpleProposalAsCompleted(
+        unit.unitName,
+        unit.proposalDate,
+        unit.requests
+      );
+
+      // Create completion record for local state
       const completionRecord = {
         proposalKey,
         unitName: unit.unitName,
@@ -483,44 +620,40 @@ const BatchLeaveProposals = () => {
         totalEmployees: unit.totalEmployees,
         totalRequests: unit.totalRequests,
         totalDays: unit.totalDays,
-        completedAt: new Date().toISOString(),
-        completedBy: currentUser.id,
+        completedAt: completedProposal.completedAt,
+        completedBy: completedProposal.completedBy,
         completedByName: currentUser.name || currentUser.email,
-        requestIds: unit.requests.map(req => req.id) // Store request IDs for verification
+        requestIds: unit.requests.map(req => req.id),
+        proposalId: completedProposal.id
       };
 
-      // Store in localStorage with better structure
-      try {
-        const existingCompleted = JSON.parse(localStorage.getItem('completedBatchProposals') || '{}');
-        existingCompleted[proposalKey] = completionRecord;
-        localStorage.setItem('completedBatchProposals', JSON.stringify(existingCompleted));
-
-        // Also keep a simple list for backward compatibility
-        const completedList = Object.keys(existingCompleted);
-        localStorage.setItem('completedProposals', JSON.stringify(completedList));
-
-        console.log("✅ Completion status saved to localStorage:", completionRecord);
-      } catch (storageError) {
-        console.error("Failed to save to localStorage:", storageError);
-        throw new Error("Gagal menyimpan status completion: " + storageError.message);
-      }
-
-      // Add to completed proposals set
+      // Update local state
       setCompletedProposals(prev => new Set([...prev, proposalKey]));
-
-      // Update local records
       setProposalRecords(prev => new Map(prev.set(proposalKey, completionRecord)));
 
       toast({
         title: "Berhasil",
-        description: `Usulan cuti dari ${unit.unitName} telah ditandai sebagai selesai diajukan dan disimpan secara lokal`,
+        description: `Usulan cuti dari ${unit.unitName} telah ditandai sebagai selesai diajukan`,
+        duration: 3000,
       });
+
+      console.log('✅ Proposal marked as completed:', completedProposal.proposalKey);
 
     } catch (error) {
       console.error("Error marking proposal as completed:", error);
+
+      let errorMessage = "Gagal menandai usulan sebagai selesai";
+      if (error.message?.includes('User not authenticated')) {
+        errorMessage = "Anda harus login untuk menandai usulan sebagai selesai";
+      } else if (error.code === '42501') {
+        errorMessage = "Fitur ini akan menggunakan penyimpanan lokal karena ada pembatasan database";
+      } else {
+        errorMessage = `Gagal menandai usulan sebagai selesai: ${safeErrorMessage(error)}`;
+      }
+
       toast({
         title: "Error",
-        description: "Gagal menandai usulan sebagai selesai: " + safeErrorMessage(error),
+        description: errorMessage,
         variant: "destructive",
       });
     }
@@ -530,30 +663,24 @@ const BatchLeaveProposals = () => {
     try {
       const proposalKey = `${unit.unitName}|${unit.proposalDate}`;
 
-      // Remove from localStorage
-      try {
-        const existingCompleted = JSON.parse(localStorage.getItem('completedBatchProposals') || '{}');
-        delete existingCompleted[proposalKey];
-        localStorage.setItem('completedBatchProposals', JSON.stringify(existingCompleted));
+      // Show confirmation dialog
+      const confirmed = window.confirm(
+        `Apakah Anda yakin ingin mengembalikan usulan cuti dari ${unit.unitName} tanggal ${format(new Date(unit.proposalDate), "dd MMMM yyyy", { locale: id })} ke status aktif?`
+      );
 
-        // Update simple list for backward compatibility
-        const completedList = Object.keys(existingCompleted);
-        localStorage.setItem('completedProposals', JSON.stringify(completedList));
+      if (!confirmed) return;
 
-        console.log("✅ Completion status removed from localStorage for:", proposalKey);
-      } catch (storageError) {
-        console.error("Failed to remove from localStorage:", storageError);
-        throw new Error("Gagal menghapus status completion: " + storageError.message);
-      }
+      // Restore using simple manager
+      console.log('🔄 Restoring proposal...');
+      const restoredProposal = await restoreSimpleProposal(unit.unitName, unit.proposalDate);
 
-      // Remove from completed proposals set
+      // Update local state
       setCompletedProposals(prev => {
         const newSet = new Set(prev);
         newSet.delete(proposalKey);
         return newSet;
       });
 
-      // Remove from local records
       setProposalRecords(prev => {
         const newMap = new Map(prev);
         newMap.delete(proposalKey);
@@ -565,11 +692,23 @@ const BatchLeaveProposals = () => {
         description: `Usulan cuti dari ${unit.unitName} telah dikembalikan ke daftar aktif`,
       });
 
+      console.log('✅ Proposal restored:', restoredProposal.success);
+
     } catch (error) {
       console.error("Error restoring proposal:", error);
+
+      let errorMessage = "Gagal mengembalikan usulan";
+      if (error.message?.includes('User not authenticated')) {
+        errorMessage = "Anda harus login untuk mengembalikan usulan";
+      } else if (error.code === '42501') {
+        errorMessage = "Fitur ini menggunakan penyimpanan lokal karena ada pembatasan database";
+      } else {
+        errorMessage = `Gagal mengembalikan usulan: ${safeErrorMessage(error)}`;
+      }
+
       toast({
         title: "Error",
-        description: "Gagal mengembalikan usulan: " + safeErrorMessage(error),
+        description: errorMessage,
         variant: "destructive",
       });
     }
@@ -698,7 +837,7 @@ const BatchLeaveProposals = () => {
         // Letter numbering
         nomor_surat: `SRT/${leaveType.toUpperCase().replace(/\s+/g, '')}/${new Date().getFullYear()}/${Math.floor(Math.random() * 1000).toString().padStart(3, '0')}`,
 
-        // Missing variables that user reported as empty
+        // Missing variables that user reported as empty - FIXED
         tanggal_pelaksanaan_cuti: completeRequests.length > 0
           ? `${format(new Date(completeRequests[0].start_date), "dd MMMM yyyy", { locale: id })} s.d. ${format(new Date(completeRequests[completeRequests.length - 1].end_date), "dd MMMM yyyy", { locale: id })}`
           : "-",
@@ -709,11 +848,25 @@ const BatchLeaveProposals = () => {
           ? format(new Date(completeRequests[0].application_form_date), "dd MMMM yyyy", { locale: id })
           : format(new Date(selectedUnitForBatch.proposalDate), "dd MMMM yyyy", { locale: id }),
 
+        // USER REPORTED MISSING VARIABLES - ADDED:
+        tanggal_formulir_pengajuan: completeRequests.length > 0 && completeRequests[0].application_form_date
+          ? format(new Date(completeRequests[0].application_form_date), "dd MMMM yyyy", { locale: id })
+          : format(new Date(selectedUnitForBatch.proposalDate), "dd MMMM yyyy", { locale: id }),
+        tanggal_cuti: completeRequests.length > 0
+          ? `${format(new Date(completeRequests[0].start_date), "dd MMMM yyyy", { locale: id })} s.d. ${format(new Date(completeRequests[completeRequests.length - 1].end_date), "dd MMMM yyyy", { locale: id })}`
+          : "-",
+        jatah_cuti_tahun: completeRequests.length > 0 ? (completeRequests[0].leave_quota_year || new Date().getFullYear()) : new Date().getFullYear(),
+
         // Additional common template variables
         departemen: selectedUnitForBatch.unitName,
         instansi: "Pemerintah Kota Jayapura", // Can be made configurable
         nama_kepala_instansi: "Kepala Dinas", // Can be made configurable
         jabatan_kepala_instansi: "Kepala Dinas", // Can be made configurable
+
+        // Additional comprehensive variables for complete coverage
+        total_pegawai_asn: completeRequests.filter(req => req.employees?.asn_status?.toLowerCase().includes('asn')).length,
+        total_pegawai_non_asn: completeRequests.filter(req => !req.employees?.asn_status?.toLowerCase().includes('asn')).length,
+        rata_rata_hari_cuti: completeRequests.length > 0 ? Math.round(completeRequests.reduce((sum, req) => sum + (req.days_requested || 0), 0) / completeRequests.length) : 0,
 
         // Employee list variables for table/loop processing
         pegawai_list: completeRequests.map((request, index) => ({
@@ -745,7 +898,10 @@ const BatchLeaveProposals = () => {
           tanggal_formulir: request.application_form_date ? format(new Date(request.application_form_date), "dd MMMM yyyy", { locale: id }) : "-",
           formulir_pengajuan_cuti: request.application_form_date ? format(new Date(request.application_form_date), "dd MMMM yyyy", { locale: id }) : "-",
           nomor_surat_cuti: request.leave_letter_number || "-",
-          tanggal_surat_cuti: request.leave_letter_date ? format(new Date(request.leave_letter_date), "dd MMMM yyyy", { locale: id }) : "-"
+          tanggal_surat_cuti: request.leave_letter_date ? format(new Date(request.leave_letter_date), "dd MMMM yyyy", { locale: id }) : "-",
+          // Additional comprehensive variables
+          durasi_hari_terbilang: numberToWords(request.days_requested || 0),
+          nomor_surat_referensi: request.reference_number || "REF tidak tersedia"
         }))
       };
 
@@ -775,10 +931,19 @@ const BatchLeaveProposals = () => {
         variables[`tanggal_formulir_${num}`] = request.application_form_date ? format(new Date(request.application_form_date), "dd MMMM yyyy", { locale: id }) : "-";
         variables[`formulir_pengajuan_cuti_${num}`] = request.application_form_date ? format(new Date(request.application_form_date), "dd MMMM yyyy", { locale: id }) : "-";
 
+        // USER REPORTED MISSING VARIABLES - ADDED FOR INDEXED:
+        variables[`tanggal_formulir_pengajuan_${num}`] = request.application_form_date ? format(new Date(request.application_form_date), "dd MMMM yyyy", { locale: id }) : "-";
+        variables[`tanggal_cuti_${num}`] = `${format(new Date(request.start_date), "dd MMMM yyyy", { locale: id })} s.d. ${format(new Date(request.end_date), "dd MMMM yyyy", { locale: id })}`;
+        variables[`jatah_cuti_tahun_${num}`] = request.leave_quota_year || new Date().getFullYear();
+
         // Additional variations for common template patterns
         variables[`nama_pegawai_${num}`] = request.employees?.name || "Nama tidak diketahui";
         variables[`tempat_alamat_cuti_${num}`] = request.address_during_leave || "-";
         variables[`periode_cuti_${num}`] = `${format(new Date(request.start_date), "dd/MM/yyyy")} - ${format(new Date(request.end_date), "dd/MM/yyyy")}`;
+        // Additional indexed variables for complete coverage
+        variables[`durasi_hari_terbilang_${num}`] = numberToWords(request.days_requested || 0);
+        variables[`nomor_surat_referensi_${num}`] = request.reference_number || "REF tidak tersedia";
+        variables[`status_asn_${num}`] = request.employees?.asn_status || "Status ASN tidak tersedia";
       });
 
       console.log("📄 Generating batch letter with variables:", {
@@ -800,6 +965,12 @@ const BatchLeaveProposals = () => {
       console.log("- cuti_tahun:", variables.cuti_tahun);
       console.log("- alamat_cuti:", variables.alamat_cuti);
       console.log("- formulir_pengajuan_cuti:", variables.formulir_pengajuan_cuti);
+
+      // Log the NEWLY ADDED variables that were reported missing:
+      console.log("🔧 NEWLY ADDED VARIABLES (user reported as missing):");
+      console.log("- tanggal_formulir_pengajuan:", variables.tanggal_formulir_pengajuan);
+      console.log("- tanggal_cuti:", variables.tanggal_cuti);
+      console.log("- jatah_cuti_tahun:", variables.jatah_cuti_tahun);
 
       // Log all variable keys for debugging
       console.log("📋 All available variables:", Object.keys(variables).sort());
@@ -942,12 +1113,14 @@ const BatchLeaveProposals = () => {
 
       toast({
         title: "Cache Dibersihkan",
-        description: "Data cache dan status completion telah dihapus. Refresh untuk mengambil data terbaru.",
+        description: "Data cache lokal telah dihapus. Refresh untuk mengambil data terbaru.",
       });
     } catch (error) {
       console.error("Error clearing cache:", error);
     }
   };
+
+  // Migration feature removed since we're using simple completion manager
 
   // Filter units based on search, selection, and completion status
   const filteredUnits = unitProposals.filter(unit => {
@@ -986,7 +1159,7 @@ const BatchLeaveProposals = () => {
       ]);
 
       if (error) {
-        console.error("Error from Supabase:", error);
+        console.error("Error from Supabase:", JSON.stringify(error, null, 2));
 
         // Retry logic for templates
         if (error.message?.includes("Failed to fetch") && retryCount < 1) {
@@ -1006,28 +1179,34 @@ const BatchLeaveProposals = () => {
 
       // Don't show error toast for template loading - it's not critical
       console.log("ℹ️ Templates unavailable - batch letters will be disabled");
+
+      // If it's specifically a timeout, mention it in console but don't spam user
+      if (error.message?.includes('timeout')) {
+        console.log("⏰ Template loading timed out - this is usually due to slow network");
+      }
     } finally {
       setLoadingTemplates(false);
     }
   }, []);
 
   useEffect(() => {
-    // Load completion status from localStorage on component mount
-    try {
-      const existingCompletions = JSON.parse(localStorage.getItem('completedBatchProposals') || '{}');
-      const completedKeys = Object.keys(existingCompletions);
-      setCompletedProposals(new Set(completedKeys));
+    // Check for localStorage data and offer migration
+    const checkForMigration = () => {
+      const localData = localStorage.getItem('completedBatchProposals');
+      if (localData) {
+        try {
+          const parsed = JSON.parse(localData);
+          const count = Object.keys(parsed).length;
+          if (count > 0) {
+            console.log(`📱 Found ${count} completed proposals in localStorage - migration available`);
+          }
+        } catch (error) {
+          console.warn('Could not parse localStorage data:', error);
+        }
+      }
+    };
 
-      const recordsMap = new Map();
-      Object.entries(existingCompletions).forEach(([key, record]) => {
-        recordsMap.set(key, record);
-      });
-      setProposalRecords(recordsMap);
-
-      console.log("📱 Loaded", completedKeys.length, "completed proposals from localStorage");
-    } catch (error) {
-      console.warn("Could not load completion status:", error);
-    }
+    checkForMigration();
 
     // Stagger the requests to avoid overwhelming the network
     const timer = setTimeout(() => {
@@ -1074,6 +1253,17 @@ const BatchLeaveProposals = () => {
         </div>
         <div className="flex items-center space-x-3">
           <ConnectionStatus onRetry={() => fetchBatchProposals(0)} />
+
+          {/* Info about storage method */}
+          <Button
+            variant="ghost"
+            className="text-slate-400 cursor-default"
+            disabled
+          >
+            <Database className="w-4 h-4 mr-2" />
+            Status tersimpan lokal
+          </Button>
+
           <Button
             onClick={() => fetchBatchProposals(0)}
             variant="outline"
@@ -1086,6 +1276,9 @@ const BatchLeaveProposals = () => {
         </div>
       </motion.div>
 
+
+      {/* Database Health Check */}
+      <DatabaseHealthChecker onHealthCheck={setDatabaseHealthy} />
 
       {/* Filters */}
       <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.2 }}>

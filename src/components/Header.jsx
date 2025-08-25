@@ -2,7 +2,7 @@ import React from "react";
 import { motion } from "framer-motion";
 import { Menu } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import NotificationBell from "./NotificationBell";
+import NotificationPanel from "./NotificationPanel";
 
 const Header = ({ toggleSidebar }) => {
   return (
@@ -14,7 +14,7 @@ const Header = ({ toggleSidebar }) => {
     >
       <div className="flex items-center justify-end">
         <div className="flex items-center space-x-4">
-          <NotificationBell />
+          <NotificationPanel />
 
           <div className="text-right">
             <p className="text-white text-sm font-medium">Selamat Datang!</p>
