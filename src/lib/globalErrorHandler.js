@@ -90,20 +90,53 @@ export class GlobalErrorHandler {
       // Override console.warn to suppress ResizeObserver errors
       console.warn = (...args) => {
         const message = args.map(arg => String(arg)).join(' ');
-        if (
-          message.includes("ResizeObserver loop") ||
-          message.includes("ResizeObserver loop completed with undelivered notifications") ||
-          message.includes("ResizeObserver: loop completed with undelivered notifications") ||
-          message.includes("ResizeObserver: loop limit exceeded")
-        ) {
+
+        // Comprehensive ResizeObserver pattern matching
+        const resizeObserverPatterns = [
+          'ResizeObserver loop',
+          'ResizeObserver loop completed with undelivered notifications',
+          'ResizeObserver: loop completed with undelivered notifications',
+          'ResizeObserver: loop limit exceeded',
+          'ResizeObserver loop limit exceeded',
+          'loop completed with undelivered notifications',
+          'ResizeObserver callback',
+          'ResizeObserver.observe'
+        ];
+
+        const isResizeObserverMessage = resizeObserverPatterns.some(pattern =>
+          message.toLowerCase().includes(pattern.toLowerCase())
+        );
+
+        if (isResizeObserverMessage) {
           // Suppress ResizeObserver warnings completely in production
           if (import.meta.env.DEV) {
-            window._originalConsoleWarn("🔄 ResizeObserver loop suppressed:", message);
+            window._originalConsoleWarn("🔄 ResizeObserver suppressed:", message);
           }
           return;
         }
         window._originalConsoleWarn.apply(console, args);
       };
+
+      // Also override console.error for ResizeObserver errors that appear as errors
+      if (!window._originalConsoleError) {
+        window._originalConsoleError = console.error;
+
+        console.error = (...args) => {
+          const message = args.map(arg => String(arg)).join(' ');
+
+          const isResizeObserverError = resizeObserverPatterns.some(pattern =>
+            message.toLowerCase().includes(pattern.toLowerCase())
+          );
+
+          if (isResizeObserverError) {
+            if (import.meta.env.DEV) {
+              window._originalConsoleError("🔄 ResizeObserver error suppressed:", message);
+            }
+            return;
+          }
+          window._originalConsoleError.apply(console, args);
+        };
+      }
     }
 
     // Handle React error boundary errors (will be caught by ErrorBoundary)
@@ -138,16 +171,37 @@ export class GlobalErrorHandler {
   };
 
   static handleError = (event) => {
-    // Suppress harmless ResizeObserver errors
-    if (
-      event.message?.includes("ResizeObserver loop") ||
-      event.message?.includes("ResizeObserver loop completed with undelivered notifications")
-    ) {
-      // Log only in development for debugging
+    // Comprehensive ResizeObserver error suppression
+    const errorMessage = event.message || String(event.error) || '';
+    const errorStack = event.error?.stack || '';
+    const errorString = event.error?.toString() || '';
+
+    // Check all possible ResizeObserver error patterns
+    const resizeObserverPatterns = [
+      'ResizeObserver loop',
+      'ResizeObserver loop completed with undelivered notifications',
+      'ResizeObserver: loop completed with undelivered notifications',
+      'ResizeObserver: loop limit exceeded',
+      'ResizeObserver loop limit exceeded',
+      'loop completed with undelivered notifications',
+      'ResizeObserver callback',
+      'ResizeObserver.observe'
+    ];
+
+    const isResizeObserverError = resizeObserverPatterns.some(pattern =>
+      errorMessage.toLowerCase().includes(pattern.toLowerCase()) ||
+      errorStack.toLowerCase().includes(pattern.toLowerCase()) ||
+      errorString.toLowerCase().includes(pattern.toLowerCase())
+    );
+
+    if (isResizeObserverError) {
+      // Completely suppress in production, minimal logging in dev
       if (import.meta.env.DEV) {
-        console.warn("🔄 ResizeObserver loop (harmless):", event.message);
+        console.warn("🔄 ResizeObserver error suppressed:", errorMessage);
       }
-      return;
+      // Prevent default browser error handling
+      if (event.preventDefault) event.preventDefault();
+      return false;
     }
 
     const error = {
