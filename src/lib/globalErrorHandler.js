@@ -83,11 +83,34 @@ export class GlobalErrorHandler {
     // Handle JavaScript errors
     window.addEventListener("error", this.handleError);
 
+    // Store original console methods for ResizeObserver suppression
+    if (!window._originalConsoleWarn) {
+      window._originalConsoleWarn = console.warn;
+
+      // Override console.warn to suppress ResizeObserver errors
+      console.warn = (...args) => {
+        const message = args.map(arg => String(arg)).join(' ');
+        if (
+          message.includes("ResizeObserver loop") ||
+          message.includes("ResizeObserver loop completed with undelivered notifications") ||
+          message.includes("ResizeObserver: loop completed with undelivered notifications") ||
+          message.includes("ResizeObserver: loop limit exceeded")
+        ) {
+          // Suppress ResizeObserver warnings completely in production
+          if (import.meta.env.DEV) {
+            window._originalConsoleWarn("🔄 ResizeObserver loop suppressed:", message);
+          }
+          return;
+        }
+        window._originalConsoleWarn.apply(console, args);
+      };
+    }
+
     // Handle React error boundary errors (will be caught by ErrorBoundary)
     // This is backup for errors that might escape the boundary
 
     this.isInitialized = true;
-    console.log("🛡️ Global error handler initialized");
+    console.log("🛡️ Global error handler initialized with ResizeObserver suppression");
   }
 
   static handleUnhandledRejection = (event) => {
