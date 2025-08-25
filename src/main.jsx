@@ -9,6 +9,7 @@ import { initDebugConsole } from "@/lib/debugConsole.js";
 import "@/utils/errorUtils.js";
 import "@/lib/productionOptimizer.js";
 import "@/lib/healthChecker.js";
+import "@/utils/resizeObserverSuppression.js";
 
 // Initialize debug console with error handling
 try {
