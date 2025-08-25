@@ -304,12 +304,23 @@ const NotificationPanel = () => {
         </ScrollArea>
 
         <DropdownMenuSeparator className="bg-slate-700" />
-        
-        <div className="p-2">
+
+        <div className="p-2 space-y-1">
+          {process.env.NODE_ENV === 'development' && (
+            <Button
+              variant="ghost"
+              size="sm"
+              className="w-full justify-start text-slate-400 hover:text-white"
+              onClick={handleCreateSample}
+            >
+              <Plus className="h-3 w-3 mr-2" />
+              Buat Demo Notifikasi
+            </Button>
+          )}
           <Button
             variant="ghost"
             size="sm"
-            className="w-full justify-center text-slate-400 hover:text-white"
+            className="w-full justify-start text-slate-400 hover:text-white"
             onClick={() => setIsOpen(false)}
           >
             <Settings className="h-3 w-3 mr-2" />
