@@ -30,6 +30,7 @@ import { id } from "date-fns/locale";
 import { NOTIFICATION_TYPES } from "@/lib/notifications";
 import useNotifications from "@/hooks/useNotifications";
 import { useToast } from "@/components/ui/use-toast";
+import NotificationIntegration from "@/utils/notificationIntegration";
 
 const NotificationPanel = () => {
   const [isOpen, setIsOpen] = useState(false);
