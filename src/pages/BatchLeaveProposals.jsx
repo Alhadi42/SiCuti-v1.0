@@ -47,6 +47,58 @@ import { safeErrorMessage, getUserFriendlyErrorMessage } from "@/utils/errorDisp
 import { markSimpleProposalAsCompleted, restoreSimpleProposal, isSimpleProposalCompleted } from "@/lib/simpleCompletionManager";
 import DatabaseHealthChecker from "@/components/DatabaseHealthChecker";
 
+// Convert number to Indonesian words
+const numberToWords = (num) => {
+  if (num === 0) return "nol";
+
+  const ones = [
+    "",
+    "satu",
+    "dua",
+    "tiga",
+    "empat",
+    "lima",
+    "enam",
+    "tujuh",
+    "delapan",
+    "sembilan",
+  ];
+  const teens = [
+    "sepuluh",
+    "sebelas",
+    "dua belas",
+    "tiga belas",
+    "empat belas",
+    "lima belas",
+    "enam belas",
+    "tujuh belas",
+    "delapan belas",
+    "sembilan belas",
+  ];
+  const tens = [
+    "",
+    "",
+    "dua puluh",
+    "tiga puluh",
+    "empat puluh",
+    "lima puluh",
+    "enam puluh",
+    "tujuh puluh",
+    "delapan puluh",
+    "sembilan puluh",
+  ];
+
+  if (num < 10) return ones[num];
+  if (num < 20) return teens[num - 10];
+  if (num < 100) {
+    const ten = Math.floor(num / 10);
+    const one = num % 10;
+    return tens[ten] + (one > 0 ? " " + ones[one] : "");
+  }
+
+  return num.toString(); // For larger numbers, just return the number
+};
+
 const BatchLeaveProposals = () => {
   const { toast } = useToast();
   const currentUser = AuthManager.getUserSession();
