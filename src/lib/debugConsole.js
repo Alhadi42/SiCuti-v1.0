@@ -44,6 +44,19 @@ export const initDebugConsole = () => {
         return originalFn.apply(console, args);
       }
 
+      // Suppress ResizeObserver errors at console level
+      if (args.some(arg => {
+        const str = String(arg);
+        return str.includes("ResizeObserver loop") ||
+               str.includes("ResizeObserver loop completed with undelivered notifications");
+      })) {
+        // Log only in development for debugging
+        if (import.meta.env.DEV && methodName === 'warn') {
+          originalConsoleLog.call(console, "🔄 ResizeObserver loop suppressed (harmless):", ...args);
+        }
+        return; // Suppress the error completely
+      }
+
       isProcessing = true;
 
       try {
