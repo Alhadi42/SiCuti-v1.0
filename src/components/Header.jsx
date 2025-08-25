@@ -14,7 +14,7 @@ const Header = ({ toggleSidebar }) => {
     >
       <div className="flex items-center justify-end">
         <div className="flex items-center space-x-4">
-          <NotificationBell />
+          <NotificationPanel />
 
           <div className="text-right">
             <p className="text-white text-sm font-medium">Selamat Datang!</p>
