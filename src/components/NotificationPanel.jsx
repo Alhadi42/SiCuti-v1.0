@@ -203,17 +203,28 @@ const NotificationPanel = () => {
               </Badge>
             )}
           </div>
-          {unreadCount > 0 && (
+          <div className="flex items-center gap-1">
             <Button
               variant="ghost"
               size="sm"
-              onClick={markAllAsRead}
+              onClick={loadNotifications}
               className="text-xs text-slate-400 hover:text-white"
+              disabled={isLoading}
             >
-              <CheckCheck className="h-3 w-3 mr-1" />
-              Tandai Semua
+              <RefreshCw className={`h-3 w-3 ${isLoading ? 'animate-spin' : ''}`} />
             </Button>
-          )}
+            {unreadCount > 0 && (
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={handleMarkAllAsRead}
+                className="text-xs text-slate-400 hover:text-white"
+              >
+                <CheckCheck className="h-3 w-3 mr-1" />
+                Tandai Semua
+              </Button>
+            )}
+          </div>
         </DropdownMenuHeader>
 
         <ScrollArea className="max-h-80">
