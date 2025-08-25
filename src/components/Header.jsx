@@ -2,7 +2,7 @@ import React from "react";
 import { motion } from "framer-motion";
 import { Menu } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import NotificationBell from "./NotificationBell";
+import NotificationPanel from "./NotificationPanel";
 
 const Header = ({ toggleSidebar }) => {
   return (
