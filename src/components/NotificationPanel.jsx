@@ -11,10 +11,10 @@ import {
   Calendar,
   Users,
   Settings,
-  Trash2,
+  RefreshCw,
+  Plus,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import {
@@ -27,116 +27,68 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { format } from "date-fns";
 import { id } from "date-fns/locale";
-import NotificationManager, { NOTIFICATION_TYPES } from "@/lib/notifications";
-import { AuthManager } from "@/lib/auth";
+import { NOTIFICATION_TYPES } from "@/lib/notifications";
+import useNotifications from "@/hooks/useNotifications";
+import { useToast } from "@/components/ui/use-toast";
 
 const NotificationPanel = () => {
-  const [notifications, setNotifications] = useState([]);
-  const [unreadCount, setUnreadCount] = useState(0);
-  const [isLoading, setIsLoading] = useState(true);
   const [isOpen, setIsOpen] = useState(false);
   const [isAnimating, setIsAnimating] = useState(false);
+  const { toast } = useToast();
 
-  // Load notifications on component mount
+  const {
+    notifications,
+    unreadCount,
+    isLoading,
+    error,
+    markAsRead,
+    markAllAsRead,
+    removeNotification,
+    createSampleNotifications,
+    loadNotifications,
+  } = useNotifications();
+
+  // Trigger animation when new notifications arrive
   useEffect(() => {
-    loadNotifications();
-    
-    // Subscribe to new notifications
-    const unsubscribe = NotificationManager.subscribe("new-notification", handleNewNotification);
-    
-    // Auto-refresh notifications every 30 seconds
-    const interval = setInterval(loadNotifications, 30000);
-    
-    return () => {
-      unsubscribe();
-      clearInterval(interval);
-    };
-  }, []);
+    if (unreadCount > 0) {
+      setIsAnimating(true);
+      setTimeout(() => setIsAnimating(false), 1000);
+    }
+  }, [unreadCount]);
 
-  const loadNotifications = async () => {
-    try {
-      setIsLoading(true);
-      const user = AuthManager.getUserSession();
-      
-      if (!user) {
-        setNotifications([]);
-        setUnreadCount(0);
-        return;
-      }
-
-      // Get notifications from NotificationManager
-      const data = await NotificationManager.getNotifications({ 
-        limit: 20,
-        includeRead: true 
+  const handleMarkAsRead = async (notificationId) => {
+    const success = await markAsRead(notificationId);
+    if (!success && error) {
+      toast({
+        title: "Error",
+        description: error,
+        variant: "destructive",
       });
-      
-      setNotifications(data);
-      
-      // Calculate unread count
-      const unread = await NotificationManager.getUnreadCount();
-      setUnreadCount(unread);
-      
-    } catch (error) {
-      console.error("Error loading notifications:", error);
-      setNotifications([]);
-      setUnreadCount(0);
-    } finally {
-      setIsLoading(false);
     }
   };
 
-  const handleNewNotification = (notification) => {
-    setNotifications(prev => [notification, ...prev.slice(0, 19)]);
-    setUnreadCount(prev => prev + 1);
-    
-    // Trigger animation
-    setIsAnimating(true);
-    setTimeout(() => setIsAnimating(false), 1000);
-  };
-
-  const markAsRead = async (notificationId) => {
-    try {
-      await NotificationManager.markAsRead(notificationId);
-      
-      // Update local state
-      setNotifications(prev => 
-        prev.map(n => 
-          n.id === notificationId 
-            ? { ...n, read_at: new Date().toISOString() }
-            : n
-        )
-      );
-      
-      setUnreadCount(prev => Math.max(0, prev - 1));
-    } catch (error) {
-      console.error("Error marking notification as read:", error);
+  const handleMarkAllAsRead = async () => {
+    const success = await markAllAsRead();
+    if (success) {
+      toast({
+        title: "Berhasil",
+        description: "Semua notifikasi telah ditandai sebagai dibaca",
+      });
+    } else if (error) {
+      toast({
+        title: "Error",
+        description: error,
+        variant: "destructive",
+      });
     }
   };
 
-  const markAllAsRead = async () => {
-    try {
-      const unreadNotifications = notifications.filter(n => !n.read_at);
-      
-      for (const notification of unreadNotifications) {
-        await NotificationManager.markAsRead(notification.id);
-      }
-      
-      setNotifications(prev => 
-        prev.map(n => ({ ...n, read_at: n.read_at || new Date().toISOString() }))
-      );
-      
-      setUnreadCount(0);
-    } catch (error) {
-      console.error("Error marking all as read:", error);
-    }
-  };
-
-  const clearNotification = (notificationId) => {
-    setNotifications(prev => prev.filter(n => n.id !== notificationId));
-    const notification = notifications.find(n => n.id === notificationId);
-    if (notification && !notification.read_at) {
-      setUnreadCount(prev => Math.max(0, prev - 1));
-    }
+  const handleCreateSample = async () => {
+    await createSampleNotifications();
+    toast({
+      title: "Demo Notifikasi",
+      description: "Notifikasi demo telah dibuat",
+    });
   };
 
   const getNotificationIcon = (type) => {
