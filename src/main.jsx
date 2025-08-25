@@ -27,6 +27,7 @@ if (import.meta.env.DEV) {
     import("@/utils/errorTestUtility.js");
     import("@/utils/consoleTest.js");
     import("@/utils/immediateConsoleTest.js");
+    import("@/utils/resizeObserverTest.js");
   }, 100);
 }
 
