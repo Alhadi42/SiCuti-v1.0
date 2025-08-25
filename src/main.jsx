@@ -29,6 +29,7 @@ if (import.meta.env.DEV) {
     import("@/utils/consoleTest.js");
     import("@/utils/immediateConsoleTest.js");
     import("@/utils/resizeObserverTest.js");
+    // Comprehensive ResizeObserver testing available via window.testResizeObserverSuppression()
   }, 100);
 }
 
