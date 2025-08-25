@@ -92,6 +92,15 @@ const NotificationPanel = () => {
     });
   };
 
+  const handleWorkflowDemo = async () => {
+    await NotificationIntegration.createWorkflowDemo();
+    toast({
+      title: "Demo Workflow",
+      description: "Demo workflow pengajuan cuti dimulai. Perhatikan notifikasi yang muncul secara bertahap.",
+      duration: 5000,
+    });
+  };
+
   const getNotificationIcon = (type) => {
     switch (type) {
       case NOTIFICATION_TYPES.LEAVE_REQUEST_SUBMITTED:
