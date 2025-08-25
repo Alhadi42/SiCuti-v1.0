@@ -277,7 +277,7 @@ const NotificationPanel = () => {
                           size="sm"
                           onClick={(e) => {
                             e.stopPropagation();
-                            markAsRead(notification.id);
+                            handleMarkAsRead(notification.id);
                           }}
                           className="h-6 w-6 p-0 text-slate-400 hover:text-white"
                         >
@@ -289,7 +289,7 @@ const NotificationPanel = () => {
                         size="sm"
                         onClick={(e) => {
                           e.stopPropagation();
-                          clearNotification(notification.id);
+                          removeNotification(notification.id);
                         }}
                         className="h-6 w-6 p-0 text-slate-400 hover:text-red-400"
                       >
