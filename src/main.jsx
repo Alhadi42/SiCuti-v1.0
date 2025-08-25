@@ -4,12 +4,13 @@ import App from "@/App";
 import "@/index.css";
 import { supabase } from "@/lib/supabaseOptimized";
 import { TempoDevtools } from "tempo-devtools";
+import "@/utils/aggressiveResizeObserverSuppression.js"; // Load FIRST - most aggressive
 import "@/lib/globalErrorHandler.js";
 import { initDebugConsole } from "@/lib/debugConsole.js";
 import "@/utils/errorUtils.js";
 import "@/lib/productionOptimizer.js";
 import "@/lib/healthChecker.js";
-import "@/utils/resizeObserverSuppression.js";
+import "@/utils/resizeObserverSuppression.js"; // Backup suppression
 
 // Initialize debug console with error handling
 try {
