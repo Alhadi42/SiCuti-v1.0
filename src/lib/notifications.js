@@ -260,7 +260,7 @@ export class NotificationManager {
     const user = AuthManager.getUserSession();
     if (!user) return [];
 
-    const { limit = 20, offset = 0, unreadOnly = false } = options;
+    const { limit = 20, offset = 0, unreadOnly = false, includeRead = true } = options;
 
     try {
       // Get from localStorage for now
@@ -269,7 +269,13 @@ export class NotificationManager {
       );
       let filtered = notifications.filter((n) => n.user_id === user.id);
 
+      // Sort by created_at descending (newest first)
+      filtered.sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
+
+      // Apply filters
       if (unreadOnly) {
+        filtered = filtered.filter((n) => !n.read_at);
+      } else if (!includeRead) {
         filtered = filtered.filter((n) => !n.read_at);
       }
 
@@ -280,6 +286,37 @@ export class NotificationManager {
     } catch (error) {
       console.warn("Failed to get notifications:", error.message);
       return [];
+    }
+  }
+
+  static async clearAllNotifications() {
+    const user = AuthManager.getUserSession();
+    if (!user) return false;
+
+    try {
+      const notifications = JSON.parse(
+        localStorage.getItem("user_notifications") || "[]",
+      );
+      const filtered = notifications.filter((n) => n.user_id !== user.id);
+      localStorage.setItem("user_notifications", JSON.stringify(filtered));
+      return true;
+    } catch (error) {
+      console.warn("Failed to clear notifications:", error.message);
+      return false;
+    }
+  }
+
+  static async deleteNotification(notificationId) {
+    try {
+      const notifications = JSON.parse(
+        localStorage.getItem("user_notifications") || "[]",
+      );
+      const filtered = notifications.filter((n) => n.id !== notificationId);
+      localStorage.setItem("user_notifications", JSON.stringify(filtered));
+      return true;
+    } catch (error) {
+      console.warn("Failed to delete notification:", error.message);
+      return false;
     }
   }
 
