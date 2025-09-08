@@ -141,6 +141,9 @@ export const markSimpleProposalAsCompleted = async (unitName, proposalDate, requ
           completionRecord.source = 'database';
           completionRecord.completedAt = updatePayload.completed_at;
           completionRecord.completedBy = currentUser.id;
+          if (updated[0] && updated[0].id) {
+            completionRecord.proposalId = updated[0].id;
+          }
         } else {
           console.log('⚠️ No existing leave_proposals rows matched for update. Will store locally as backup.');
           completionRecord.source = 'localStorage';
