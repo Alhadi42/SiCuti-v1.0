@@ -1145,6 +1145,15 @@ const BatchLeaveProposals = () => {
   // Get unique units for filter dropdown
   const uniqueUnits = [...new Set(unitProposals.map(unit => unit.unitName))];
 
+  // Reset page when filters or data change
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [searchTerm, selectedUnit, showCompleted, unitProposals, completedProposals]);
+
+  // Pagination calculations
+  const totalPages = Math.max(1, Math.ceil(filteredUnits.length / itemsPerPage));
+  const paginatedUnits = filteredUnits.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage);
+
   // Load available templates
   const loadTemplates = useCallback(async (retryCount = 0) => {
     try {
