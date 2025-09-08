@@ -120,16 +120,50 @@ export const markSimpleProposalAsCompleted = async (unitName, proposalDate, requ
       source: 'simple'
     };
 
-    // Skip database operations to avoid RLS issues - use localStorage only
-    console.log('💾 Using localStorage-only storage to avoid RLS restrictions');
-    completionRecord.source = 'localStorage';
+    // Try to persist to database first (update matching leave_proposals records)
+    try {
+      console.log('🔁 Attempting to persist completion status to database...');
+      const updatePayload = {
+        status: 'completed',
+        completed_by: currentUser.id,
+        completed_at: new Date().toISOString(),
+      };
 
-    // Always store in localStorage as backup/primary storage
-    const existingCompleted = JSON.parse(localStorage.getItem('completedBatchProposals') || '{}');
-    existingCompleted[proposalKey] = completionRecord;
-    localStorage.setItem('completedBatchProposals', JSON.stringify(existingCompleted));
+      const { data: updated, error: updateError } = await supabase
+        .from('leave_proposals')
+        .update(updatePayload)
+        .eq('proposer_unit', unitName)
+        .eq('proposal_date', proposalDate);
 
-    console.log('✅ Completion status saved:', completionRecord);
+      if (!updateError) {
+        if (updated && updated.length > 0) {
+          console.log('✅ Completion status persisted to DB for existing proposals:', updated.length);
+          completionRecord.source = 'database';
+          completionRecord.completedAt = updatePayload.completed_at;
+          completionRecord.completedBy = currentUser.id;
+        } else {
+          console.log('⚠️ No existing leave_proposals rows matched for update. Will store locally as backup.');
+          completionRecord.source = 'localStorage';
+        }
+      } else {
+        console.warn('⚠️ Database update failed, falling back to localStorage:', updateError);
+        completionRecord.source = 'localStorage';
+      }
+    } catch (dbError) {
+      console.warn('⚠️ Error while persisting to DB, falling back to localStorage:', dbError);
+      completionRecord.source = 'localStorage';
+    }
+
+    // Always store in localStorage as backup
+    try {
+      const existingCompleted = JSON.parse(localStorage.getItem('completedBatchProposals') || '{}');
+      existingCompleted[proposalKey] = completionRecord;
+      localStorage.setItem('completedBatchProposals', JSON.stringify(existingCompleted));
+      console.log('💾 Completion status saved locally as backup:', proposalKey);
+    } catch (storageError) {
+      console.error('❌ Failed to save completion status to localStorage:', storageError);
+    }
+
     return completionRecord;
 
   } catch (error) {
