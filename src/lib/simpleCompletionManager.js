@@ -36,8 +36,9 @@ export const isSimpleProposalCompleted = async (unitName, proposalDate) => {
     if (!queryError && existingProposals && existingProposals.length > 0) {
       return {
         isCompleted: true,
-        completedAt: existingProposals[0].updated_at,
-        completedBy: null,
+        completedAt: existingProposals[0].completed_at || existingProposals[0].updated_at,
+        completedBy: existingProposals[0].completed_by || null,
+        id: existingProposals[0].id || null,
         source: 'database'
       };
     }
