@@ -184,13 +184,43 @@ export const restoreSimpleProposal = async (unitName, proposalDate) => {
 
     const proposalKey = getProposalKey(unitName, proposalDate);
 
-    // Skip database operations to avoid RLS issues - use localStorage only
-    console.log('💾 Using localStorage-only storage to avoid RLS restrictions');
+    // Try to restore in database first (set status back to 'pending' and clear completion metadata)
+    try {
+      console.log('🔁 Attempting to restore completion status in database...');
+      const updatePayload = {
+        status: 'pending',
+        completed_by: null,
+        completed_at: null,
+      };
 
-    // Remove from localStorage
-    const existingCompleted = JSON.parse(localStorage.getItem('completedBatchProposals') || '{}');
-    delete existingCompleted[proposalKey];
-    localStorage.setItem('completedBatchProposals', JSON.stringify(existingCompleted));
+      const { data: updated, error: updateError } = await supabase
+        .from('leave_proposals')
+        .update(updatePayload)
+        .eq('proposer_unit', unitName)
+        .eq('proposal_date', proposalDate);
+
+      if (!updateError) {
+        if (updated && updated.length > 0) {
+          console.log('✅ Restoration persisted to DB for existing proposals:', updated.length);
+        } else {
+          console.log('⚠️ No DB rows matched during restore. Will remove local backup if present.');
+        }
+      } else {
+        console.warn('⚠️ Database restore failed, will still remove local backup:', updateError);
+      }
+    } catch (dbError) {
+      console.warn('⚠️ Error while restoring in DB, will still remove local backup:', dbError);
+    }
+
+    // Remove from localStorage (backup/primary)
+    try {
+      const existingCompleted = JSON.parse(localStorage.getItem('completedBatchProposals') || '{}');
+      delete existingCompleted[proposalKey];
+      localStorage.setItem('completedBatchProposals', JSON.stringify(existingCompleted));
+      console.log('💾 Removed local completion backup for', proposalKey);
+    } catch (storageError) {
+      console.warn('⚠️ Failed to remove local completion backup:', storageError);
+    }
 
     console.log('✅ Proposal restored to active status');
     return { success: true };
