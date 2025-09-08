@@ -935,7 +935,7 @@ function DocxSuratKeterangan() {
   };
 
   // Generate combined data for batch template with indexed variables
-  const generateBatchTemplateData = async (employees, maxSlots = 30) => {
+  const generateBatchTemplateData = async (employees, maxSlots = 45) => {
     console.log(
       `=== GENERATING BATCH DATA FOR ${employees.length} EMPLOYEES (max ${maxSlots} slots) ===`,
     );
@@ -1181,9 +1181,28 @@ function DocxSuratKeterangan() {
         });
 
         try {
+          // Determine maxSlots dynamically from template variables (fallback to 45)
+          let detectedMaxSlots = 45;
+          try {
+            const variables = await extractDocxVariables(templateData);
+            const variableNames = variables.map((v) => v.name);
+            const indices = variableNames
+              .map((name) => {
+                const m = name.match(/_(\d+)$/);
+                return m ? parseInt(m[1], 10) : null;
+              })
+              .filter((n) => Number.isInteger(n));
+            if (indices.length > 0) {
+              detectedMaxSlots = Math.max(...indices);
+            }
+            console.log("Detected maxSlots from template:", detectedMaxSlots);
+          } catch (e) {
+            console.warn("Could not detect maxSlots from template, using fallback 45:", e);
+          }
+
           const batchData = await generateBatchTemplateData(
             selectedEmployees,
-            30,
+            detectedMaxSlots,
           );
           console.log("Generated batch data:", batchData);
           console.log("Number of employees:", selectedEmployees.length);
@@ -1583,12 +1602,12 @@ function DocxSuratKeterangan() {
                                 yang dipilih
                               </li>
                               <li>
-                                • Maksimal 30 pegawai dapat digabung dalam satu
-                                template
+                                • Maksimal 45 pegawai dapat digabung dalam satu
+                                template (atau sesuai jumlah variabel di template)
                               </li>
                               <li>
                                 • Variabel kosong akan dibiarkan kosong jika
-                                pegawai kurang dari 30
+                                pegawai kurang dari jumlah slot template
                               </li>
                             </ul>
                           </div>
