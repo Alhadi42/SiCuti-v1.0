@@ -142,6 +142,10 @@ const BatchLeaveProposals = () => {
   const [loadingTemplates, setLoadingTemplates] = useState(true);
   const [databaseHealthy, setDatabaseHealthy] = useState(null);
 
+  // Pagination for unit proposals
+  const [currentPage, setCurrentPage] = useState(1);
+  const itemsPerPage = 10;
+
   // Check user permission
   if (!currentUser || currentUser.role !== 'master_admin') {
     return (
@@ -1141,6 +1145,15 @@ const BatchLeaveProposals = () => {
   // Get unique units for filter dropdown
   const uniqueUnits = [...new Set(unitProposals.map(unit => unit.unitName))];
 
+  // Reset page when filters or data change
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [searchTerm, selectedUnit, showCompleted, unitProposals, completedProposals]);
+
+  // Pagination calculations
+  const totalPages = Math.max(1, Math.ceil(filteredUnits.length / itemsPerPage));
+  const paginatedUnits = filteredUnits.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage);
+
   // Load available templates
   const loadTemplates = useCallback(async (retryCount = 0) => {
     try {
@@ -1385,7 +1398,7 @@ const BatchLeaveProposals = () => {
               </div>
             ) : (
               <div className="space-y-4">
-                {filteredUnits.map((unit, index) => (
+                {paginatedUnits.map((unit, index) => (
                   <div
                     key={index}
                     className="p-4 bg-slate-700/30 rounded-lg border border-slate-600/50 hover:bg-slate-700/50 transition-colors"
@@ -1417,7 +1430,7 @@ const BatchLeaveProposals = () => {
                           </div>
                           <div className="flex items-center">
                             <Clock className="w-4 h-4 mr-1" />
-                            {unit.dateRange.earliest && unit.dateRange.latest && 
+                            {unit.dateRange.earliest && unit.dateRange.latest &&
                               `${format(unit.dateRange.earliest, "dd/MM", { locale: id })} - ${format(unit.dateRange.latest, "dd/MM", { locale: id })}`
                             }
                           </div>
@@ -1469,6 +1482,22 @@ const BatchLeaveProposals = () => {
                     </div>
                   </div>
                 ))}
+
+                {filteredUnits.length > itemsPerPage && (
+                  <div className="mt-4 flex items-center justify-between">
+                    <div className="text-sm text-slate-400">
+                      Menampilkan {filteredUnits.length === 0 ? 0 : ((currentPage - 1) * itemsPerPage + 1)} - {Math.min(currentPage * itemsPerPage, filteredUnits.length)} dari {filteredUnits.length} hasil
+                    </div>
+                    <div className="flex items-center space-x-2">
+                      <Button size="sm" variant="outline" onClick={() => setCurrentPage(1)} disabled={currentPage === 1}>Pertama</Button>
+                      <Button size="sm" variant="outline" onClick={() => setCurrentPage(p => Math.max(1, p - 1))} disabled={currentPage === 1}>Sebelumnya</Button>
+                      <div className="text-sm text-slate-300 px-3">Halaman {currentPage} / {totalPages}</div>
+                      <Button size="sm" variant="outline" onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))} disabled={currentPage === totalPages}>Berikutnya</Button>
+                      <Button size="sm" variant="outline" onClick={() => setCurrentPage(totalPages)} disabled={currentPage === totalPages}>Terakhir</Button>
+                    </div>
+                  </div>
+                )}
+
               </div>
             )}
           </CardContent>

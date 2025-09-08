@@ -71,6 +71,7 @@ export const extractDocxVariables = async (docxData) => {
       /\{\s*\{([^}]+)\}\s*\}/g, // { {variable} } with spaces
       /\u007B\u007B([^\u007D]+)\u007D\u007D/g, // Unicode curly braces
       /\u201C\u201C([^\u201D]+)\u201D\u201D/g, // Smart quotes converted to unicode
+      /\{([A-Za-z0-9_]+)\}/g, // {variable} single braces with allowed chars
     ];
 
     const variables = new Set();
