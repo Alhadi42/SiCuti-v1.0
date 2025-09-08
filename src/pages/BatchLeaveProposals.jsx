@@ -142,6 +142,10 @@ const BatchLeaveProposals = () => {
   const [loadingTemplates, setLoadingTemplates] = useState(true);
   const [databaseHealthy, setDatabaseHealthy] = useState(null);
 
+  // Pagination for unit proposals
+  const [currentPage, setCurrentPage] = useState(1);
+  const itemsPerPage = 10;
+
   // Check user permission
   if (!currentUser || currentUser.role !== 'master_admin') {
     return (
