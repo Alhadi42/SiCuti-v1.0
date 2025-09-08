@@ -1430,7 +1430,7 @@ const BatchLeaveProposals = () => {
                           </div>
                           <div className="flex items-center">
                             <Clock className="w-4 h-4 mr-1" />
-                            {unit.dateRange.earliest && unit.dateRange.latest && 
+                            {unit.dateRange.earliest && unit.dateRange.latest &&
                               `${format(unit.dateRange.earliest, "dd/MM", { locale: id })} - ${format(unit.dateRange.latest, "dd/MM", { locale: id })}`
                             }
                           </div>
@@ -1482,6 +1482,22 @@ const BatchLeaveProposals = () => {
                     </div>
                   </div>
                 ))}
+
+                {filteredUnits.length > itemsPerPage && (
+                  <div className="mt-4 flex items-center justify-between">
+                    <div className="text-sm text-slate-400">
+                      Menampilkan {filteredUnits.length === 0 ? 0 : ((currentPage - 1) * itemsPerPage + 1)} - {Math.min(currentPage * itemsPerPage, filteredUnits.length)} dari {filteredUnits.length} hasil
+                    </div>
+                    <div className="flex items-center space-x-2">
+                      <Button size="sm" variant="outline" onClick={() => setCurrentPage(1)} disabled={currentPage === 1}>Pertama</Button>
+                      <Button size="sm" variant="outline" onClick={() => setCurrentPage(p => Math.max(1, p - 1))} disabled={currentPage === 1}>Sebelumnya</Button>
+                      <div className="text-sm text-slate-300 px-3">Halaman {currentPage} / {totalPages}</div>
+                      <Button size="sm" variant="outline" onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))} disabled={currentPage === totalPages}>Berikutnya</Button>
+                      <Button size="sm" variant="outline" onClick={() => setCurrentPage(totalPages)} disabled={currentPage === totalPages}>Terakhir</Button>
+                    </div>
+                  </div>
+                )}
+
               </div>
             )}
           </CardContent>
