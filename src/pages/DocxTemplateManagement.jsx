@@ -81,8 +81,8 @@ const DocxTemplateManagement = () => {
     nip_atasan: "NIP Atasan",
     jabatan_atasan: "Jabatan Atasan",
 
-    // Batch Template Variables (untuk surat dengan multiple pegawai, hingga 30 pegawai)
-    ...Array.from({ length: 30 }, (_, i) => {
+    // Batch Template Variables (untuk surat dengan multiple pegawai, hingga 45 pegawai)
+    ...Array.from({ length: 45 }, (_, i) => {
       const num = i + 1;
       return {
         [`nama_${num}`]: `Nama Pegawai ke-${num} (untuk template batch)`,
