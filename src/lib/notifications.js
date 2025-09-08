@@ -2,7 +2,8 @@ import { supabase } from "./supabaseOptimized";
 import { AuthManager } from "./auth";
 
 /**
- * Real-time notification system for the application
+ * Real-time notification system for the application (DB-backed)
+ * Uses `notifications` and optional `system_announcements` tables in Supabase.
  */
 
 export const NOTIFICATION_TYPES = {
@@ -19,6 +20,7 @@ export class NotificationManager {
   static instance = null;
   static subscribers = new Map();
   static subscription = null;
+  static systemSubscription = null;
   static isConnected = false;
 
   static getInstance() {
@@ -28,32 +30,69 @@ export class NotificationManager {
     return this.instance;
   }
 
+  // Initialize realtime subscriptions and state
   static async initialize() {
     const user = AuthManager.getUserSession();
     if (!user) return;
 
     try {
-      // For now, just mark as connected (real-time features can be added later when DB is ready)
-      this.isConnected = true;
-      console.log("🔔 Notification system initialized (basic mode)");
+      // Cleanup existing
+      if (this.subscription) {
+        try {
+          await supabase.removeChannel(this.subscription);
+        } catch (e) {
+          console.warn("Failed to remove old subscription:", e);
+        }
+        this.subscription = null;
+      }
 
-      // Could add real-time subscriptions here when database tables are ready
+      // Subscribe to user notifications (INSERT/UPDATE)
+      this.subscription = supabase
+        .channel(`public:notifications:user:${user.id}`)
+        .on(
+          "postgres_changes",
+          { event: "INSERT", schema: "public", table: "notifications", filter: `user_id=eq.${user.id}` },
+          (payload) => {
+            if (payload?.new) this.handleNewNotification(payload.new);
+          },
+        )
+        .on(
+          "postgres_changes",
+          { event: "UPDATE", schema: "public", table: "notifications", filter: `user_id=eq.${user.id}` },
+          (payload) => {
+            if (payload?.new) this.handleUpdatedNotification(payload.new);
+          },
+        )
+        .subscribe();
+
+      // Subscribe to system announcements if table exists
+      try {
+        this.systemSubscription = supabase
+          .channel(`public:system_announcements`)
+          .on(
+            "postgres_changes",
+            { event: "INSERT", schema: "public", table: "system_announcements" },
+            (payload) => {
+              if (payload?.new) this.handleSystemAnnouncement(payload.new);
+            },
+          )
+          .subscribe();
+      } catch (e) {
+        console.warn("System announcements subscription skipped:", e?.message || e);
+      }
+
+      this.isConnected = true;
+      console.log("🔔 Notification system initialized (DB-backed)");
     } catch (error) {
-      console.warn("Notification initialization warning:", error.message);
+      console.warn("Notification initialization warning:", error?.message || error);
       this.isConnected = false;
     }
   }
 
   static handleNewNotification(notification) {
     console.log("🔔 New notification:", notification);
-
-    // Emit to subscribers
     this.emitToSubscribers("new-notification", notification);
-
-    // Show browser notification if permission granted
     this.showBrowserNotification(notification);
-
-    // Show toast notification
     this.showToastNotification(notification);
   }
 
@@ -64,7 +103,6 @@ export class NotificationManager {
 
   static handleSystemAnnouncement(announcement) {
     console.log("📢 System announcement:", announcement);
-
     const notification = {
       id: announcement.id,
       type: NOTIFICATION_TYPES.SYSTEM_ANNOUNCEMENT,
@@ -73,24 +111,28 @@ export class NotificationManager {
       priority: announcement.priority,
       created_at: announcement.created_at,
     };
-
     this.showSystemNotification(notification);
   }
 
   static showBrowserNotification(notification) {
+    if (typeof window === "undefined") return;
     if ("Notification" in window && Notification.permission === "granted") {
-      new Notification(notification.title, {
-        body: notification.message,
-        icon: "/icon-192x192.png",
-        badge: "/badge-72x72.png",
-        tag: notification.id,
-        data: notification,
-      });
+      try {
+        new Notification(notification.title, {
+          body: notification.message,
+          icon: "/icon-192x192.png",
+          badge: "/badge-72x72.png",
+          tag: String(notification.id),
+          data: notification,
+        });
+      } catch (e) {
+        console.warn("Browser notification failed:", e?.message || e);
+      }
     }
   }
 
   static showToastNotification(notification) {
-    // Use the global toast function if available
+    if (typeof window === "undefined") return;
     if (window.toast) {
       const variant = this.getToastVariant(notification.type);
       window.toast({
@@ -103,13 +145,13 @@ export class NotificationManager {
   }
 
   static showSystemNotification(notification) {
-    // System notifications are more prominent
+    if (typeof window === "undefined") return;
     if (window.toast) {
       window.toast({
         title: `📢 ${notification.title}`,
         description: notification.message,
         variant: notification.priority === "high" ? "destructive" : "default",
-        duration: 10000, // Longer duration for system messages
+        duration: 10000,
       });
     }
   }
@@ -119,7 +161,6 @@ export class NotificationManager {
       case NOTIFICATION_TYPES.LEAVE_REQUEST_APPROVED:
         return "success";
       case NOTIFICATION_TYPES.LEAVE_REQUEST_REJECTED:
-        return "destructive";
       case NOTIFICATION_TYPES.SECURITY_ALERT:
         return "destructive";
       default:
@@ -152,22 +193,17 @@ export class NotificationManager {
   }
 
   static subscribe(event, callback) {
-    if (!this.subscribers.has(event)) {
-      this.subscribers.set(event, []);
-    }
+    if (!this.subscribers.has(event)) this.subscribers.set(event, []);
     this.subscribers.get(event).push(callback);
-
-    // Return unsubscribe function
     return () => {
       const eventSubscribers = this.subscribers.get(event) || [];
       const index = eventSubscribers.indexOf(callback);
-      if (index > -1) {
-        eventSubscribers.splice(index, 1);
-      }
+      if (index > -1) eventSubscribers.splice(index, 1);
     };
   }
 
   static async requestPermission() {
+    if (typeof window === "undefined") return false;
     if ("Notification" in window) {
       const permission = await Notification.requestPermission();
       console.log("Notification permission:", permission);
@@ -176,65 +212,47 @@ export class NotificationManager {
     return false;
   }
 
+  // Persist notification to DB and return inserted row
   static async sendNotification(userId, notification) {
     try {
-      // For now, just store locally and show toast
-      const localNotification = {
-        id: Date.now(),
+      const payload = {
         user_id: userId,
         type: notification.type,
         title: notification.title,
         message: notification.message,
         priority: notification.priority || "medium",
         data: notification.data || {},
-        created_at: new Date().toISOString(),
-        read_at: null,
       };
 
-      // Store in localStorage as fallback
-      this.storeNotificationLocally(localNotification);
-
-      // Show immediate notification
-      this.showToastNotification(localNotification);
-
-      return localNotification;
+      const { data, error } = await supabase.from("notifications").insert(payload).select().single();
+      if (error) throw error;
+      return data;
     } catch (error) {
-      console.warn("Failed to send notification:", error.message);
+      console.warn("Failed to send notification via DB, showing local toast:", error?.message || error);
+      this.showToastNotification(notification);
       return null;
     }
   }
 
-  static storeNotificationLocally(notification) {
-    try {
-      const notifications = JSON.parse(
-        localStorage.getItem("user_notifications") || "[]",
-      );
-      notifications.unshift(notification); // Add to beginning
-
-      // Keep only last 50 notifications
-      if (notifications.length > 50) {
-        notifications.splice(50);
-      }
-
-      localStorage.setItem("user_notifications", JSON.stringify(notifications));
-    } catch (error) {
-      console.warn("Failed to store notification locally:", error.message);
-    }
-  }
-
+  // Mark notification as read in DB
   static async markAsRead(notificationId) {
     try {
-      const notifications = JSON.parse(
-        localStorage.getItem("user_notifications") || "[]",
-      );
-      const updated = notifications.map((n) =>
-        n.id === notificationId
-          ? { ...n, read_at: new Date().toISOString() }
-          : n,
-      );
-      localStorage.setItem("user_notifications", JSON.stringify(updated));
+      const user = AuthManager.getUserSession();
+      if (!user) return false;
+
+      const { error } = await supabase
+        .from("notifications")
+        .update({ read_at: new Date().toISOString() })
+        .match({ id: notificationId, user_id: user.id });
+
+      if (error) {
+        console.warn("Failed to mark as read:", error.message || error);
+        return false;
+      }
+      return true;
     } catch (error) {
-      console.warn("Failed to mark notification as read:", error.message);
+      console.warn("Error marking notification as read:", error?.message || error);
+      return false;
     }
   }
 
@@ -243,19 +261,21 @@ export class NotificationManager {
     if (!user) return 0;
 
     try {
-      const notifications = JSON.parse(
-        localStorage.getItem("user_notifications") || "[]",
-      );
-      const unreadCount = notifications.filter(
-        (n) => n.user_id === user.id && !n.read_at,
-      ).length;
-      return unreadCount;
+      const { count, error } = await supabase
+        .from("notifications")
+        .select("id", { count: "exact", head: true })
+        .is("read_at", null)
+        .eq("user_id", user.id);
+
+      if (error) throw error;
+      return count || 0;
     } catch (error) {
-      console.warn("Failed to get unread count:", error.message);
+      console.warn("Failed to get unread count from DB:", error?.message || error);
       return 0;
     }
   }
 
+  // Get notifications from DB with pagination and filters
   static async getNotifications(options = {}) {
     const user = AuthManager.getUserSession();
     if (!user) return [];
@@ -263,28 +283,20 @@ export class NotificationManager {
     const { limit = 20, offset = 0, unreadOnly = false, includeRead = true } = options;
 
     try {
-      // Get from localStorage for now
-      const notifications = JSON.parse(
-        localStorage.getItem("user_notifications") || "[]",
-      );
-      let filtered = notifications.filter((n) => n.user_id === user.id);
+      let query = supabase
+        .from("notifications")
+        .select("*", { count: "exact" })
+        .eq("user_id", user.id)
+        .order("created_at", { ascending: false })
+        .range(offset, offset + limit - 1);
 
-      // Sort by created_at descending (newest first)
-      filtered.sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
+      if (unreadOnly || !includeRead) query = query.is("read_at", null);
 
-      // Apply filters
-      if (unreadOnly) {
-        filtered = filtered.filter((n) => !n.read_at);
-      } else if (!includeRead) {
-        filtered = filtered.filter((n) => !n.read_at);
-      }
-
-      // Apply pagination
-      const result = filtered.slice(offset, offset + limit);
-
-      return result;
+      const { data, error } = await query;
+      if (error) throw error;
+      return data || [];
     } catch (error) {
-      console.warn("Failed to get notifications:", error.message);
+      console.warn("Failed to get notifications from DB:", error?.message || error);
       return [];
     }
   }
@@ -294,41 +306,42 @@ export class NotificationManager {
     if (!user) return false;
 
     try {
-      const notifications = JSON.parse(
-        localStorage.getItem("user_notifications") || "[]",
-      );
-      const filtered = notifications.filter((n) => n.user_id !== user.id);
-      localStorage.setItem("user_notifications", JSON.stringify(filtered));
+      const { error } = await supabase.from("notifications").delete().eq("user_id", user.id);
+      if (error) throw error;
       return true;
     } catch (error) {
-      console.warn("Failed to clear notifications:", error.message);
+      console.warn("Failed to clear notifications:", error?.message || error);
       return false;
     }
   }
 
   static async deleteNotification(notificationId) {
     try {
-      const notifications = JSON.parse(
-        localStorage.getItem("user_notifications") || "[]",
-      );
-      const filtered = notifications.filter((n) => n.id !== notificationId);
-      localStorage.setItem("user_notifications", JSON.stringify(filtered));
+      const user = AuthManager.getUserSession();
+      if (!user) return false;
+
+      const { error } = await supabase.from("notifications").delete().match({ id: notificationId, user_id: user.id });
+      if (error) throw error;
       return true;
     } catch (error) {
-      console.warn("Failed to delete notification:", error.message);
+      console.warn("Failed to delete notification:", error?.message || error);
       return false;
     }
   }
 
   static disconnect() {
-    if (this.subscription) {
-      supabase.removeChannel(this.subscription);
-      this.subscription = null;
-    }
+    try {
+      if (this.subscription) {
+        supabase.removeChannel(this.subscription);
+        this.subscription = null;
+      }
 
-    if (this.systemSubscription) {
-      supabase.removeChannel(this.systemSubscription);
-      this.systemSubscription = null;
+      if (this.systemSubscription) {
+        supabase.removeChannel(this.systemSubscription);
+        this.systemSubscription = null;
+      }
+    } catch (e) {
+      console.warn("Error while disconnecting subscriptions:", e);
     }
 
     this.isConnected = false;
@@ -338,12 +351,8 @@ export class NotificationManager {
   static getStatus() {
     return {
       connected: this.isConnected,
-      subscriberCount: Array.from(this.subscribers.values()).reduce(
-        (total, subs) => total + subs.length,
-        0,
-      ),
-      browserNotificationsEnabled:
-        "Notification" in window && Notification.permission === "granted",
+      subscriberCount: Array.from(this.subscribers.values()).reduce((total, subs) => total + subs.length, 0),
+      browserNotificationsEnabled: typeof window !== "undefined" && "Notification" in window && Notification.permission === "granted",
     };
   }
 }
@@ -353,12 +362,10 @@ if (typeof window !== "undefined") {
   document.addEventListener("DOMContentLoaded", () => {
     if (AuthManager.isAuthenticated()) {
       NotificationManager.initialize();
-      // Request notification permission
       NotificationManager.requestPermission();
     }
   });
 
-  // Cleanup on page unload
   window.addEventListener("beforeunload", () => {
     NotificationManager.disconnect();
   });
