@@ -1398,7 +1398,7 @@ const BatchLeaveProposals = () => {
               </div>
             ) : (
               <div className="space-y-4">
-                {filteredUnits.map((unit, index) => (
+                {paginatedUnits.map((unit, index) => (
                   <div
                     key={index}
                     className="p-4 bg-slate-700/30 rounded-lg border border-slate-600/50 hover:bg-slate-700/50 transition-colors"
