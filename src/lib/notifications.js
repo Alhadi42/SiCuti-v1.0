@@ -186,8 +186,9 @@ export class NotificationManager {
     eventSubscribers.forEach((callback) => {
       try {
         callback(data);
-      } catch (error) {
-        console.error("Error in notification subscriber:", error);
+      } catch (err) {
+        // Fix: Use 'err' instead of 'error' to avoid conflict
+        console.error("Error in notification subscriber:", err);
       }
     });
   }

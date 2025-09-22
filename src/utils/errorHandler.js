@@ -11,8 +11,8 @@ export class AppError extends Error {
   }
 }
 
-export const handleSupabaseError = (error) => {
-  console.error('Supabase error:', error);
+export const handleSupabaseError = (err) => {
+  console.error('Supabase error:', err);
   
   // Common Supabase error codes
   const errorMappings = {
@@ -23,13 +23,13 @@ export const handleSupabaseError = (error) => {
     'PGRST301': 'Terlalu banyak baris yang dikembalikan.',
   };
 
-  const message = errorMappings[error.code] || error.message || 'Terjadi kesalahan pada database';
+  const message = errorMappings[err.code] || err.message || 'Terjadi kesalahan pada database';
   
-  return new AppError(message, error.code, 400);
+  return new AppError(message, err.code, 400);
 };
 
-export const handleNetworkError = (error) => {
-  console.error('Network error:', error);
+export const handleNetworkError = (err) => {
+  console.error('Network error:', err);
   
   if (!navigator.onLine) {
     return new AppError('Tidak ada koneksi internet. Periksa koneksi Anda.', 'NETWORK_OFFLINE', 0);
@@ -42,23 +42,23 @@ export const withErrorHandling = (asyncFn) => {
   return async (...args) => {
     try {
       return await asyncFn(...args);
-    } catch (error) {
-      if (error.name === 'AppError') {
-        throw error;
+    } catch (err) {
+      if (err.name === 'AppError') {
+        throw err;
       }
       
       // Handle different types of errors
-      if (error.code && error.message) {
-        throw handleSupabaseError(error);
+      if (err.code && err.message) {
+        throw handleSupabaseError(err);
       }
       
-      if (error.name === 'TypeError' && error.message.includes('fetch')) {
-        throw handleNetworkError(error);
+      if (err.name === 'TypeError' && err.message.includes('fetch')) {
+        throw handleNetworkError(err);
       }
       
       // Generic error
       throw new AppError(
-        error.message || 'Terjadi kesalahan yang tidak diketahui',
+        err.message || 'Terjadi kesalahan yang tidak diketahui',
         'UNKNOWN_ERROR',
         500
       );
@@ -66,18 +66,18 @@ export const withErrorHandling = (asyncFn) => {
   };
 };
 
-export const formatErrorMessage = (error) => {
-  if (error instanceof AppError) {
+export const formatErrorMessage = (err) => {
+  if (err instanceof AppError) {
     return {
-      title: getErrorTitle(error.code),
-      description: error.message,
-      variant: getErrorVariant(error.statusCode)
+      title: getErrorTitle(err.code),
+      description: err.message,
+      variant: getErrorVariant(err.statusCode)
     };
   }
   
   return {
     title: 'Terjadi Kesalahan',
-    description: error.message || 'Kesalahan tidak diketahui',
+    description: err.message || 'Kesalahan tidak diketahui',
     variant: 'destructive'
   };
 };

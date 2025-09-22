@@ -58,8 +58,9 @@ export class AuditLogger {
 
       // Store in localStorage (reliable fallback)
       this.logToLocalStorage(auditEntry);
-    } catch (error) {
-      console.warn("Audit logging error (non-critical):", error.message);
+    } catch (err) {
+      // Fix: Use 'err' instead of 'error' to avoid variable conflicts
+      console.warn("Audit logging error (non-critical):", err.message);
     }
   }
 
@@ -89,8 +90,9 @@ export class AuditLogger {
       }
 
       localStorage.setItem("audit_logs_fallback", JSON.stringify(logs));
-    } catch (error) {
-      console.warn("Failed to log to localStorage:", error.message);
+    } catch (err) {
+      // Fix: Use 'err' instead of 'error' to avoid variable conflicts
+      console.warn("Failed to log to localStorage:", err.message);
     }
   }
 
@@ -173,8 +175,9 @@ export class AuditLogger {
       }
 
       return filteredLogs;
-    } catch (error) {
-      console.warn("Failed to retrieve audit logs:", error.message);
+    } catch (err) {
+      // Fix: Use 'err' instead of 'error' to avoid variable conflicts
+      console.warn("Failed to retrieve audit logs:", err.message);
       return [];
     }
   }
@@ -197,8 +200,9 @@ export class AuditLogger {
           return logDate >= weekAgo;
         }).length,
       };
-    } catch (error) {
-      console.warn("Failed to get audit stats:", error.message);
+    } catch (err) {
+      // Fix: Use 'err' instead of 'error' to avoid variable conflicts
+      console.warn("Failed to get audit stats:", err.message);
       return { total: 0, today: 0, lastWeek: 0 };
     }
   }
@@ -207,8 +211,9 @@ export class AuditLogger {
     try {
       localStorage.removeItem("audit_logs_fallback");
       console.log("Audit logs cleared");
-    } catch (error) {
-      console.warn("Failed to clear audit logs:", error.message);
+    } catch (err) {
+      // Fix: Use 'err' instead of 'error' to avoid variable conflicts
+      console.warn("Failed to clear audit logs:", err.message);
     }
   }
 }

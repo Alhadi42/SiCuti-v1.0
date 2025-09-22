@@ -87,21 +87,21 @@ export class GlobalErrorHandler {
     if (!window._originalConsoleWarn) {
       window._originalConsoleWarn = console.warn;
 
+      // Define ResizeObserver patterns once at the top level
+      const resizeObserverPatterns = [
+        'ResizeObserver loop',
+        'ResizeObserver loop completed with undelivered notifications',
+        'ResizeObserver: loop completed with undelivered notifications',
+        'ResizeObserver: loop limit exceeded',
+        'ResizeObserver loop limit exceeded',
+        'loop completed with undelivered notifications',
+        'ResizeObserver callback',
+        'ResizeObserver.observe'
+      ];
+
       // Override console.warn to suppress ResizeObserver errors
       console.warn = (...args) => {
         const message = args.map(arg => String(arg)).join(' ');
-
-        // Comprehensive ResizeObserver pattern matching
-        const resizeObserverPatterns = [
-          'ResizeObserver loop',
-          'ResizeObserver loop completed with undelivered notifications',
-          'ResizeObserver: loop completed with undelivered notifications',
-          'ResizeObserver: loop limit exceeded',
-          'ResizeObserver loop limit exceeded',
-          'loop completed with undelivered notifications',
-          'ResizeObserver callback',
-          'ResizeObserver.observe'
-        ];
 
         const isResizeObserverMessage = resizeObserverPatterns.some(pattern =>
           message.toLowerCase().includes(pattern.toLowerCase())
@@ -110,11 +110,11 @@ export class GlobalErrorHandler {
         if (isResizeObserverMessage) {
           // Suppress ResizeObserver warnings completely in production
           if (import.meta.env.DEV) {
-            window._originalConsoleWarn("🔄 ResizeObserver suppressed:", message);
+            return window._originalConsoleWarn("🔄 ResizeObserver suppressed:", message);
           }
           return;
         }
-        window._originalConsoleWarn.apply(console, args);
+        return window._originalConsoleWarn.apply(console, args);
       };
 
       // Also override console.error for ResizeObserver errors that appear as errors
@@ -130,11 +130,11 @@ export class GlobalErrorHandler {
 
           if (isResizeObserverError) {
             if (import.meta.env.DEV) {
-              window._originalConsoleError("🔄 ResizeObserver error suppressed:", message);
+              return window._originalConsoleError("🔄 ResizeObserver error suppressed:", message);
             }
             return;
           }
-          window._originalConsoleError.apply(console, args);
+          return window._originalConsoleError.apply(console, args);
         };
       }
     }

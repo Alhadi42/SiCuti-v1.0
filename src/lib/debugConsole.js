@@ -62,7 +62,7 @@ export const initDebugConsole = () => {
       })) {
         // Log only in development for debugging
         if (import.meta.env.DEV && (methodName === 'warn' || methodName === 'error')) {
-          originalConsoleLog.call(console, "🔄 ResizeObserver suppressed:", ...args);
+          return originalConsoleLog.call(console, "🔄 ResizeObserver suppressed:", ...args);
         }
         return; // Suppress the error completely
       }
@@ -71,75 +71,76 @@ export const initDebugConsole = () => {
 
       try {
         // Check if any argument is [object Object] or contains it
-      const hasObjectError = args.some((arg) => {
-        const str = String(arg);
-        return (
-          str === "[object Object]" ||
-          str.includes("[object Object]") ||
-          (str.match(/^\[object \w+\]$/) && !str.match(/^\[object (Error|Date|Array|Function|RegExp|Promise)\]$/)) ||
-          (typeof arg === "object" && arg !== null &&
-           !Array.isArray(arg) &&
-           !(arg instanceof Error) &&
-           !(arg instanceof Date) &&
-           !(arg instanceof RegExp) &&
-           !(arg instanceof Function) &&
-           arg.constructor === Object)
-        );
-      });
+        const hasObjectError = args.some((arg) => {
+          const str = String(arg);
+          return (
+            str === "[object Object]" ||
+            str.includes("[object Object]") ||
+            (str.match(/^\[object \w+\]$/) && !str.match(/^\[object (Error|Date|Array|Function|RegExp|Promise)\]$/)) ||
+            (typeof arg === "object" && arg !== null &&
+             !Array.isArray(arg) &&
+             !(arg instanceof Error) &&
+             !(arg instanceof Date) &&
+             !(arg instanceof RegExp) &&
+             !(arg instanceof Function) &&
+             arg.constructor === Object)
+          );
+        });
 
-      if (hasObjectError && methodName === 'error') {
-        originalConsoleLog.call(console, "🔍 [object Object] Error Detected!");
-        originalConsoleLog.call(console, "Arguments:", args.map(arg => safeStringify(arg)));
-        originalConsoleLog.call(console, "Stack trace:", new Error().stack);
-        originalConsoleLog.call(console, "URL:", window.location.href);
+        if (hasObjectError && methodName === 'error') {
+          originalConsoleLog.call(console, "🔍 [object Object] Error Detected!");
+          originalConsoleLog.call(console, "Arguments:", args.map(arg => safeStringify(arg)));
+          originalConsoleLog.call(console, "Stack trace:", new Error().stack);
+          originalConsoleLog.call(console, "URL:", window.location.href);
 
-        // Send to global error handler
-        if (window.GlobalErrorHandler) {
-          window.GlobalErrorHandler.logError({
-            type: "object-object-error",
-            message: "Detected [object Object] error in console",
-            args: args.map((arg) => safeStringify(arg)),
-            url: window.location.href,
-            timestamp: new Date().toISOString(),
-          });
+          // Send to global error handler
+          if (window.GlobalErrorHandler) {
+            window.GlobalErrorHandler.logError({
+              type: "object-object-error",
+              message: "Detected [object Object] error in console",
+              args: args.map((arg) => safeStringify(arg)),
+              url: window.location.href,
+              timestamp: new Date().toISOString(),
+            });
+          }
         }
-      }
 
-      // Process ALL arguments to prevent any [object Object] from appearing
-      const processedArgs = args.map((arg) => {
-        // Handle null and undefined first
-        if (arg === null || arg === undefined) {
+        // Process ALL arguments to prevent any [object Object] from appearing
+        const processedArgs = args.map((arg) => {
+          // Handle null and undefined first
+          if (arg === null || arg === undefined) {
+            return arg;
+          }
+
+          const str = String(arg);
+
+          // Direct check for [object Object] string
+          if (str === "[object Object]") {
+            return safeStringify(arg);
+          }
+
+          // Check for other [object Type] patterns that aren't useful
+          if (str.match(/^\[object \w+\]$/) &&
+              !str.match(/^\[object (Error|Date|Array|Function|RegExp|Promise)\]$/)) {
+            return safeStringify(arg);
+          }
+
+          // Check for plain objects that would stringify to [object Object]
+          if (typeof arg === "object" && arg !== null &&
+              !Array.isArray(arg) &&
+              !(arg instanceof Error) &&
+              !(arg instanceof Date) &&
+              !(arg instanceof RegExp) &&
+              !(arg instanceof Function) &&
+              arg.constructor === Object) {
+            return safeStringify(arg);
+          }
+
           return arg;
-        }
+        });
 
-        const str = String(arg);
-
-        // Direct check for [object Object] string
-        if (str === "[object Object]") {
-          return safeStringify(arg);
-        }
-
-        // Check for other [object Type] patterns that aren't useful
-        if (str.match(/^\[object \w+\]$/) &&
-            !str.match(/^\[object (Error|Date|Array|Function|RegExp|Promise)\]$/)) {
-          return safeStringify(arg);
-        }
-
-        // Check for plain objects that would stringify to [object Object]
-        if (typeof arg === "object" && arg !== null &&
-            !Array.isArray(arg) &&
-            !(arg instanceof Error) &&
-            !(arg instanceof Date) &&
-            !(arg instanceof RegExp) &&
-            !(arg instanceof Function) &&
-            arg.constructor === Object) {
-          return safeStringify(arg);
-        }
-
-        return arg;
-      });
-
-        originalFn.apply(console, processedArgs);
+        // Fix: Always return the result of the original function call
+        return originalFn.apply(console, processedArgs);
       } catch (recursionError) {
         errorCount++;
         if (errorCount > 3) {
@@ -148,8 +149,8 @@ export const initDebugConsole = () => {
           restoreConsole();
           originalConsoleError.call(console, "🚨 Debug console disabled due to errors");
         }
-        // Fallback to original method
-        originalFn.apply(console, args);
+        // Fallback to original method - also return the result
+        return originalFn.apply(console, args);
       } finally {
         isProcessing = false;
       }
