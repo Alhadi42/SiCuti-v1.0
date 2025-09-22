@@ -1,6 +1,6 @@
 /**
- * Simple Completion Manager - Works with existing data without complex RLS
- * This approach avoids RLS issues by using a simpler storage mechanism
+ * Simple Completion Manager - Enhanced to properly store in database
+ * This approach prioritizes database storage with localStorage as fallback
  */
 
 import { supabase } from './supabaseClient';
@@ -15,36 +15,50 @@ const getProposalKey = (unitName, proposalDate) => {
 
 /**
  * Check if a unit-date combination is marked as completed
- * Uses a simple approach that doesn't require complex RLS
+ * Enhanced to properly query database first
  */
 export const isSimpleProposalCompleted = async (unitName, proposalDate) => {
   try {
     const proposalKey = getProposalKey(unitName, proposalDate);
     
-    // Try to check if there's any completion record in the database
-    // We'll use a simple table approach if available, otherwise fall back to localStorage
+    // First, try to query the leave_proposals table for completed status
+    console.log(`🔍 Checking completion status for: ${proposalKey}`);
     
-    // First, try to query existing leave_proposals table (read-only, should work with RLS)
-    const { data: existingProposals, error: queryError } = await supabase
+    const { data: completedProposals, error: queryError } = await supabase
       .from('leave_proposals')
-      .select('id, status, updated_at')
+      .select('id, status, completed_at, completed_by, proposer_unit, proposal_date')
       .eq('proposer_unit', unitName)
       .eq('proposal_date', proposalDate)
       .eq('status', 'completed');
 
     // If query succeeds and finds completed proposals
-    if (!queryError && existingProposals && existingProposals.length > 0) {
+    if (!queryError && completedProposals && completedProposals.length > 0) {
+      console.log(`✅ Found completed proposal in database:`, completedProposals[0]);
       return {
         isCompleted: true,
-        completedAt: existingProposals[0].completed_at || existingProposals[0].updated_at,
-        completedBy: existingProposals[0].completed_by || null,
-        id: existingProposals[0].id || null,
+        completedAt: completedProposals[0].completed_at,
+        completedBy: completedProposals[0].completed_by,
+        id: completedProposals[0].id,
         source: 'database'
       };
     }
 
-    // If query fails due to RLS or other issues, fall back to localStorage
-    if (queryError && queryError.code !== 'PGRST116') {
+    // If no completed proposals found in database, check if there are any proposals at all
+    if (!queryError) {
+      const { data: anyProposals, error: anyError } = await supabase
+        .from('leave_proposals')
+        .select('id, status')
+        .eq('proposer_unit', unitName)
+        .eq('proposal_date', proposalDate);
+
+      if (!anyError && anyProposals && anyProposals.length > 0) {
+        console.log(`📊 Found ${anyProposals.length} proposals for ${proposalKey}, but none are completed`);
+        return false;
+      }
+    }
+
+    // If database query fails or no proposals exist, check localStorage as fallback
+    if (queryError) {
       console.warn('Database query failed, using localStorage fallback:', queryError.code);
     }
 
@@ -55,6 +69,7 @@ export const isSimpleProposalCompleted = async (unitName, proposalDate) => {
         const completedProposals = JSON.parse(localData);
         const completion = completedProposals[proposalKey];
         if (completion) {
+          console.log(`📱 Found completion in localStorage:`, completion);
           return {
             isCompleted: true,
             completedAt: completion.completedAt,
@@ -97,7 +112,7 @@ export const isSimpleProposalCompleted = async (unitName, proposalDate) => {
 };
 
 /**
- * Mark a proposal as completed using simple storage
+ * Mark a proposal as completed - Enhanced database-first approach
  */
 export const markSimpleProposalAsCompleted = async (unitName, proposalDate, requestsData = []) => {
   try {
@@ -118,44 +133,60 @@ export const markSimpleProposalAsCompleted = async (unitName, proposalDate, requ
       completedBy: currentUser.id,
       completedByName: currentUser.name || currentUser.email,
       requestIds: requestsData.map(req => req.id),
-      source: 'simple'
+      source: 'database'
     };
 
-    // Try to persist to database first (update matching leave_proposals records)
-    try {
-      console.log('🔁 Attempting to persist completion status to database...');
-      const updatePayload = {
+    console.log(`🔄 Marking proposal as completed: ${proposalKey}`);
+
+    // Step 1: Try to update existing leave_proposals records
+    const updatePayload = {
+      status: 'completed',
+      completed_by: currentUser.id,
+      completed_at: new Date().toISOString(),
+    };
+
+    const { data: updatedProposals, error: updateError } = await supabase
+      .from('leave_proposals')
+      .update(updatePayload)
+      .eq('proposer_unit', unitName)
+      .eq('proposal_date', proposalDate)
+      .select();
+
+    if (!updateError && updatedProposals && updatedProposals.length > 0) {
+      console.log(`✅ Updated ${updatedProposals.length} existing proposals to completed status`);
+      completionRecord.proposalId = updatedProposals[0].id;
+      completionRecord.source = 'database';
+    } else {
+      // Step 2: If no existing proposals, create a new one to track completion
+      console.log(`📝 No existing proposals found, creating new completion record`);
+      
+      const newProposalPayload = {
+        proposal_title: `Usulan Cuti ${unitName} - ${proposalDate}`,
+        proposed_by: currentUser.id,
+        proposer_name: currentUser.name || currentUser.email,
+        proposer_unit: unitName,
+        proposal_date: proposalDate,
+        total_employees: requestsData.length,
         status: 'completed',
         completed_by: currentUser.id,
         completed_at: new Date().toISOString(),
+        notes: `Auto-created completion record for batch proposal from ${unitName}`
       };
 
-      const { data: updated, error: updateError } = await supabase
+      const { data: newProposal, error: createError } = await supabase
         .from('leave_proposals')
-        .update(updatePayload)
-        .eq('proposer_unit', unitName)
-        .eq('proposal_date', proposalDate);
+        .insert(newProposalPayload)
+        .select()
+        .single();
 
-      if (!updateError) {
-        if (updated && updated.length > 0) {
-          console.log('✅ Completion status persisted to DB for existing proposals:', updated.length);
-          completionRecord.source = 'database';
-          completionRecord.completedAt = updatePayload.completed_at;
-          completionRecord.completedBy = currentUser.id;
-          if (updated[0] && updated[0].id) {
-            completionRecord.proposalId = updated[0].id;
-          }
-        } else {
-          console.log('⚠️ No existing leave_proposals rows matched for update. Will store locally as backup.');
-          completionRecord.source = 'localStorage';
-        }
+      if (!createError && newProposal) {
+        console.log(`✅ Created new completion record in database:`, newProposal.id);
+        completionRecord.proposalId = newProposal.id;
+        completionRecord.source = 'database';
       } else {
-        console.warn('⚠️ Database update failed, falling back to localStorage:', updateError);
+        console.warn('⚠️ Failed to create completion record in database:', createError);
         completionRecord.source = 'localStorage';
       }
-    } catch (dbError) {
-      console.warn('⚠️ Error while persisting to DB, falling back to localStorage:', dbError);
-      completionRecord.source = 'localStorage';
     }
 
     // Always store in localStorage as backup
@@ -163,7 +194,7 @@ export const markSimpleProposalAsCompleted = async (unitName, proposalDate, requ
       const existingCompleted = JSON.parse(localStorage.getItem('completedBatchProposals') || '{}');
       existingCompleted[proposalKey] = completionRecord;
       localStorage.setItem('completedBatchProposals', JSON.stringify(existingCompleted));
-      console.log('💾 Completion status saved locally as backup:', proposalKey);
+      console.log('💾 Completion status saved locally as backup');
     } catch (storageError) {
       console.error('❌ Failed to save completion status to localStorage:', storageError);
     }
@@ -177,7 +208,7 @@ export const markSimpleProposalAsCompleted = async (unitName, proposalDate, requ
 };
 
 /**
- * Restore a completed proposal back to active status
+ * Restore a completed proposal back to active status - Enhanced database-first approach
  */
 export const restoreSimpleProposal = async (unitName, proposalDate) => {
   try {
@@ -187,41 +218,37 @@ export const restoreSimpleProposal = async (unitName, proposalDate) => {
     }
 
     const proposalKey = getProposalKey(unitName, proposalDate);
+    console.log(`🔄 Restoring proposal: ${proposalKey}`);
 
-    // Try to restore in database first (set status back to 'pending' and clear completion metadata)
-    try {
-      console.log('🔁 Attempting to restore completion status in database...');
-      const updatePayload = {
-        status: 'pending',
-        completed_by: null,
-        completed_at: null,
-      };
+    // Step 1: Update database records back to pending status
+    const updatePayload = {
+      status: 'pending',
+      completed_by: null,
+      completed_at: null,
+    };
 
-      const { data: updated, error: updateError } = await supabase
-        .from('leave_proposals')
-        .update(updatePayload)
-        .eq('proposer_unit', unitName)
-        .eq('proposal_date', proposalDate);
+    const { data: updatedProposals, error: updateError } = await supabase
+      .from('leave_proposals')
+      .update(updatePayload)
+      .eq('proposer_unit', unitName)
+      .eq('proposal_date', proposalDate)
+      .eq('status', 'completed')
+      .select();
 
-      if (!updateError) {
-        if (updated && updated.length > 0) {
-          console.log('✅ Restoration persisted to DB for existing proposals:', updated.length);
-        } else {
-          console.log('⚠️ No DB rows matched during restore. Will remove local backup if present.');
-        }
-      } else {
-        console.warn('⚠️ Database restore failed, will still remove local backup:', updateError);
-      }
-    } catch (dbError) {
-      console.warn('⚠️ Error while restoring in DB, will still remove local backup:', dbError);
+    if (!updateError && updatedProposals && updatedProposals.length > 0) {
+      console.log(`✅ Restored ${updatedProposals.length} proposals to pending status in database`);
+    } else if (updateError) {
+      console.warn('⚠️ Database restore failed:', updateError);
+    } else {
+      console.log('ℹ️ No completed proposals found in database to restore');
     }
 
-    // Remove from localStorage (backup/primary)
+    // Step 2: Remove from localStorage backup
     try {
       const existingCompleted = JSON.parse(localStorage.getItem('completedBatchProposals') || '{}');
       delete existingCompleted[proposalKey];
       localStorage.setItem('completedBatchProposals', JSON.stringify(existingCompleted));
-      console.log('💾 Removed local completion backup for', proposalKey);
+      console.log('💾 Removed local completion backup');
     } catch (storageError) {
       console.warn('⚠️ Failed to remove local completion backup:', storageError);
     }
@@ -236,19 +263,64 @@ export const restoreSimpleProposal = async (unitName, proposalDate) => {
 };
 
 /**
- * Get all completion records
+ * Get all completion records from both database and localStorage
  */
-export const getAllSimpleCompletions = () => {
+export const getAllSimpleCompletions = async () => {
+  const completions = new Map();
+
+  try {
+    // First, get all completed proposals from database
+    const { data: dbCompletions, error: dbError } = await supabase
+      .from('leave_proposals')
+      .select('id, proposer_unit, proposal_date, completed_at, completed_by, status')
+      .eq('status', 'completed');
+
+    if (!dbError && dbCompletions) {
+      dbCompletions.forEach(completion => {
+        const key = getProposalKey(completion.proposer_unit, completion.proposal_date);
+        completions.set(key, {
+          proposalKey: key,
+          unitName: completion.proposer_unit,
+          proposalDate: completion.proposal_date,
+          completedAt: completion.completed_at,
+          completedBy: completion.completed_by,
+          id: completion.id,
+          source: 'database'
+        });
+      });
+      console.log(`📊 Loaded ${dbCompletions.length} completions from database`);
+    }
+  } catch (error) {
+    console.warn('Error loading completions from database:', error);
+  }
+
+  // Then, get localStorage completions (as backup/additional)
   try {
     const localData = localStorage.getItem('completedBatchProposals');
     if (localData) {
-      return JSON.parse(localData);
+      const localCompletions = JSON.parse(localData);
+      Object.entries(localCompletions).forEach(([key, completion]) => {
+        // Only add if not already in database
+        if (!completions.has(key)) {
+          completions.set(key, {
+            ...completion,
+            source: 'localStorage'
+          });
+        }
+      });
+      console.log(`📱 Loaded additional completions from localStorage`);
     }
-    return {};
   } catch (error) {
-    console.warn('Error getting simple completions:', error);
-    return {};
+    console.warn('Error loading completions from localStorage:', error);
   }
+
+  // Convert Map to object for compatibility
+  const result = {};
+  completions.forEach((value, key) => {
+    result[key] = value;
+  });
+
+  return result;
 };
 
 export default {

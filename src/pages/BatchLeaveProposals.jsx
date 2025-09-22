@@ -432,7 +432,7 @@ const BatchLeaveProposals = () => {
       console.log("📊 Final grouped requests:", groupedRequests);
       console.log("✅ Fetched", groupedRequests.length, "unit-date groups with leave requests");
 
-      // Load completion status from database - AFTER groupedRequests is defined
+      // Load completion status from database - ENHANCED to use database first
       const completedProposalsMap = new Map();
       const completedSet = new Set();
 
@@ -440,32 +440,72 @@ const BatchLeaveProposals = () => {
       if (groupedRequests && groupedRequests.length > 0) {
         console.log("🔍 Checking completion status for", groupedRequests.length, "proposal groups...");
 
-        // Check completion status for each unit-date group
-        for (const group of groupedRequests) {
-          try {
-          const completionStatus = await isSimpleProposalCompleted(group.unitName, group.proposalDate);
-          if (completionStatus && completionStatus.isCompleted) {
-            const proposalKey = `${group.unitName}|${group.proposalDate}`;
-            completedSet.add(proposalKey);
-            completedProposalsMap.set(proposalKey, {
-              proposalKey,
-              unitName: group.unitName,
-              proposalDate: group.proposalDate,
-              completedAt: completionStatus.completedAt,
-              completedBy: completionStatus.completedBy,
-              source: completionStatus.source
+        // ENHANCED: First, get all completed proposals from database in one query
+        try {
+          const { data: dbCompletedProposals, error: dbError } = await supabase
+            .from('leave_proposals')
+            .select('id, proposer_unit, proposal_date, completed_at, completed_by, status')
+            .eq('status', 'completed');
+
+          if (!dbError && dbCompletedProposals) {
+            console.log(`📊 Found ${dbCompletedProposals.length} completed proposals in database`);
+            
+            dbCompletedProposals.forEach(completion => {
+              const proposalKey = `${completion.proposer_unit}|${completion.proposal_date}`;
+              completedSet.add(proposalKey);
+              completedProposalsMap.set(proposalKey, {
+                proposalKey,
+                unitName: completion.proposer_unit,
+                proposalDate: completion.proposal_date,
+                completedAt: completion.completed_at,
+                completedBy: completion.completed_by,
+                id: completion.id,
+                source: 'database'
+              });
             });
+          } else if (dbError) {
+            console.warn('Database query for completed proposals failed:', dbError);
           }
-        } catch (statusError) {
-          // Only log actual errors, not expected cases
-          console.warn(`Could not check completion status for ${group.unitName}|${group.proposalDate}:`, statusError.message || statusError);
+        } catch (dbQueryError) {
+          console.warn('Error querying completed proposals from database:', dbQueryError);
         }
+
+        // Then, check individual groups for any that weren't found in the bulk query
+        for (const group of groupedRequests) {
+          const proposalKey = `${group.unitName}|${group.proposalDate}`;
+          
+          // Skip if already found in database
+          if (completedSet.has(proposalKey)) {
+            continue;
+          }
+
+          try {
+            const completionStatus = await isSimpleProposalCompleted(group.unitName, group.proposalDate);
+            if (completionStatus && completionStatus.isCompleted) {
+              completedSet.add(proposalKey);
+              completedProposalsMap.set(proposalKey, {
+                proposalKey,
+                unitName: group.unitName,
+                proposalDate: group.proposalDate,
+                completedAt: completionStatus.completedAt,
+                completedBy: completionStatus.completedBy,
+                source: completionStatus.source
+              });
+            }
+          } catch (statusError) {
+            // Only log actual errors, not expected cases
+            console.warn(`Could not check completion status for ${group.unitName}|${group.proposalDate}:`, statusError.message || statusError);
+          }
         }
       } else {
         console.log("📊 No proposal groups to check for completion status");
       }
 
-      console.log("📊 Loaded completion records from database:", completedSet.size);
+      console.log("📊 Loaded completion records:", completedSet.size, "completed proposals");
+      console.log("📊 Completion sources:", Array.from(completedProposalsMap.values()).reduce((acc, record) => {
+        acc[record.source] = (acc[record.source] || 0) + 1;
+        return acc;
+      }, {}));
 
       setUnitProposals(groupedRequests);
       setProposalRecords(completedProposalsMap);
