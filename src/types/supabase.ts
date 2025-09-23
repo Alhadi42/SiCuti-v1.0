@@ -621,31 +621,48 @@ export type Database = {
         Row: {
           content: Json
           created_at: string
+          created_by: string | null
           description: string | null
           id: string
           name: string
+          template_scope: string | null
           type: string
+          unit_scope: string | null
           user_id: string | null
         }
         Insert: {
           content: Json
           created_at?: string
+          created_by?: string | null
           description?: string | null
           id?: string
           name: string
+          template_scope?: string | null
           type: string
+          unit_scope?: string | null
           user_id?: string | null
         }
         Update: {
           content?: Json
           created_at?: string
+          created_by?: string | null
           description?: string | null
           id?: string
           name?: string
+          template_scope?: string | null
           type?: string
+          unit_scope?: string | null
           user_id?: string | null
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "templates_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       users: {
         Row: {
@@ -697,6 +714,10 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      can_user_access_template: {
+        Args: { template_id: string; user_role: string; user_unit?: string }
+        Returns: boolean
+      }
       get_all_departments: {
         Args: Record<PropertyKey, never>
         Returns: {
@@ -711,6 +732,21 @@ export type Database = {
         Args: Record<PropertyKey, never>
         Returns: {
           department_name: string
+        }[]
+      }
+      get_user_accessible_templates: {
+        Args: { user_role: string; user_unit?: string }
+        Returns: {
+          created_at: string
+          created_by: string
+          description: string
+          id: string
+          name: string
+          template_data: string
+          template_scope: string
+          type: string
+          unit_scope: string
+          updated_at: string
         }[]
       }
       mark_proposal_completed: {

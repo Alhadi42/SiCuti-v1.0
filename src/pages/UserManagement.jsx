@@ -67,7 +67,9 @@ const PermissionInfo = ({ role }) => {
             "Dashboard access",
             "Employee data (own unit only)",
             "Leave requests (own unit only)",
-            "Leave history (own unit only)"
+            "Leave history (own unit only)",
+            "Template management (own unit only)",
+            "Letter creation (own unit only)"
           ]
         };
       case "employee":
@@ -168,7 +170,7 @@ const UserManagement = () => {
     if (userData.role === "master_admin") {
       permissions = ["all"];
     } else if (userData.role === "admin_unit") {
-      permissions = ["dashboard", "employees_unit", "leave_requests_unit", "leave_history_unit"];
+      permissions = ["dashboard", "employees_unit", "leave_requests_unit", "leave_history_unit", "surat_keterangan_unit"];
     } else {
       permissions = ["dashboard"];
     }
@@ -204,7 +206,7 @@ const UserManagement = () => {
     if (userData.role === "master_admin") {
       permissions = ["all"];
     } else if (userData.role === "admin_unit") {
-      permissions = ["dashboard", "employees_unit", "leave_requests_unit", "leave_history_unit"];
+      permissions = ["dashboard", "employees_unit", "leave_requests_unit", "leave_history_unit", "surat_keterangan_unit"];
     } else {
       permissions = ["dashboard"];
     }

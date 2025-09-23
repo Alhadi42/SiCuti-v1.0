@@ -43,6 +43,7 @@ import {
   countWorkingDays,
   fetchNationalHolidaysFromDB,
 } from "@/utils/workingDays";
+import { AuthManager } from "@/lib/authManager";
 
 // Dummy data for employees - in a real app, this would come from an API
 const dummyEmployees = [
@@ -210,9 +211,32 @@ function DocxSuratKeterangan() {
       try {
         console.log("Loading templates from Supabase...");
 
-        const { data, error } = await supabase
-          .from("templates")
-          .select("*")
+        const currentUser = AuthManager.getUserSession();
+        if (!currentUser) {
+          throw new Error("User not authenticated");
+        }
+
+        console.log("Current user:", { role: currentUser.role, unit: currentUser.unit_kerja || currentUser.unitKerja });
+
+        let query = supabase.from("templates").select("*");
+
+        // Apply role-based filtering
+        if (currentUser.role === "master_admin") {
+          // Master admin sees only global templates
+          query = query.eq("template_scope", "global");
+        } else if (currentUser.role === "admin_unit") {
+          // Admin unit sees only their own unit's templates
+          const userUnit = currentUser.unit_kerja || currentUser.unitKerja;
+          if (!userUnit) {
+            throw new Error("Admin unit user must have a unit assigned");
+          }
+          query = query.eq("template_scope", "unit").eq("unit_scope", userUnit);
+        } else {
+          // Other roles have no access
+          throw new Error("Insufficient permissions to access templates");
+        }
+
+        const { data, error } = await query
           .eq("type", "docx")
           .order("name", { ascending: true });
 
@@ -1340,7 +1364,7 @@ function DocxSuratKeterangan() {
       <div className="flex items-center justify-between mb-6">
         <div>
           <h1 className="text-2xl font-bold text-white">Buat Surat DOCX</h1>
-          <div className="flex items-center gap-2 mt-1">
+          <div className="flex items-center gap-4 mt-1">
             <div
               className={`flex items-center gap-1 text-xs px-2 py-1 rounded ${holidays.size > 0 ? "bg-green-500/20 text-green-400" : "bg-yellow-500/20 text-yellow-400"}`}
             >
@@ -1349,6 +1373,25 @@ function DocxSuratKeterangan() {
                 ? `${holidays.size} hari dimuat`
                 : "Belum dimuat"}
             </div>
+            {(() => {
+              const currentUser = AuthManager.getUserSession();
+              if (currentUser?.role === "master_admin") {
+                return (
+                  <div className="flex items-center gap-1 text-xs px-2 py-1 rounded bg-purple-500/20 text-purple-400">
+                    <div className="w-2 h-2 bg-purple-400 rounded-full"></div>
+                    Template Global
+                  </div>
+                );
+              } else if (currentUser?.role === "admin_unit") {
+                return (
+                  <div className="flex items-center gap-1 text-xs px-2 py-1 rounded bg-blue-500/20 text-blue-400">
+                    <div className="w-2 h-2 bg-blue-400 rounded-full"></div>
+                    Template Unit: {currentUser.unit_kerja || currentUser.unitKerja || "Unit Anda"}
+                  </div>
+                );
+              }
+              return null;
+            })()}
           </div>
         </div>
       </div>

@@ -33,6 +33,8 @@ import { useToast } from "@/components/ui/use-toast";
 import { extractPdfFormFields } from "@/utils/pdfTemplates";
 import { extractDocxVariables, validateDocxFile } from "@/utils/docxTemplates";
 import { Link } from "react-router-dom";
+import { AuthManager } from "@/auth/AuthManager";
+import { supabase } from "@/supabase/supabaseClient";
 
 const TemplateManagement = () => {
   // State management
@@ -81,35 +83,83 @@ const TemplateManagement = () => {
   const [selectedTemplateFields, setSelectedTemplateFields] = useState([]);
   const [isAnalyzingFields, setIsAnalyzingFields] = useState(false);
 
-  // Load templates on component mount
+  // Load templates from Supabase database
   useEffect(() => {
-    loadTemplates();
-  }, []);
+    const loadTemplates = async () => {
+      try {
+        console.log("Loading templates from Supabase...");
+        
+        const currentUser = AuthManager.getUserSession();
+        if (!currentUser) {
+          throw new Error("User not authenticated");
+        }
 
-  const loadTemplates = () => {
-    try {
-      const savedTemplates =
-        JSON.parse(localStorage.getItem("savedTemplates")) || [];
-      // Filter out any non-PDF templates for backward compatibility
-      const pdfTemplates = savedTemplates.filter(
-        (t) => t.type === "pdf" && t.content?.type === "pdf",
-      );
-      setTemplates(pdfTemplates);
+        console.log("Current user:", { role: currentUser.role, unit: currentUser.unit_kerja || currentUser.unitKerja });
 
-      // Auto-select first template if available
-      if (pdfTemplates.length > 0 && !selectedTemplate) {
-        setSelectedTemplate(pdfTemplates[0]);
-        analyzeTemplateFields(pdfTemplates[0]);
+        let query = supabase.from("templates").select("*");
+
+        // Apply role-based filtering
+        if (currentUser.role === "master_admin") {
+          // Master admin sees only global templates
+          query = query.eq("template_scope", "global");
+        } else if (currentUser.role === "admin_unit") {
+          // Admin unit sees only their own unit's templates
+          const userUnit = currentUser.unit_kerja || currentUser.unitKerja;
+          if (!userUnit) {
+            throw new Error("Admin unit user must have a unit assigned");
+          }
+          query = query.eq("template_scope", "unit").eq("unit_scope", userUnit);
+        } else {
+          // Other roles have no access
+          throw new Error("Insufficient permissions to access templates");
+        }
+
+        const { data, error } = await query
+          .eq("type", "docx")
+          .order("name", { ascending: true });
+
+        if (error) {
+          throw error;
+        }
+
+        console.log("Templates loaded from Supabase:", data);
+        setTemplates(data || []);
+
+        if (data && data.length > 0 && !selectedTemplate) {
+          setSelectedTemplate(data[0]);
+        }
+      } catch (error) {
+        console.error("Error loading templates from Supabase:", error);
+        toast({
+          title: "Gagal memuat template dari database",
+          description: error.message,
+          variant: "destructive",
+        });
+
+        // Fallback to localStorage if Supabase fails (only for backward compatibility)
+        try {
+          const savedTemplates =
+            JSON.parse(localStorage.getItem("savedTemplates")) || [];
+          const docxTemplates = savedTemplates.filter((t) => {
+            return t.type === "docx" && t.content?.type === "docx";
+          });
+          console.log(
+            "Fallback: Loaded DOCX templates from localStorage:",
+            docxTemplates,
+          );
+          setTemplates(docxTemplates);
+
+          if (docxTemplates.length > 0 && !selectedTemplate) {
+            setSelectedTemplate(docxTemplates[0]);
+          }
+        } catch (localError) {
+          console.error("Error loading from localStorage:", localError);
+        }
       }
-    } catch (error) {
-      console.error("Error loading templates:", error);
-      toast({
-        title: "Gagal memuat template",
-        description: "Terjadi kesalahan saat memuat daftar template",
-        variant: "destructive",
-      });
-    }
-  };
+    };
+
+    loadTemplates();
+  }, [toast]);
 
   // Analyze PDF template form fields
   const analyzeTemplateFields = async (template) => {
@@ -212,34 +262,94 @@ const TemplateManagement = () => {
     setIsLoading(true);
 
     try {
-      const newTemplate = {
-        id: currentTemplateId || Date.now().toString(),
+      const currentUser = AuthManager.getUserSession();
+      if (!currentUser) {
+        throw new Error("User not authenticated");
+      }
+
+      // Determine template scope based on user role
+      let templateScope = "global";
+      let unitScope = null;
+
+      if (currentUser.role === "admin_unit") {
+        templateScope = "unit";
+        unitScope = currentUser.unit_kerja || currentUser.unitKerja;
+        
+        if (!unitScope) {
+          throw new Error("Admin unit user must have a unit assigned");
+        }
+      } else if (currentUser.role === "master_admin") {
+        templateScope = "global";
+        unitScope = null;
+      } else {
+        throw new Error("Insufficient permissions to create templates");
+      }
+
+      const templateData = {
         name: templateName.trim(),
         description: templateDescription.trim(),
-        content: templateContent,
-        type: templateContent.type || "pdf", // Use the actual file type
-        updatedAt: new Date().toISOString(),
+        type: templateContent.type || "docx",
+        template_data: templateContent.data,
+        created_by: currentUser.id,
+        template_scope: templateScope,
+        unit_scope: unitScope,
       };
 
-      const updatedTemplates = isEditMode
-        ? templates.map((t) => (t.id === currentTemplateId ? newTemplate : t))
-        : [...templates, newTemplate];
+      console.log("Saving template with scope:", { templateScope, unitScope, userRole: currentUser.role });
 
-      localStorage.setItem("savedTemplates", JSON.stringify(updatedTemplates));
-      setTemplates(updatedTemplates);
+      if (isEditMode && currentTemplateId) {
+        // Update existing template
+        const { data, error } = await supabase
+          .from("templates")
+          .update({
+            name: templateData.name,
+            description: templateData.description,
+            template_data: templateData.template_data,
+            updated_at: new Date().toISOString(),
+          })
+          .eq("id", currentTemplateId)
+          .select()
+          .single();
 
-      toast({
-        title: `Template ${isEditMode ? "diperbarui" : "disimpan"}`,
-        description: `Template "${templateName}" berhasil ${isEditMode ? "diperbarui" : "disimpan"}`,
-        variant: "default",
-      });
+        if (error) throw error;
+
+        // Update local state
+        const updatedTemplates = templates.map((t) =>
+          t.id === currentTemplateId ? { ...t, ...data } : t
+        );
+        setTemplates(updatedTemplates);
+
+        toast({
+          title: "Template diperbarui",
+          description: `Template "${templateName}" berhasil diperbarui`,
+          variant: "default",
+        });
+      } else {
+        // Create new template
+        const { data, error } = await supabase
+          .from("templates")
+          .insert(templateData)
+          .select()
+          .single();
+
+        if (error) throw error;
+
+        // Update local state
+        setTemplates([...templates, data]);
+
+        toast({
+          title: "Template disimpan",
+          description: `Template "${templateName}" berhasil disimpan${templateScope === "unit" ? ` untuk unit ${unitScope}` : " secara global"}`,
+          variant: "default",
+        });
+      }
 
       resetForm();
     } catch (error) {
       console.error("Error saving template:", error);
       toast({
         title: "Gagal menyimpan template",
-        description: "Terjadi kesalahan saat menyimpan template",
+        description: error.message,
         variant: "destructive",
       });
     } finally {
@@ -256,7 +366,7 @@ const TemplateManagement = () => {
     setIsSaveDialogOpen(true);
   };
 
-  const handleDeleteTemplate = (templateId) => {
+  const handleDeleteTemplate = async (templateId) => {
     if (!templateId) {
       console.error("Invalid template ID for deletion");
       return;
@@ -274,11 +384,39 @@ const TemplateManagement = () => {
       return;
     }
 
-    const updatedTemplates = templates.filter((t) => t.id !== templateId);
-
     try {
-      localStorage.setItem("savedTemplates", JSON.stringify(updatedTemplates));
-      setTemplates(updatedTemplates);
+      const currentUser = AuthManager.getUserSession();
+      if (!currentUser) {
+        throw new Error("User not authenticated");
+      }
+
+      // Check permissions
+      if (currentUser.role === "admin_unit") {
+        // Admin unit can only delete their own unit's templates
+        const userUnit = currentUser.unit_kerja || currentUser.unitKerja;
+        if (templateToDelete.template_scope !== "unit" || templateToDelete.unit_scope !== userUnit) {
+          throw new Error("You can only delete templates from your own unit");
+        }
+      } else if (currentUser.role === "master_admin") {
+        // Master admin can only delete global templates
+        if (templateToDelete.template_scope !== "global") {
+          throw new Error("Master admin can only delete global templates");
+        }
+      } else {
+        throw new Error("Insufficient permissions to delete templates");
+      }
+
+      // Delete from database
+      const { error } = await supabase
+        .from("templates")
+        .delete()
+        .eq("id", templateId);
+
+      if (error) throw error;
+
+      // Update local state
+      const updatedTemplates = templates.filter((t) => t.id !== templateId);
+      setSavedTemplates(updatedTemplates);
 
       if (selectedTemplate?.id === templateId) {
         setSelectedTemplate(null);
@@ -293,7 +431,7 @@ const TemplateManagement = () => {
       console.error("Error deleting template:", error);
       toast({
         title: "Gagal menghapus template",
-        description: "Terjadi kesalahan saat menghapus template",
+        description: error.message,
         variant: "destructive",
       });
     }
@@ -317,7 +455,32 @@ const TemplateManagement = () => {
       transition={{ duration: 0.3 }}
     >
       <div className="flex items-center justify-between mb-6">
-        <h1 className="text-2xl font-bold text-white">Kelola Template Surat</h1>
+        <div>
+          <h1 className="text-2xl font-bold text-white">Kelola Template Surat</h1>
+          <div className="mt-2">
+            {(() => {
+              const currentUser = AuthManager.getUserSession();
+              if (currentUser?.role === "master_admin") {
+                return (
+                  <div className="flex items-center gap-2 text-sm">
+                    <div className="w-3 h-3 bg-purple-500 rounded-full"></div>
+                    <span className="text-slate-300">Master Admin: Akses template global</span>
+                  </div>
+                );
+              } else if (currentUser?.role === "admin_unit") {
+                return (
+                  <div className="flex items-center gap-2 text-sm">
+                    <div className="w-3 h-3 bg-blue-500 rounded-full"></div>
+                    <span className="text-slate-300">
+                      Admin Unit: Template khusus untuk {currentUser.unit_kerja || currentUser.unitKerja || "unit Anda"}
+                    </span>
+                  </div>
+                );
+              }
+              return null;
+            })()}
+          </div>
+        </div>
         <div className="flex items-center space-x-4">
           <Button
             variant="outline"
