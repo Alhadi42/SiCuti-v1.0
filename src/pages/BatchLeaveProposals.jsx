@@ -1023,7 +1023,7 @@ const BatchLeaveProposals = () => {
       // Templates are typically stored as { content: { data: "base64..." } }
       let templateContent = template.content?.data || template.content || template.template_data;
 
-      console.log("���� Template content structure:", {
+      console.log("📄 Template content structure:", {
         hasContent: !!template.content,
         hasContentData: !!template.content?.data,
         hasTemplateData: !!template.template_data,
@@ -1629,14 +1629,14 @@ const BatchLeaveProposals = () => {
             <div className="space-y-4 max-h-96 overflow-y-auto">
               {/* Template Selection */}
               <div className="p-4 bg-slate-700/30 rounded-lg border border-slate-600/50">
-                <Label className="text-slate-300 text-sm font-medium">Pilih Template DOCX</Label>
+                <Label className="text-slate-200 text-sm font-medium">Pilih Template DOCX</Label>
                 <Select value={selectedTemplate} onValueChange={setSelectedTemplate} disabled={loadingTemplates}>
-                  <SelectTrigger className="bg-slate-700/50 border-slate-600/50 text-white mt-2">
+                  <SelectTrigger className="bg-slate-700/50 border-slate-600/50 text-white mt-2 hover:bg-slate-700/70 focus:border-slate-500">
                     <SelectValue placeholder={loadingTemplates ? "Memuat template..." : "Pilih template untuk surat batch..."} />
                   </SelectTrigger>
                   <SelectContent className="bg-slate-700 border-slate-600">
                     {availableTemplates.map(template => (
-                      <SelectItem key={template.id} value={template.id}>
+                      <SelectItem key={template.id} value={template.id} className="text-white hover:bg-slate-600 focus:bg-slate-600">
                         {template.name}
                       </SelectItem>
                     ))}
@@ -1659,21 +1659,21 @@ const BatchLeaveProposals = () => {
               </div>
 
               {/* Summary Section */}
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-4 p-4 bg-slate-700/30 rounded-lg">
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-4 p-4 bg-slate-700/30 rounded-lg border border-slate-600/50">
                 <div className="text-center">
-                  <p className="text-slate-400 text-sm">Unit Kerja</p>
+                  <p className="text-slate-300 text-sm">Unit Kerja</p>
                   <p className="text-white font-bold">{selectedUnitForBatch.unitName}</p>
                 </div>
                 <div className="text-center">
-                  <p className="text-slate-400 text-sm">Total Pengajuan</p>
+                  <p className="text-slate-300 text-sm">Total Pengajuan</p>
                   <p className="text-white font-bold text-xl">{selectedUnitForBatch.totalRequests}</p>
                 </div>
                 <div className="text-center">
-                  <p className="text-slate-400 text-sm">Jenis Cuti</p>
+                  <p className="text-slate-300 text-sm">Jenis Cuti</p>
                   <p className="text-white font-bold text-xl">{Object.keys(leaveTypeClassification).length}</p>
                 </div>
                 <div className="text-center">
-                  <p className="text-slate-400 text-sm">Tanggal Usulan</p>
+                  <p className="text-slate-300 text-sm">Tanggal Usulan</p>
                   <p className="text-white font-bold text-sm">
                     {format(new Date(selectedUnitForBatch.proposalDate), "dd MMM yyyy", { locale: id })}
                   </p>
@@ -1682,11 +1682,11 @@ const BatchLeaveProposals = () => {
 
               <div className="grid grid-cols-1 gap-4">
                 {Object.entries(leaveTypeClassification).map(([leaveType, requests]) => (
-                  <div key={leaveType} className="p-4 bg-slate-700/30 rounded-lg border border-slate-600/50">
+                  <div key={leaveType} className="p-4 bg-slate-700/30 rounded-lg border border-slate-600/50 hover:border-slate-500/50 transition-colors">
                     <div className="flex items-center justify-between mb-3">
                       <div>
                         <h3 className="text-white font-medium text-lg">{leaveType}</h3>
-                        <p className="text-slate-400 text-sm">
+                        <p className="text-slate-300 text-sm">
                           {requests.length} pengajuan cuti • {requests.reduce((sum, req) => sum + (req.days_requested || 0), 0)} hari total
                         </p>
                       </div>
@@ -1696,7 +1696,7 @@ const BatchLeaveProposals = () => {
                           setShowBatchDialog(false);
                         }}
                         disabled={generatingLetter || !selectedTemplate || availableTemplates.length === 0}
-                        className="bg-blue-600 hover:bg-blue-700 text-white disabled:opacity-50"
+                        className="bg-blue-600 hover:bg-blue-700 text-white disabled:opacity-50 disabled:cursor-not-allowed"
                       >
                         {currentlyGenerating === leaveType ? (
                           <RefreshCw className="w-4 h-4 mr-2 animate-spin" />
@@ -1712,12 +1712,12 @@ const BatchLeaveProposals = () => {
                       <h4 className="text-slate-300 text-sm font-medium">Daftar Pegawai:</h4>
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
                         {requests.map((request, index) => (
-                          <div key={request.id} className="p-2 bg-slate-800/50 rounded text-sm">
+                          <div key={request.id} className="p-2 bg-slate-800/50 rounded text-sm border border-slate-600/50 hover:border-slate-500/50 transition-colors">
                             <div className="text-white font-medium">{request.employees?.name}</div>
-                            <div className="text-slate-400">
+                            <div className="text-slate-300">
                               {request.employees?.nip} • {request.days_requested} hari
                             </div>
-                            <div className="text-slate-500 text-xs">
+                            <div className="text-slate-400 text-xs">
                               {format(new Date(request.start_date), "dd MMM", { locale: id })} -
                               {format(new Date(request.end_date), "dd MMM yyyy", { locale: id })}
                             </div>
@@ -1731,10 +1731,10 @@ const BatchLeaveProposals = () => {
 
               {/* Generate All Types Button */}
               <div className="pt-4 border-t border-slate-600">
-                <div className="flex items-center justify-between">
+                <div className="flex items-center justify-between p-4 bg-slate-700/20 rounded-lg border border-slate-600/30">
                   <div>
                     <h3 className="text-white font-medium">Buat Semua Surat Sekaligus</h3>
-                    <p className="text-slate-400 text-sm">
+                    <p className="text-slate-300 text-sm">
                       Generate surat terpisah untuk setiap jenis cuti ({Object.keys(leaveTypeClassification).length} jenis)
                     </p>
                   </div>
@@ -1749,7 +1749,7 @@ const BatchLeaveProposals = () => {
                     }}
                     disabled={!selectedTemplate || availableTemplates.length === 0}
                     variant="outline"
-                    className="border-green-600 text-green-400 hover:bg-green-900/20 disabled:opacity-50"
+                    className="border-green-600 text-green-400 hover:bg-green-900/20 hover:text-green-300 disabled:opacity-50 disabled:cursor-not-allowed"
                   >
                     <Layers className="w-4 h-4 mr-2" />
                     Buat Semua Surat

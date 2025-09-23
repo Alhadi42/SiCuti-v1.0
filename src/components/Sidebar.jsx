@@ -69,7 +69,7 @@ const getMenuItemsByPermissions = (permissions = []) => {
     if (
       item.type === "group" &&
       item.label === "Surat Keterangan" &&
-      permissions.includes("surat_keterangan")
+      (permissions.includes("surat_keterangan") || permissions.includes("surat_keterangan_unit"))
     )
       return true;
     return false;

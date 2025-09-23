@@ -199,6 +199,38 @@ export class AuthManager {
     // Employees can only access their own data
     return false;
   }
+
+  // NEW: Check if user can access template management features
+  static canAccessTemplateManagement() {
+    const user = this.getUserSession();
+    if (!user) return false;
+
+    // Both master_admin and admin_unit can access template management
+    return user.role === "master_admin" || user.role === "admin_unit";
+  }
+
+  // NEW: Check if user can access letter creation features
+  static canAccessLetterCreation() {
+    const user = this.getUserSession();
+    if (!user) return false;
+
+    // Both master_admin and admin_unit can access letter creation
+    return user.role === "master_admin" || user.role === "admin_unit";
+  }
+
+  // NEW: Get template scope for current user
+  static getTemplateScope() {
+    const user = this.getUserSession();
+    if (!user) return null;
+
+    if (user.role === "master_admin") {
+      return "global"; // Can access all templates
+    } else if (user.role === "admin_unit") {
+      return "unit"; // Can only access their own unit's templates
+    }
+
+    return null;
+  }
 }
 
 // Input sanitization helpers
