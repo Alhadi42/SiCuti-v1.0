@@ -2,7 +2,7 @@
 CREATE TABLE IF NOT EXISTS audit_logs (
   id BIGSERIAL PRIMARY KEY,
   event_type VARCHAR(50) NOT NULL,
-    user_id UUID REFERENCES users(id) ON DELETE SET NULL,
+  user_id INTEGER REFERENCES users(id) ON DELETE SET NULL,
   user_agent TEXT,
   ip_address VARCHAR(45),
   session_id VARCHAR(255),
@@ -53,7 +53,7 @@ COMMENT ON FUNCTION clean_old_audit_logs IS 'Removes audit logs older than speci
 -- Create a view for recent security events (last 30 days)
 CREATE OR REPLACE VIEW recent_security_events AS
 SELECT 
-  al.id,
+  id,
   event_type,
   user_id,
   u.username,
@@ -72,7 +72,6 @@ COMMENT ON VIEW recent_security_events IS 'Recent security-related audit events 
 ALTER TABLE audit_logs ENABLE ROW LEVEL SECURITY;
 
 -- Create RLS policy: Only master_admin can view audit logs
-DROP POLICY IF EXISTS "audit_logs_view_policy" ON audit_logs;
 CREATE POLICY "audit_logs_view_policy" ON audit_logs
   FOR SELECT
   USING (
@@ -84,7 +83,6 @@ CREATE POLICY "audit_logs_view_policy" ON audit_logs
   );
 
 -- Create RLS policy: System can insert audit logs
-DROP POLICY IF EXISTS "audit_logs_insert_policy" ON audit_logs;
 CREATE POLICY "audit_logs_insert_policy" ON audit_logs
   FOR INSERT
   WITH CHECK (true); -- Allow all inserts for system logging
@@ -95,7 +93,6 @@ GRANT INSERT ON audit_logs TO authenticated;
 GRANT SELECT ON recent_security_events TO authenticated;
 
 -- Only allow audit log deletion for master_admin (for cleanup purposes)
-DROP POLICY IF EXISTS "audit_logs_delete_policy" ON audit_logs;
 CREATE POLICY "audit_logs_delete_policy" ON audit_logs
   FOR DELETE
   USING (

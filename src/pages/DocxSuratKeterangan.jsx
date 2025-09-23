@@ -205,16 +205,7 @@ function DocxSuratKeterangan() {
   const [holidays, setHolidays] = useState(new Set());
   const { toast } = useToast();
 
-  // Monitor templates state changes for debugging
-  useEffect(() => {
-    console.log("DocxSuratKeterangan: Templates state updated:", savedTemplates.length, "templates");
-    console.log("DocxSuratKeterangan: Template details:", savedTemplates.map(t => ({ id: t.id, name: t.name, scope: t.template_scope, type: t.type })));
-    if (savedTemplates.length > 0) {
-      console.log("DocxSuratKeterangan: First template:", savedTemplates[0]);
-    }
-  }, [savedTemplates]);
-
-  // Load templates on component mount
+  // Load DOCX templates from Supabase database
   useEffect(() => {
     const loadTemplates = async () => {
       try {
@@ -231,8 +222,8 @@ function DocxSuratKeterangan() {
 
         // Apply role-based filtering
         if (currentUser.role === "master_admin") {
-          // Master admin can see all templates
-          // No additional filtering needed - RLS policies handle access
+          // Master admin sees only global templates
+          query = query.eq("template_scope", "global");
         } else if (currentUser.role === "admin_unit") {
           // Admin unit sees only their own unit's templates
           const userUnit = currentUser.unit_kerja || currentUser.unitKerja;
@@ -245,20 +236,15 @@ function DocxSuratKeterangan() {
           throw new Error("Insufficient permissions to access templates");
         }
 
-        console.log("Executing query with role:", currentUser.role);
-
         const { data, error } = await query
           .eq("type", "docx")
           .order("name", { ascending: true });
 
         if (error) {
-          console.error("Database query error:", error);
           throw error;
         }
 
         console.log("Templates loaded from Supabase:", data);
-        console.log("Template count:", data ? data.length : 0);
-        console.log("Template data details:", data?.map(t => ({ id: t.id, name: t.name, scope: t.template_scope, type: t.type })));
         setSavedTemplates(data || []);
 
         if (data && data.length > 0 && !selectedTemplate) {

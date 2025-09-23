@@ -37,9 +37,7 @@ const menuItems = [
   { icon: Settings, label: "Pengaturan", path: "/settings" },
 ];
 
-const getMenuItemsByPermissions = (user) => {
-  const permissions = user?.permissions || [];
-  const role = user?.role;
+const getMenuItemsByPermissions = (permissions = []) => {
   if (permissions.includes("all")) return menuItems;
   return menuItems.filter((item) => {
     if (item.label === "Dashboard" && permissions.includes("dashboard"))
@@ -71,9 +69,7 @@ const getMenuItemsByPermissions = (user) => {
     if (
       item.type === "group" &&
       item.label === "Surat Keterangan" &&
-      (permissions.includes("surat_keterangan") ||
-        permissions.includes("surat_keterangan_unit") ||
-        role === "admin_unit")
+      (permissions.includes("surat_keterangan") || permissions.includes("surat_keterangan_unit"))
     )
       return true;
     return false;
@@ -125,7 +121,7 @@ const Sidebar = ({ isOpen, setIsOpen }) => {
       </div>
       {/* Navigation */}
       <nav className="flex-1 p-4 space-y-2 overflow-y-auto">
-                {(getMenuItemsByPermissions(user) || []).map((item) => {
+        {(getMenuItemsByPermissions(user?.permissions) || []).map((item) => {
           if (item.type === "group") {
             return (
               <div key={item.label} className="space-y-1">

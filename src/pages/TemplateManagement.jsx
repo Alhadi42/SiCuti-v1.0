@@ -83,73 +83,83 @@ const TemplateManagement = () => {
   const [selectedTemplateFields, setSelectedTemplateFields] = useState([]);
   const [isAnalyzingFields, setIsAnalyzingFields] = useState(false);
 
-  // Monitor templates state changes for debugging
+  // Load templates from Supabase database
   useEffect(() => {
-    console.log("Templates state updated:", templates.length, "templates");
-    if (templates.length > 0) {
-      console.log("First template:", templates[0]);
-    }
-  }, [templates]);
+    const loadTemplates = async () => {
+      try {
+        console.log("Loading templates from Supabase...");
+        
+        const currentUser = AuthManager.getUserSession();
+        if (!currentUser) {
+          throw new Error("User not authenticated");
+        }
 
-  // Load templates on component mount
-  useEffect(() => {
+        console.log("Current user:", { role: currentUser.role, unit: currentUser.unit_kerja || currentUser.unitKerja });
+
+        let query = supabase.from("templates").select("*");
+
+        // Apply role-based filtering
+        if (currentUser.role === "master_admin") {
+          // Master admin sees only global templates
+          query = query.eq("template_scope", "global");
+        } else if (currentUser.role === "admin_unit") {
+          // Admin unit sees only their own unit's templates
+          const userUnit = currentUser.unit_kerja || currentUser.unitKerja;
+          if (!userUnit) {
+            throw new Error("Admin unit user must have a unit assigned");
+          }
+          query = query.eq("template_scope", "unit").eq("unit_scope", userUnit);
+        } else {
+          // Other roles have no access
+          throw new Error("Insufficient permissions to access templates");
+        }
+
+        const { data, error } = await query
+          .eq("type", "docx")
+          .order("name", { ascending: true });
+
+        if (error) {
+          throw error;
+        }
+
+        console.log("Templates loaded from Supabase:", data);
+        setTemplates(data || []);
+
+        if (data && data.length > 0 && !selectedTemplate) {
+          setSelectedTemplate(data[0]);
+        }
+      } catch (error) {
+        console.error("Error loading templates from Supabase:", error);
+        toast({
+          title: "Gagal memuat template dari database",
+          description: error.message,
+          variant: "destructive",
+        });
+
+        // Fallback to localStorage if Supabase fails (only for backward compatibility)
+        try {
+          const savedTemplates =
+            JSON.parse(localStorage.getItem("savedTemplates")) || [];
+          const docxTemplates = savedTemplates.filter((t) => {
+            return t.type === "docx" && t.content?.type === "docx";
+          });
+          console.log(
+            "Fallback: Loaded DOCX templates from localStorage:",
+            docxTemplates,
+          );
+          setTemplates(docxTemplates);
+
+          if (docxTemplates.length > 0 && !selectedTemplate) {
+            setSelectedTemplate(docxTemplates[0]);
+          }
+        } catch (localError) {
+          console.error("Error loading from localStorage:", localError);
+        }
+      }
+    };
+
     loadTemplates();
   }, [toast]);
-
-  // Function to load templates for the current user
-  const loadTemplates = async () => {
-    setIsLoading(true);
-    try {
-      const currentUser = AuthManager.getUserSession();
-      if (!currentUser) {
-        throw new Error("User not authenticated");
-      }
-
-      let query = supabase
-        .from('templates')
-        .select('*')
-        .order('updated_at', { ascending: false });
-
-      // Filter templates based on user role
-      if (currentUser.role === 'master_admin') {
-        // Master admin can see all templates
-        query = query;
-      } else if (currentUser.role === 'admin_unit') {
-        // Admin unit can only see their own templates or global templates
-        query = query.or(
-          `and(created_by.eq.${currentUser.id},template_scope.eq.unit),and(unit_scope.eq.${currentUser.unit_kerja || currentUser.unitKerja},template_scope.eq.unit),template_scope.eq.global`
-        );
-      } else {
-        // Regular users can only see their own templates
-        query = query.eq('created_by', currentUser.id);
-      }
-
-      const { data, error } = await query;
-
-      if (error) throw error;
-
-      // Transform data to match expected format
-      const formattedTemplates = data.map(template => ({
-        ...template,
-        content: {
-          type: template.type,
-          data: template.template_data,
-          fileName: template.name + (template.type === 'pdf' ? '.pdf' : '.docx')
-        }
-      }));
-
-      setTemplates(formattedTemplates);
-    } catch (error) {
-      console.error('Error loading templates:', error);
-      toast({
-        title: 'Gagal memuat template',
-        description: error.message,
-        variant: 'destructive',
-      });
-    } finally {
-      setIsLoading(false);
-    }
-  };
 
   // Analyze PDF template form fields
   const analyzeTemplateFields = async (template) => {
@@ -368,65 +378,72 @@ const TemplateManagement = () => {
       return;
     }
 
-    if (!confirm(`Yakin ingin menghapus template "${templateToDelete.name}"?`)) {
+    if (
+      !confirm(`Yakin ingin menghapus template "${templateToDelete.name}"?`)
+    ) {
       return;
     }
 
-    setIsLoading(true);
     try {
       const currentUser = AuthManager.getUserSession();
       if (!currentUser) {
         throw new Error("User not authenticated");
       }
 
-      // First, verify the template exists and get its details
-      const { data: template, error: fetchError } = await supabase
-        .from('templates')
-        .select('*')
-        .eq('id', templateId)
-        .single();
-
-      if (fetchError) throw fetchError;
-
-      // Check if user has permission to delete this template
-      if (currentUser.role !== 'master_admin' && template.created_by !== currentUser.id) {
-        throw new Error('Anda tidak memiliki izin untuk menghapus template ini');
+      // Check permissions
+      if (currentUser.role === "admin_unit") {
+        // Admin unit can only delete their own unit's templates
+        const userUnit = currentUser.unit_kerja || currentUser.unitKerja;
+        if (templateToDelete.template_scope !== "unit" || templateToDelete.unit_scope !== userUnit) {
+          throw new Error("You can only delete templates from your own unit");
+        }
+      } else if (currentUser.role === "master_admin") {
+        // Master admin can only delete global templates
+        if (templateToDelete.template_scope !== "global") {
+          throw new Error("Master admin can only delete global templates");
+        }
+      } else {
+        throw new Error("Insufficient permissions to delete templates");
       }
 
-      // If permission check passes, delete the template
-      const { error: deleteError } = await supabase
-        .from('templates')
+      // Delete from database
+      const { error } = await supabase
+        .from("templates")
         .delete()
-        .eq('id', templateId);
+        .eq("id", templateId);
 
-      if (deleteError) throw deleteError;
+      if (error) throw error;
 
       // Update local state
-      setTemplates(templates.filter(t => t.id !== templateId));
+      const updatedTemplates = templates.filter((t) => t.id !== templateId);
+      setSavedTemplates(updatedTemplates);
 
-      // Clear selected template if it was the one deleted
       if (selectedTemplate?.id === templateId) {
         setSelectedTemplate(null);
       }
 
       toast({
-        title: 'Template dihapus',
-        description: 'Template berhasil dihapus',
-        variant: 'default',
+        title: "Template dihapus",
+        description: `Template "${templateToDelete.name}" telah dihapus`,
+        variant: "default",
       });
     } catch (error) {
-      console.error('Error deleting template:', error);
+      console.error("Error deleting template:", error);
       toast({
-        title: 'Gagal menghapus template',
+        title: "Gagal menghapus template",
         description: error.message,
-        variant: 'destructive',
+        variant: "destructive",
       });
-    } finally {
-      setIsLoading(false);
     }
   };
 
-  const handleCloseDialog = () => {
+  const resetForm = () => {
+    setTemplateName("");
+    setTemplateDescription("");
+    setTemplateContent("");
+    setSelectedTemplate(null);
+    setIsEditMode(false);
+    setCurrentTemplateId(null);
     setIsSaveDialogOpen(false);
   };
 

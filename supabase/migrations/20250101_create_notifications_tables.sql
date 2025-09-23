@@ -1,7 +1,7 @@
 -- Create notifications table
 CREATE TABLE IF NOT EXISTS notifications (
   id BIGSERIAL PRIMARY KEY,
-  user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
   type VARCHAR(50) NOT NULL,
   title VARCHAR(255) NOT NULL,
   message TEXT NOT NULL,
@@ -21,7 +21,7 @@ CREATE TABLE IF NOT EXISTS system_announcements (
   active BOOLEAN DEFAULT true,
   start_date TIMESTAMPTZ DEFAULT NOW(),
   end_date TIMESTAMPTZ NULL,
-  created_by UUID REFERENCES users(id) ON DELETE SET NULL,
+  created_by INTEGER REFERENCES users(id) ON DELETE SET NULL,
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
@@ -29,7 +29,7 @@ CREATE TABLE IF NOT EXISTS system_announcements (
 -- Create notification preferences table
 CREATE TABLE IF NOT EXISTS notification_preferences (
   id BIGSERIAL PRIMARY KEY,
-  user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
   notification_type VARCHAR(50) NOT NULL,
   email_enabled BOOLEAN DEFAULT true,
   browser_enabled BOOLEAN DEFAULT true,
@@ -80,7 +80,7 @@ CREATE TRIGGER update_notification_preferences_updated_at
   EXECUTE FUNCTION update_updated_at_column();
 
 -- Create function to get unread notification count
-CREATE OR REPLACE FUNCTION get_unread_notification_count(p_user_id UUID)
+CREATE OR REPLACE FUNCTION get_unread_notification_count(p_user_id INTEGER)
 RETURNS INTEGER
 LANGUAGE plpgsql
 SECURITY DEFINER
@@ -100,8 +100,8 @@ $$;
 
 -- Create function to mark notifications as read
 CREATE OR REPLACE FUNCTION mark_notifications_read(
-  p_user_id UUID,
-  p_notification_ids BIGINT[] DEFAULT NULL
+  p_user_id INTEGER,
+  p_notification_ids INTEGER[] DEFAULT NULL
 )
 RETURNS INTEGER
 LANGUAGE plpgsql
@@ -177,30 +177,25 @@ ALTER TABLE system_announcements ENABLE ROW LEVEL SECURITY;
 ALTER TABLE notification_preferences ENABLE ROW LEVEL SECURITY;
 
 -- Create RLS policies for notifications
-DROP POLICY IF EXISTS "notifications_view_own" ON notifications;
 CREATE POLICY "notifications_view_own" ON notifications
   FOR SELECT
   USING (user_id = auth.uid());
 
-DROP POLICY IF EXISTS "notifications_insert_any" ON notifications;
 CREATE POLICY "notifications_insert_any" ON notifications
   FOR INSERT
   WITH CHECK (true); -- Allow system to insert notifications
 
-DROP POLICY IF EXISTS "notifications_update_own" ON notifications;
 CREATE POLICY "notifications_update_own" ON notifications
   FOR UPDATE
   USING (user_id = auth.uid());
 
 -- Create RLS policies for system announcements
-DROP POLICY IF EXISTS "system_announcements_view_all" ON system_announcements;
 CREATE POLICY "system_announcements_view_all" ON system_announcements
   FOR SELECT
   USING (active = true AND 
          (start_date IS NULL OR start_date <= NOW()) AND
          (end_date IS NULL OR end_date >= NOW()));
 
-DROP POLICY IF EXISTS "system_announcements_manage" ON system_announcements;
 CREATE POLICY "system_announcements_manage" ON system_announcements
   FOR ALL
   USING (
@@ -212,7 +207,6 @@ CREATE POLICY "system_announcements_manage" ON system_announcements
   );
 
 -- Create RLS policies for notification preferences
-DROP POLICY IF EXISTS "notification_preferences_manage_own" ON notification_preferences;
 CREATE POLICY "notification_preferences_manage_own" ON notification_preferences
   FOR ALL
   USING (user_id = auth.uid());
@@ -224,8 +218,8 @@ GRANT SELECT, INSERT, UPDATE, DELETE ON notification_preferences TO authenticate
 GRANT SELECT ON notification_summary TO authenticated;
 
 -- Grant function permissions
-GRANT EXECUTE ON FUNCTION get_unread_notification_count(UUID) TO authenticated;
-GRANT EXECUTE ON FUNCTION mark_notifications_read(UUID, BIGINT[]) TO authenticated;
+GRANT EXECUTE ON FUNCTION get_unread_notification_count(INTEGER) TO authenticated;
+GRANT EXECUTE ON FUNCTION mark_notifications_read(INTEGER, INTEGER[]) TO authenticated;
 GRANT EXECUTE ON FUNCTION get_active_system_announcements() TO authenticated;
 
 -- Insert default notification preferences for existing users
