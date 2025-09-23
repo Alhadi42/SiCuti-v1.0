@@ -110,4 +110,13 @@ END;
 $$ LANGUAGE plpgsql;
 
 -- 8. Enable realtime for templates table
-ALTER PUBLICATION supabase_realtime ADD TABLE templates;
+DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1
+    FROM pg_publication_tables
+    WHERE pubname = 'supabase_realtime' AND tablename = 'templates'
+  ) THEN
+    ALTER PUBLICATION supabase_realtime ADD TABLE templates;
+  END IF;
+END $$;

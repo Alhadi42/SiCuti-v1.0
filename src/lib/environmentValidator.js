@@ -14,6 +14,11 @@ const REQUIRED_ENV_VARS = {
     validate: (value) => value && value.length > 50,
     error: "VITE_SUPABASE_ANON_KEY must be a valid Supabase anonymous key",
   },
+  VITE_SUPABASE_SERVICE_ROLE_KEY: {
+    required: true,
+    validate: (value) => value && value.length > 50 && value.startsWith("ey"),
+    error: "VITE_SUPABASE_SERVICE_ROLE_KEY must be a valid Supabase service role key",
+  },
 };
 
 // Optional environment variables with defaults
@@ -86,6 +91,7 @@ export class EnvironmentValidator {
       supabase: {
         url: import.meta.env.VITE_SUPABASE_URL,
         anonKey: import.meta.env.VITE_SUPABASE_ANON_KEY,
+        serviceRoleKey: import.meta.env.VITE_SUPABASE_SERVICE_ROLE_KEY,
       },
       app: {
         version:

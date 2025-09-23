@@ -26,3 +26,24 @@ export const supabase = createClient(
     },
   },
 );
+
+// Create admin client with service role for server-side operations
+export const supabaseAdmin = createClient(
+  config.supabase.url,
+  config.supabase.serviceRoleKey, // This comes from environment variables via the config
+  {
+    auth: {
+      autoRefreshToken: false,
+      persistSession: false,
+    },
+    db: {
+      schema: "public",
+    },
+    global: {
+      headers: {
+        "x-application-name": "sistem-cuti-admin",
+        "x-client-version": config.app.version,
+      },
+    },
+  },
+);

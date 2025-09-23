@@ -44,7 +44,7 @@ import { processDocxTemplate } from "@/utils/docxTemplates";
 import { saveAs } from "file-saver";
 import ConnectionStatus from "@/components/ConnectionStatus";
 import { safeErrorMessage, getUserFriendlyErrorMessage } from "@/utils/errorDisplay";
-import { markSimpleProposalAsCompleted, restoreSimpleProposal, isSimpleProposalCompleted } from "@/lib/simpleCompletionManager";
+import { markProposalCompleted, isProposalCompleted } from '@/lib/simplifiedCompletionManager'; // Updated import
 import DatabaseHealthChecker from "@/components/DatabaseHealthChecker";
 
 // Convert number to Indonesian words
@@ -480,7 +480,7 @@ const BatchLeaveProposals = () => {
           }
 
           try {
-            const completionStatus = await isSimpleProposalCompleted(group.unitName, group.proposalDate);
+            const completionStatus = await isProposalCompleted(group.unitName, group.proposalDate);
             if (completionStatus && completionStatus.isCompleted) {
               completedSet.add(proposalKey);
               completedProposalsMap.set(proposalKey, {
@@ -650,11 +650,15 @@ const BatchLeaveProposals = () => {
 
       // Mark as completed using simple manager
       console.log('🔄 Marking proposal as completed...');
-      const completedProposal = await markSimpleProposalAsCompleted(
+      const { success, data: completedProposal } = await markProposalCompleted(
         unit.unitName,
         unit.proposalDate,
         unit.requests
       );
+
+      if (!success) {
+        throw new Error('Failed to mark proposal as completed in the backend.');
+      }
 
       // Create completion record for local state
       const completionRecord = {
@@ -716,7 +720,16 @@ const BatchLeaveProposals = () => {
 
       // Restore using simple manager
       console.log('🔄 Restoring proposal...');
-      const restoredProposal = await restoreSimpleProposal(unit.unitName, unit.proposalDate);
+      // The new simplified manager doesn't have a restore function.
+      // We will directly update the status using supabaseAdmin client for simplicity.
+      const { data: restoredProposal, error } = await supabaseAdmin
+        .from('leave_proposals')
+        .update({ status: 'draft', completed_at: null, completed_by: null })
+        .eq('proposer_unit', unit.unitName)
+        .eq('proposal_date', unit.proposalDate)
+        .select();
+
+      if (error) throw error;
 
       // Update local state
       setCompletedProposals(prev => {

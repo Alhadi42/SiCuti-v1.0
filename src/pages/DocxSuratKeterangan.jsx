@@ -43,7 +43,7 @@ import {
   countWorkingDays,
   fetchNationalHolidaysFromDB,
 } from "@/utils/workingDays";
-import { AuthManager } from "@/lib/authManager";
+import { AuthManager } from "@/lib/auth";
 
 // Dummy data for employees - in a real app, this would come from an API
 const dummyEmployees = [
@@ -205,7 +205,16 @@ function DocxSuratKeterangan() {
   const [holidays, setHolidays] = useState(new Set());
   const { toast } = useToast();
 
-  // Load DOCX templates from Supabase database
+  // Monitor templates state changes for debugging
+  useEffect(() => {
+    console.log("DocxSuratKeterangan: Templates state updated:", savedTemplates.length, "templates");
+    console.log("DocxSuratKeterangan: Template details:", savedTemplates.map(t => ({ id: t.id, name: t.name, scope: t.template_scope, type: t.type })));
+    if (savedTemplates.length > 0) {
+      console.log("DocxSuratKeterangan: First template:", savedTemplates[0]);
+    }
+  }, [savedTemplates]);
+
+  // Load templates on component mount
   useEffect(() => {
     const loadTemplates = async () => {
       try {
@@ -222,8 +231,8 @@ function DocxSuratKeterangan() {
 
         // Apply role-based filtering
         if (currentUser.role === "master_admin") {
-          // Master admin sees only global templates
-          query = query.eq("template_scope", "global");
+          // Master admin can see all templates
+          // No additional filtering needed - RLS policies handle access
         } else if (currentUser.role === "admin_unit") {
           // Admin unit sees only their own unit's templates
           const userUnit = currentUser.unit_kerja || currentUser.unitKerja;
@@ -236,15 +245,20 @@ function DocxSuratKeterangan() {
           throw new Error("Insufficient permissions to access templates");
         }
 
+        console.log("Executing query with role:", currentUser.role);
+
         const { data, error } = await query
           .eq("type", "docx")
           .order("name", { ascending: true });
 
         if (error) {
+          console.error("Database query error:", error);
           throw error;
         }
 
         console.log("Templates loaded from Supabase:", data);
+        console.log("Template count:", data ? data.length : 0);
+        console.log("Template data details:", data?.map(t => ({ id: t.id, name: t.name, scope: t.template_scope, type: t.type })));
         setSavedTemplates(data || []);
 
         if (data && data.length > 0 && !selectedTemplate) {
