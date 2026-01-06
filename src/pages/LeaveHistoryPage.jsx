@@ -432,7 +432,7 @@ const LeaveHistoryPage = () => {
         const { data: deferralsLogData, error: deferralsLogError } =
           await supabase
             .from("leave_deferrals")
-            .select("id, employee_id, days_deferred")
+            .select("id, employee_id, days_deferred, google_drive_link")
             .eq("year", previousYear)
             .in("employee_id", employeeIds);
 
@@ -444,6 +444,7 @@ const LeaveHistoryPage = () => {
           deferralLogMap.set(d.employee_id, {
             id: d.id,
             days_deferred: d.days_deferred,
+            google_drive_link: d.google_drive_link,
           });
         });
 

@@ -18,6 +18,7 @@ import { calculateDeferrableDays, ensureLeaveBalance } from '@/utils/leaveBalanc
 const AddDeferredLeaveDialog = ({ isOpen, onOpenChange, employee, year, onSuccess, leaveTypes, deferralLog }) => {
   const { toast } = useToast();
   const [deferredDays, setDeferredDays] = useState('');
+  const [documentLink, setDocumentLink] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [annualLeaveTypeId, setAnnualLeaveTypeId] = useState(null);
   const previousYear = year - 1;
@@ -36,10 +37,12 @@ const AddDeferredLeaveDialog = ({ isOpen, onOpenChange, employee, year, onSucces
         });
       }
     }
-    if (deferralLog && deferralLog.days_deferred) {
-      setDeferredDays(deferralLog.days_deferred.toString());
+    if (deferralLog) {
+      if (deferralLog.days_deferred) setDeferredDays(deferralLog.days_deferred.toString());
+      if (deferralLog.google_drive_link) setDocumentLink(deferralLog.google_drive_link);
     } else {
       setDeferredDays('');
+      setDocumentLink('');
     }
   }, [leaveTypes, toast, deferralLog]);
 
@@ -54,14 +57,14 @@ const AddDeferredLeaveDialog = ({ isOpen, onOpenChange, employee, year, onSucces
       return;
     }
     if (!annualLeaveTypeId) {
-        toast({
-            variant: "destructive",
-            title: "Konfigurasi Error",
-            description: "ID Jenis Cuti Tahunan tidak ditemukan. Tidak dapat melanjutkan.",
-        });
-        return;
+      toast({
+        variant: "destructive",
+        title: "Konfigurasi Error",
+        description: "ID Jenis Cuti Tahunan tidak ditemukan. Tidak dapat melanjutkan.",
+      });
+      return;
     }
-    
+
     setIsLoading(true);
     const days = parseInt(deferredDays, 10);
 
@@ -69,7 +72,7 @@ const AddDeferredLeaveDialog = ({ isOpen, onOpenChange, employee, year, onSucces
       if (deferralLog && deferralLog.id) {
         const { error: updateError } = await supabase
           .from('leave_deferrals')
-          .update({ days_deferred: days })
+          .update({ days_deferred: days, google_drive_link: documentLink })
           .eq('id', deferralLog.id);
         if (updateError) throw updateError;
         const { error: updateBalanceError } = await supabase
@@ -123,7 +126,7 @@ const AddDeferredLeaveDialog = ({ isOpen, onOpenChange, employee, year, onSucces
           .eq('year', previousYear)
           .single();
 
-        const maxDeferrable = previousBalance 
+        const maxDeferrable = previousBalance
           ? calculateDeferrableDays(previousBalance)
           : 0;
 
@@ -140,21 +143,21 @@ const AddDeferredLeaveDialog = ({ isOpen, onOpenChange, employee, year, onSucces
         // Update balance with new deferred days
         // If updating existing, replace the value; if new, set it
         const newDeferredDays = existingDeferral ? days : days; // Use input value
-        
+
         const { error: updateError } = await supabase
           .from('leave_balances')
           .update({ deferred_days: newDeferredDays })
           .eq('id', balance.id);
-        
+
         if (updateError) throw updateError;
 
         // Update or create deferral log
         if (existingDeferral) {
           const { error: updateDeferralError } = await supabase
             .from('leave_deferrals')
-            .update({ days_deferred: days })
+            .update({ days_deferred: days, google_drive_link: documentLink })
             .eq('id', existingDeferral.id);
-          
+
           if (updateDeferralError) {
             console.warn("Gagal memperbarui log penangguhan:", updateDeferralError);
             toast({
@@ -169,9 +172,10 @@ const AddDeferredLeaveDialog = ({ isOpen, onOpenChange, employee, year, onSucces
             .insert({
               employee_id: employee.id,
               year: previousYear,
-              days_deferred: days
+              days_deferred: days,
+              google_drive_link: documentLink
             });
-          
+
           if (deferralLogError) {
             console.warn("Gagal mencatat log penangguhan:", deferralLogError);
             toast({
@@ -199,6 +203,7 @@ const AddDeferredLeaveDialog = ({ isOpen, onOpenChange, employee, year, onSucces
     } finally {
       setIsLoading(false);
       setDeferredDays('');
+      setDocumentLink('');
     }
   };
 
@@ -231,6 +236,17 @@ const AddDeferredLeaveDialog = ({ isOpen, onOpenChange, employee, year, onSucces
                 placeholder="Contoh: 5"
                 min="0"
                 required
+                className="bg-slate-700/50 border-slate-600/50"
+              />
+            </div>
+            <div>
+              <Label htmlFor="document-link">Link Dokumen (Google Drive)</Label>
+              <Input
+                id="document-link"
+                type="url"
+                value={documentLink}
+                onChange={(e) => setDocumentLink(e.target.value)}
+                placeholder="https://drive.google.com/..."
                 className="bg-slate-700/50 border-slate-600/50"
               />
             </div>

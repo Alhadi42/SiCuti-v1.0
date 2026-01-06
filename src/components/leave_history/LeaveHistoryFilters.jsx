@@ -1,9 +1,8 @@
 import React, { useState } from 'react';
-import { Search, Plus } from 'lucide-react';
+import { Search } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import DeferredLeaveInputDialog from './DeferredLeaveInputDialog.jsx';
 
 const LeaveHistoryFilters = ({
   searchTerm,
@@ -14,8 +13,6 @@ const LeaveHistoryFilters = ({
   onRefresh,
   isLoading
 }) => {
-  const [isInputDeferredOpen, setIsInputDeferredOpen] = useState(false);
-
   return (
     <>
       <Card className="bg-slate-800/50 backdrop-blur-xl border-slate-700/50">
@@ -32,7 +29,7 @@ const LeaveHistoryFilters = ({
                 className="pl-10 bg-slate-700/50 border-slate-600/50 text-white placeholder-slate-400"
               />
             </div>
-            
+
             <select
               id="year-select"
               name="year-select"
@@ -46,25 +43,9 @@ const LeaveHistoryFilters = ({
                 </option>
               ))}
             </select>
-
-            <Button 
-              variant="outline" 
-              onClick={() => setIsInputDeferredOpen(true)} 
-              className="border-slate-600 text-slate-300 hover:text-white hover:bg-slate-700" 
-              disabled={isLoading}
-            >
-              <Plus className="w-4 h-4 mr-2" />
-              Input Data Penangguhan
-            </Button>
           </div>
         </CardContent>
       </Card>
-
-      <DeferredLeaveInputDialog
-        isOpen={isInputDeferredOpen}
-        onOpenChange={setIsInputDeferredOpen}
-        onSuccess={onRefresh}
-      />
     </>
   );
 };
