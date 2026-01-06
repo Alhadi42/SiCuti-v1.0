@@ -2,3 +2,4 @@ node_modules
 **/tempobook/dynamic/
 **/tempobook/storyboards/
 .env
+**/tempobook/**

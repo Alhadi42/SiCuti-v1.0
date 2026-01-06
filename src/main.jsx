@@ -3,7 +3,7 @@ import ReactDOM from "react-dom/client";
 import App from "@/App";
 import "@/index.css";
 import { supabase } from "@/lib/supabaseOptimized";
-import { TempoDevtools } from "tempo-devtools";
+
 import "@/utils/aggressiveResizeObserverSuppression.js"; // Load FIRST - most aggressive
 import "@/lib/globalErrorHandler.js";
 import { initDebugConsole } from "@/lib/debugConsole.js";
@@ -20,7 +20,7 @@ try {
   // Continue without debug console
 }
 
-TempoDevtools.init();
+;
 
 // Import test utilities AFTER console override is initialized
 if (import.meta.env.DEV) {
