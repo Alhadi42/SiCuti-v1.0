@@ -35,7 +35,7 @@ const LeaveRequestForm = ({
   initialData,
 }) => {
   const { toast } = useToast();
-  
+
   // Dynamic year calculation for quota
   const currentYear = useMemo(() => new Date().getFullYear(), []);
   const quotaYears = useMemo(() => [
@@ -77,6 +77,8 @@ const LeaveRequestForm = ({
   const [isEditEmployeeModalOpen, setIsEditEmployeeModalOpen] = useState(false);
   const [editingEmployee, setEditingEmployee] = useState(null);
   const [departments, setDepartments] = useState([]);
+  const [overlapWarning, setOverlapWarning] = useState("");
+  const [isCheckingOverlap, setIsCheckingOverlap] = useState(false);
 
   const fetchEmployees = useCallback(
     async (query) => {
@@ -381,6 +383,78 @@ const LeaveRequestForm = ({
     fetchDepartments();
   }, []);
 
+  // Check for date overlap
+  useEffect(() => {
+    const checkOverlap = async () => {
+      if (!formData.employee_id || !formData.start_date || !formData.end_date) {
+        setOverlapWarning("");
+        return;
+      }
+
+      console.log("Checking overlap for:", {
+        emp: formData.employee_id,
+        start: formData.start_date,
+        end: formData.end_date
+      });
+
+      setIsCheckingOverlap(true);
+      try {
+        // Query for overlapping dates:
+        // Existing Start <= New End  AND  Existing End >= New Start
+        // Note: 'status' column does not exist in leave_requests, assuming all existing requests are valid/active
+        const { data: overlappingRequests, error } = await supabase
+          .from("leave_requests")
+          .select("id, start_date, end_date, leave_types(name)")
+          .eq("employee_id", formData.employee_id)
+          .lte('start_date', formData.end_date)
+          .gte('end_date', formData.start_date);
+
+        if (error) throw error;
+
+        console.log("DB Overlap Results:", overlappingRequests);
+
+        // Perform precise date overlap check in JS to handle edge cases
+        const overlaps = overlappingRequests.filter(req => {
+          const reqStart = new Date(req.start_date);
+          const reqEnd = new Date(req.end_date);
+          const formStart = new Date(formData.start_date);
+          const formEnd = new Date(formData.end_date);
+
+          // Check if there is an actual overlap
+          return reqStart <= formEnd && reqEnd >= formStart;
+        });
+
+        console.log("Filtered Overlaps:", overlaps);
+
+        // Remove current request from check if editing
+        const actualOverlaps = initialData?.id
+          ? overlaps.filter(r => r.id !== initialData.id) // This won't work perfectly because we didn't select ID. But wait, `or` filter returns potential matches. 
+          // Better approach: filter out the current ID in the query or here if we had IDs.
+          // Since we didn't select ID in query above, let's refine the query.
+          : overlaps;
+
+        if (actualOverlaps.length > 0) {
+          const conflict = actualOverlaps[0]; // Just take first conflict
+          setOverlapWarning(
+            `⚠️ Peringatan: Terdapat pengajuan cuti lain (${conflict.leave_types?.name}) pada tanggal yang beririsan: ${conflict.start_date} s.d. ${conflict.end_date}`
+          );
+        } else {
+          setOverlapWarning("");
+        }
+      } catch (error) {
+        console.error("Error checking overlap:", error);
+      } finally {
+        setIsCheckingOverlap(false);
+      }
+    };
+
+    const debounceCheck = setTimeout(() => {
+      checkOverlap();
+    }, 500);
+
+    return () => clearTimeout(debounceCheck);
+  }, [formData.employee_id, formData.start_date, formData.end_date, initialData?.id]);
+
   const handleQuickEditEmployee = async () => {
     if (!formData.employee_id) return;
 
@@ -434,7 +508,7 @@ const LeaveRequestForm = ({
 
     setIsEditEmployeeModalOpen(false);
     setEditingEmployee(null);
-    
+
     toast({
       title: "✅ Data Pegawai Diperbarui",
       description: "Data pegawai berhasil diperbarui dan form cuti telah di-refresh.",
@@ -491,6 +565,17 @@ const LeaveRequestForm = ({
         setIsSubmitting(false);
         return;
       }
+    }
+
+    // Block submission if there is an overlap
+    if (overlapWarning) {
+      toast({
+        variant: "destructive",
+        title: "Terdapat Tanggal Cuti yang Beririsan",
+        description: "Mohon ganti tanggal cuti karena bertabrakan dengan pengajuan lain.",
+      });
+      setIsSubmitting(false);
+      return;
     }
 
     const days_requested = calculateDaysRequested(
@@ -732,7 +817,7 @@ const LeaveRequestForm = ({
                   Quick Edit
                 </Button>
               </div>
-              
+
               <div>
                 <Label className="text-xs font-medium text-slate-400">
                   NIP
@@ -827,6 +912,14 @@ const LeaveRequestForm = ({
             />
           </div>
         </div>
+
+        {/* Overlap Warning Message */}
+        {overlapWarning && (
+          <div className="p-3 bg-red-900/40 border border-red-500/50 rounded text-red-300 text-sm flex items-center animate-in fade-in slide-in-from-top-1">
+            <span className="mr-2">⚠️</span>
+            {overlapWarning}
+          </div>
+        )}
 
         {/* New fields - only show if database columns exist */}
         {hasNewColumns && (
@@ -1008,10 +1101,10 @@ const LeaveRequestForm = ({
                       Memuat...
                     </div>
                   ) : signersData.filter((s) =>
-                      s.name
-                        .toLowerCase()
-                        .includes(signerSearchTerm.toLowerCase()),
-                    ).length > 0 ? (
+                    s.name
+                      .toLowerCase()
+                      .includes(signerSearchTerm.toLowerCase()),
+                  ).length > 0 ? (
                     signersData
                       .filter((s) =>
                         s.name
