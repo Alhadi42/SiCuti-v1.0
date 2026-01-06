@@ -38,10 +38,12 @@ const LeaveRequestForm = ({
 
   // Dynamic year calculation for quota
   const currentYear = useMemo(() => new Date().getFullYear(), []);
+  const [selectedPeriod, setSelectedPeriod] = useState(currentYear);
+
   const quotaYears = useMemo(() => [
-    { value: currentYear.toString(), label: `${currentYear} (Tahun Berjalan)` },
-    { value: (currentYear - 1).toString(), label: `${currentYear - 1} (Penangguhan)` },
-  ], [currentYear]);
+    { value: selectedPeriod.toString(), label: `${selectedPeriod} (Tahun Berjalan)` },
+    { value: (selectedPeriod - 1).toString(), label: `${selectedPeriod - 1} (Penangguhan)` },
+  ], [selectedPeriod]);
 
   const [formData, setFormData] = useState({
     employee_id: "",
@@ -59,6 +61,7 @@ const LeaveRequestForm = ({
     signed_by: "",
     address_during_leave: "",
     leave_quota_year: currentYear.toString(), // Default ke tahun berjalan (dynamic)
+    leave_period: currentYear.toString(), // Periode cuti yang sedang diinput
     application_form_date: new Date().toISOString().split("T")[0], // Default ke hari ini
   });
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -196,7 +199,15 @@ const LeaveRequestForm = ({
         application_form_date: initialData.application_form_date
           ? initialData.application_form_date.split("T")[0]
           : new Date().toISOString().split("T")[0],
+        leave_period:
+          initialData.leave_period?.toString() ||
+          initialData.leave_quota_year?.toString() ||
+          new Date().getFullYear().toString(),
       }));
+
+      // Set selected period based on initial data
+      const period = initialData.leave_period || initialData.leave_quota_year || new Date().getFullYear();
+      setSelectedPeriod(parseInt(period));
 
       // Then fetch and set employee data
       fetchEmployeeData();
@@ -540,22 +551,22 @@ const LeaveRequestForm = ({
       return;
     }
 
-    // Validate quota year (if new columns are available)
+    // Validate quota year based on selected period
     if (hasNewColumns) {
       const quotaYear = parseInt(formData.leave_quota_year);
 
-      if (quotaYear < currentYear - 1) {
+      if (quotaYear < selectedPeriod - 1) {
         toast({
           variant: "destructive",
           title: "Tahun Jatah Cuti Tidak Valid",
           description:
-            "Hanya bisa menggunakan jatah cuti tahun berjalan atau tahun sebelumnya.",
+            `Untuk periode ${selectedPeriod}, hanya bisa menggunakan jatah cuti tahun ${selectedPeriod} atau ${selectedPeriod - 1}.`,
         });
         setIsSubmitting(false);
         return;
       }
 
-      if (quotaYear > currentYear) {
+      if (quotaYear > selectedPeriod) {
         toast({
           variant: "destructive",
           title: "Tahun Jatah Cuti Tidak Valid",
@@ -607,6 +618,7 @@ const LeaveRequestForm = ({
       address_during_leave: formData.address_during_leave || null,
       leave_quota_year:
         parseInt(formData.leave_quota_year) || new Date().getFullYear(),
+      leave_period: parseInt(formData.leave_period) || selectedPeriod,
       application_form_date: formData.application_form_date || null,
       submitted_date: initialData?.id
         ? formData.submitted_date
@@ -924,6 +936,53 @@ const LeaveRequestForm = ({
         {/* New fields - only show if database columns exist */}
         {hasNewColumns && (
           <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+            <div>
+              <Label htmlFor="leave_period" className="text-slate-300">
+                Periode Cuti
+                <span className="text-xs text-slate-400 block">
+                  (Pilih tahun periode cuti yang sedang diinput)
+                </span>
+              </Label>
+              <Select
+                value={selectedPeriod.toString()}
+                onValueChange={(value) => {
+                  const newPeriod = parseInt(value);
+                  setSelectedPeriod(newPeriod);
+                  // Reset leave_quota_year to the new period when period changes
+                  setFormData(prev => ({
+                    ...prev,
+                    leave_quota_year: value,
+                    leave_period: value
+                  }));
+                }}
+              >
+                <SelectTrigger
+                  id="leave_period"
+                  className="bg-slate-700 border-slate-600 text-white"
+                >
+                  <SelectValue placeholder="Pilih periode cuti" />
+                </SelectTrigger>
+                <SelectContent className="bg-slate-700 border-slate-600">
+                  {/* Generate years from 2024 to current year */}
+                  {Array.from({ length: currentYear - 2023 }, (_, i) => currentYear - i).map(year => (
+                    <SelectItem
+                      key={year}
+                      value={year.toString()}
+                      className="text-white hover:bg-slate-600"
+                    >
+                      {year}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <div className="mt-2 p-2 rounded border border-slate-600/50 bg-slate-800/30">
+                <p className="text-xs text-slate-400">
+                  💡 Periode menentukan tahun cuti yang sedang Anda input.
+                  Pilih <strong className="text-slate-300">2025</strong> untuk input data cuti periode 2025,
+                  atau <strong className="text-slate-300">2026</strong> untuk periode 2026.
+                </p>
+              </div>
+            </div>
             <div>
               <Label htmlFor="leave_quota_year" className="text-slate-300">
                 Jatah Cuti Tahun

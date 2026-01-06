@@ -16,14 +16,14 @@
  */
 export const calculateDeferrableDays = (previousYearBalance) => {
   if (!previousYearBalance) return 0;
-  
+
   const total = previousYearBalance.total_days || 0;
   const deferred = previousYearBalance.deferred_days || 0;
   const used = previousYearBalance.used_days || 0;
-  
+
   // Remaining = (total + existing deferred) - used
   const remaining = Math.max(0, (total + deferred) - used);
-  
+
   return remaining;
 };
 
@@ -47,44 +47,45 @@ export const calculateLeaveBalance = ({
 }) => {
   const yearNum = typeof year === 'string' ? parseInt(year, 10) : year;
   const currentYearNum = typeof currentYear === 'string' ? parseInt(currentYear, 10) : currentYear;
-  
+
   // Filter requests for this leave type
   const typeRequests = (leaveRequests || []).filter(
     (lr) => lr.leave_type_id === leaveType.id
   );
-  
-  // Calculate usage split based on leave_quota_year
+
+  // Calculate usage split based on leave_quota_year and leave_period
   const usedFromCurrentYear = typeRequests
     .filter((lr) => {
-      const quotaYear = lr.leave_quota_year || new Date(lr.start_date).getFullYear();
+      const quotaYear = lr.leave_quota_year || lr.leave_period || new Date(lr.start_date).getFullYear();
       return quotaYear === yearNum;
     })
     .reduce((sum, lr) => sum + (lr.days_requested || 0), 0);
-  
+
   const usedFromDeferred = typeRequests
     .filter((lr) => {
-      const quotaYear = lr.leave_quota_year || new Date(lr.start_date).getFullYear();
+      const quotaYear = lr.leave_quota_year || lr.leave_period || new Date(lr.start_date).getFullYear();
+      const requestPeriod = lr.leave_period || new Date(lr.start_date).getFullYear();
       // Deferred usage: quota year is less than the year we're viewing
-      // AND the request was made in the viewing year
-      return quotaYear < yearNum && new Date(lr.start_date).getFullYear() === yearNum;
+      // AND the request period is the viewing year
+      return quotaYear < yearNum && requestPeriod === yearNum;
     })
     .reduce((sum, lr) => sum + (lr.days_requested || 0), 0);
-  
+
   // Get base values
   const deferred = dbBalance?.deferred_days || 0;
   let total = leaveType.default_days || 0;
-  
+
   // Use database total_days if available and valid
   if (dbBalance?.total_days != null && dbBalance.total_days > 0) {
     total = dbBalance.total_days;
   }
-  
+
   // Calculate total used
   const totalUsed = usedFromCurrentYear + usedFromDeferred;
-  
+
   // Calculate remaining
   const remaining = Math.max(0, total + deferred - totalUsed);
-  
+
   return {
     total,
     deferred,
@@ -113,7 +114,7 @@ export const ensureLeaveBalance = async (supabase, employeeId, leaveTypeId, year
   const yearNum = typeof year === 'string' ? parseInt(year, 10) : year;
   const currentYear = new Date().getFullYear();
   const previousYear = yearNum - 1;
-  
+
   // Check if balance exists
   const { data: existingBalance, error: fetchError } = await supabase
     .from('leave_balances')
@@ -122,21 +123,21 @@ export const ensureLeaveBalance = async (supabase, employeeId, leaveTypeId, year
     .eq('leave_type_id', leaveTypeId)
     .eq('year', yearNum)
     .single();
-  
+
   if (fetchError && fetchError.code !== 'PGRST116') {
     // Error other than "not found"
     throw fetchError;
   }
-  
+
   if (existingBalance) {
     return existingBalance;
   }
-  
+
   // Balance doesn't exist, create it
   // IMPORTANT: Deferred days only come from manual input via "Input Data Penangguhan"
   // Do NOT automatically calculate from previous year balance
   let deferredDays = 0;
-  
+
   // Only check deferral log if this is a new year and leave type can be deferred
   // Deferred days should ONLY come from deferral log (manual input)
   if (yearNum === currentYear && leaveType.can_defer && previousYear >= 2020) {
@@ -146,14 +147,14 @@ export const ensureLeaveBalance = async (supabase, employeeId, leaveTypeId, year
       .eq('employee_id', employeeId)
       .eq('year', previousYear)
       .single();
-    
+
     // Only use deferral log if it exists (manual input)
     // If no deferral log exists, deferred_days = 0
     if (deferralLog && deferralLog.days_deferred != null) {
       deferredDays = deferralLog.days_deferred;
     }
   }
-  
+
   // Create new balance record
   const { data: newBalance, error: insertError } = await supabase
     .from('leave_balances')
@@ -167,11 +168,11 @@ export const ensureLeaveBalance = async (supabase, employeeId, leaveTypeId, year
     })
     .select()
     .single();
-  
+
   if (insertError) {
     throw insertError;
   }
-  
+
   return newBalance;
 };
 
@@ -185,28 +186,28 @@ export const ensureLeaveBalance = async (supabase, employeeId, leaveTypeId, year
 export const initializeYearBalances = async (supabase, year = null) => {
   const targetYear = year || new Date().getFullYear();
   const previousYear = targetYear - 1;
-  
+
   // Get all employees
   const { data: employees, error: employeesError } = await supabase
     .from('employees')
     .select('id');
-  
+
   if (employeesError) {
     throw employeesError;
   }
-  
+
   // Get all leave types
   const { data: leaveTypes, error: leaveTypesError } = await supabase
     .from('leave_types')
     .select('*');
-  
+
   if (leaveTypesError) {
     throw leaveTypesError;
   }
-  
+
   let initialized = 0;
   let errors = [];
-  
+
   // Initialize balance for each employee and leave type
   for (const employee of employees || []) {
     for (const leaveType of leaveTypes || []) {
@@ -219,15 +220,15 @@ export const initializeYearBalances = async (supabase, year = null) => {
           .eq('leave_type_id', leaveType.id)
           .eq('year', targetYear)
           .single();
-        
+
         if (existing) {
           continue; // Already exists
         }
-        
+
         // IMPORTANT: Deferred days only come from manual input via "Input Data Penangguhan"
         // Do NOT automatically calculate from previous year balance
         let deferredDays = 0;
-        
+
         // Only check deferral log (manual input)
         // If no deferral log exists, deferred_days = 0
         if (leaveType.can_defer && previousYear >= 2020) {
@@ -237,13 +238,13 @@ export const initializeYearBalances = async (supabase, year = null) => {
             .eq('employee_id', employee.id)
             .eq('year', previousYear)
             .single();
-          
+
           // Only use deferral log if it exists (manual input)
           if (deferralLog && deferralLog.days_deferred != null) {
             deferredDays = deferralLog.days_deferred;
           }
         }
-        
+
         // Create balance record
         const { error: insertError } = await supabase
           .from('leave_balances')
@@ -255,7 +256,7 @@ export const initializeYearBalances = async (supabase, year = null) => {
             used_days: 0,
             deferred_days: deferredDays,
           });
-        
+
         if (insertError) {
           errors.push({
             employee_id: employee.id,
@@ -274,7 +275,7 @@ export const initializeYearBalances = async (supabase, year = null) => {
       }
     }
   }
-  
+
   return {
     initialized,
     total: (employees?.length || 0) * (leaveTypes?.length || 0),
@@ -293,36 +294,37 @@ export const initializeYearBalances = async (supabase, year = null) => {
  */
 export const recalculateLeaveBalance = async (supabase, employeeId, leaveTypeId, year) => {
   const yearNum = typeof year === 'string' ? parseInt(year, 10) : year;
-  
+
   // Get all leave requests for this employee and leave type
   const { data: requests, error: requestsError } = await supabase
     .from('leave_requests')
-    .select('days_requested, leave_quota_year, start_date')
+    .select('days_requested, leave_quota_year, leave_period, start_date')
     .eq('employee_id', employeeId)
     .eq('leave_type_id', leaveTypeId);
-  
+
   if (requestsError) {
     throw requestsError;
   }
-  
+
   // Calculate used days from current year quota
   const usedFromCurrent = (requests || [])
     .filter((lr) => {
-      const quotaYear = lr.leave_quota_year || new Date(lr.start_date).getFullYear();
+      const quotaYear = lr.leave_quota_year || lr.leave_period || new Date(lr.start_date).getFullYear();
       return quotaYear === yearNum;
     })
     .reduce((sum, lr) => sum + (lr.days_requested || 0), 0);
-  
+
   // Calculate used days from deferred (previous year quota used in this year)
   const usedFromDeferred = (requests || [])
     .filter((lr) => {
-      const quotaYear = lr.leave_quota_year || new Date(lr.start_date).getFullYear();
-      return quotaYear < yearNum && new Date(lr.start_date).getFullYear() === yearNum;
+      const quotaYear = lr.leave_quota_year || lr.leave_period || new Date(lr.start_date).getFullYear();
+      const requestPeriod = lr.leave_period || new Date(lr.start_date).getFullYear();
+      return quotaYear < yearNum && requestPeriod === yearNum;
     })
     .reduce((sum, lr) => sum + (lr.days_requested || 0), 0);
-  
+
   const totalUsed = usedFromCurrent + usedFromDeferred;
-  
+
   // Get current balance
   const { data: balance, error: balanceError } = await supabase
     .from('leave_balances')
@@ -331,11 +333,11 @@ export const recalculateLeaveBalance = async (supabase, employeeId, leaveTypeId,
     .eq('leave_type_id', leaveTypeId)
     .eq('year', yearNum)
     .single();
-  
+
   if (balanceError && balanceError.code !== 'PGRST116') {
     throw balanceError;
   }
-  
+
   // Update used_days
   if (balance) {
     const { data: updated, error: updateError } = await supabase
@@ -344,13 +346,13 @@ export const recalculateLeaveBalance = async (supabase, employeeId, leaveTypeId,
       .eq('id', balance.id)
       .select()
       .single();
-    
+
     if (updateError) {
       throw updateError;
     }
-    
+
     return updated;
   }
-  
+
   return null;
 };

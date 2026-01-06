@@ -405,16 +405,17 @@ const LeaveHistoryPage = () => {
 
         if (balancesError) throw balancesError;
 
-        // Fetch leave requests to calculate separate usage for current year vs deferred
-        // Now with full leave_quota_year support after migration
+        // Fetch leave requests based on start_date for history display
+        // leave_period is used for balance calculation, not for filtering history
+        // History shows when leave was taken, not which period's quota was used
         const { data: leaveRequestsData, error: requestsError } = await supabase
           .from("leave_requests")
           .select(
-            "employee_id, leave_type_id, days_requested, leave_quota_year, start_date",
+            "employee_id, leave_type_id, days_requested, leave_quota_year, leave_period, start_date",
           )
           .in("employee_id", employeeIds)
           .gte("start_date", `${year - 1}-01-01`) // Get requests from previous year onwards
-          .lte("start_date", `${year}-12-31`);
+          .lte("start_date", `${year}-12-31`); // Filter by execution date, not period
 
         if (requestsError) throw requestsError;
 
