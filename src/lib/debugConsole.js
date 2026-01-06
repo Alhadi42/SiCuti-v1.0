@@ -1,4 +1,4 @@
-/**
+﻿/**
  * Debug console utility to help track down [object Object] errors
  */
 
@@ -31,7 +31,7 @@ export const initDebugConsole = () => {
     originalConsoleError = console.error;
     originalConsoleLog = console.log;
     originalConsoleWarn = console.warn;
-    console.log("��� Stored original console methods");
+    console.log("✅ Stored original console methods");
   } else {
     console.log("🔍 Using previously stored console methods");
   }

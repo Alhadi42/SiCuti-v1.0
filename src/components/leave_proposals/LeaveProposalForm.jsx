@@ -6,7 +6,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/components/ui/use-toast";
-import { useAuth } from "@/lib/supabaseClient";
+import { useAuth } from "@/hooks/useAuth";
 import { useEmployeeData } from "@/hooks/useEmployeeData";
 import { useLeaveTypes } from "@/hooks/useLeaveTypes";
 import AutocompleteInput from "@/components/ui/AutocompleteInput";

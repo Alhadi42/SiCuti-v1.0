@@ -13,7 +13,8 @@ import {
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/components/ui/use-toast";
-import { supabase, useAuth } from "@/lib/supabaseClient";
+import { supabase } from "@/lib/supabaseClient";
+import { useAuth } from "@/hooks/useAuth";
 import { checkSupabaseConnection } from "@/utils/supabaseHealthChecker";
 
 import { useLeaveTypes } from "@/hooks/useLeaveTypes";

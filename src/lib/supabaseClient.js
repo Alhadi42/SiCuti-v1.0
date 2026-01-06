@@ -1,6 +1,10 @@
 import { createClient } from "@supabase/supabase-js";
 import EnvironmentValidator from "./environmentValidator";
 
+// Re-export useAuth hook for backward compatibility
+// Note: useAuth is now in @/hooks/useAuth, but we export it here for convenience
+export { useAuth } from "@/hooks/useAuth";
+
 // Validate environment before creating client
 const config = EnvironmentValidator.getConfig();
 

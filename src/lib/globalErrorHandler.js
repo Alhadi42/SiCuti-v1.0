@@ -159,7 +159,7 @@ export class GlobalErrorHandler {
       reason: event.reason,
       timestamp: new Date().toISOString(),
       url: window.location.href,
-      user: AuthManager.getUserSession()?.id || "anonymous",
+      user: (AuthManager?.getUserSession && AuthManager.getUserSession()?.id) || "anonymous",
     };
 
     this.logError(error);
@@ -213,7 +213,7 @@ export class GlobalErrorHandler {
       stack: event.error?.stack,
       timestamp: new Date().toISOString(),
       url: window.location.href,
-      user: AuthManager.getUserSession()?.id || "anonymous",
+      user: (AuthManager?.getUserSession && AuthManager.getUserSession()?.id) || "anonymous",
     };
 
     this.logError(error);
@@ -237,11 +237,20 @@ export class GlobalErrorHandler {
 
     // Log critical errors to audit system
     if (this.isCriticalError(error)) {
-      AuditLogger.logSecurityEvent(AUDIT_EVENTS.SYSTEM_ERROR, {
-        error: error.message,
-        type: error.type,
-        user: error.user,
-      });
+      try {
+        if (AuditLogger && AuditLogger.logSecurityEvent && AUDIT_EVENTS) {
+          AuditLogger.logSecurityEvent(AUDIT_EVENTS.SYSTEM_ERROR, {
+            error: error.message,
+            type: error.type,
+            user: error.user,
+          });
+        }
+      } catch (auditError) {
+        // Non-critical: audit logging failure shouldn't break error handling
+        if (import.meta.env.DEV) {
+          console.warn("Failed to log to audit system:", auditError);
+        }
+      }
     }
 
     // Send to external error tracking service in production
