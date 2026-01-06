@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useMemo } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -6,7 +6,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/components/ui/use-toast";
-import { AuthManager } from "@/lib/auth";
+import { useAuth } from "@/lib/supabaseClient";
 import { useEmployeeData } from "@/hooks/useEmployeeData";
 import { useLeaveTypes } from "@/hooks/useLeaveTypes";
 import AutocompleteInput from "@/components/ui/AutocompleteInput";
@@ -19,7 +19,10 @@ import { validateLeaveProposal, validateEmployeeLeaveItem, sanitizeProposalData,
 
 const LeaveProposalForm = ({ onSubmit, onCancel }) => {
   const { toast } = useToast();
-  const currentUser = AuthManager.getUserSession();
+  const { profile: currentUser } = useAuth();
+  
+  // Dynamic year calculation
+  const currentYear = useMemo(() => new Date().getFullYear(), []);
   
   // Form state
   const [proposalTitle, setProposalTitle] = useState("");
@@ -36,7 +39,7 @@ const LeaveProposalForm = ({ onSubmit, onCancel }) => {
     start_date: "",
     end_date: "",
     days_requested: 0,
-    leave_quota_year: new Date().getFullYear(),
+    leave_quota_year: currentYear, // Dynamic year
     reason: "",
     address_during_leave: "",
   });
@@ -139,7 +142,7 @@ const LeaveProposalForm = ({ onSubmit, onCancel }) => {
       start_date: "",
       end_date: "",
       days_requested: 0,
-      leave_quota_year: new Date().getFullYear(),
+      leave_quota_year: currentYear, // Dynamic year
       reason: "",
       address_during_leave: "",
     });

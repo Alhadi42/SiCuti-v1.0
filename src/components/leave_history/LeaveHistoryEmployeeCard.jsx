@@ -15,13 +15,17 @@ const LeaveBalanceBar = ({ typeConfig, balance, year }) => {
     return null;
   }
 
-  const currentYear = new Date().getFullYear();
-  const isCurrentYear = year === currentYear;
+  // Use the selected year passed from parent, default to current year if not provided
+  const displayYear = year || new Date().getFullYear();
+  const systemCurrentYear = new Date().getFullYear();
+  const isCurrentYear = displayYear === systemCurrentYear;
 
-  // Debug logging untuk melihat data balance yang diterima
-  if (typeConfig.name === "Cuti Tahunan") {
+  // Debug logging untuk melihat data balance yang diterima (only in dev)
+  if (import.meta.env.DEV && typeConfig.name === "Cuti Tahunan") {
     console.log(`🔍 LeaveBalanceBar Debug - ${typeConfig.name}:`, {
       balance,
+      displayYear,
+      systemCurrentYear,
       used_current: balance.used_current,
       used_deferred: balance.used_deferred,
       total: balance.total,
@@ -57,9 +61,10 @@ const LeaveBalanceBar = ({ typeConfig, balance, year }) => {
     remaining: Math.max(0, totalCurrentYear - usedCurrentYear),
   };
 
-  // Debug logging untuk verifikasi
-  if (typeConfig.name === "Cuti Tahunan") {
+  // Debug logging untuk verifikasi (only in dev mode)
+  if (import.meta.env.DEV && typeConfig.name === "Cuti Tahunan") {
     console.log(`🔍 FIXED CALCULATION - ${typeConfig.name}:`, {
+      displayYear,
       totalCurrentYear,
       totalDeferred,
       totalAvailableBalance,
@@ -86,9 +91,10 @@ const LeaveBalanceBar = ({ typeConfig, balance, year }) => {
   const usagePercentage =
     totalAvailable > 0 ? (totalUsed / totalAvailable) * 100 : 0;
 
-  // Debug logging untuk perhitungan
-  if (typeConfig.name === "Cuti Tahunan") {
+  // Debug logging untuk perhitungan (only in dev mode)
+  if (import.meta.env.DEV && typeConfig.name === "Cuti Tahunan") {
     console.log(`🔍 LeaveBalanceBar Final Calculations - ${typeConfig.name}:`, {
+      displayYear,
       currentYearBalance,
       deferredBalance,
       totalUsed,
@@ -139,7 +145,7 @@ const LeaveBalanceBar = ({ typeConfig, balance, year }) => {
         {/* Current Year Balance */}
         <div className="border-t border-slate-600 pt-2">
           <div className="flex justify-between text-xs">
-            <span className="text-slate-400">Saldo {currentYear}</span>
+            <span className="text-slate-400">Saldo {displayYear}</span>
             <span className="text-white font-medium">
               {currentYearBalance.remaining} hari
             </span>

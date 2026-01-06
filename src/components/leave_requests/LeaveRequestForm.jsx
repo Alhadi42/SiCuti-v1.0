@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from "react";
+import React, { useState, useEffect, useCallback, useMemo } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -35,6 +35,14 @@ const LeaveRequestForm = ({
   initialData,
 }) => {
   const { toast } = useToast();
+  
+  // Dynamic year calculation for quota
+  const currentYear = useMemo(() => new Date().getFullYear(), []);
+  const quotaYears = useMemo(() => [
+    { value: currentYear.toString(), label: `${currentYear} (Tahun Berjalan)` },
+    { value: (currentYear - 1).toString(), label: `${currentYear - 1} (Penangguhan)` },
+  ], [currentYear]);
+
   const [formData, setFormData] = useState({
     employee_id: "",
     employee_name: "",
@@ -50,7 +58,7 @@ const LeaveRequestForm = ({
     leave_letter_date: "",
     signed_by: "",
     address_during_leave: "",
-    leave_quota_year: new Date().getFullYear().toString(), // Default ke tahun berjalan
+    leave_quota_year: currentYear.toString(), // Default ke tahun berjalan (dynamic)
     application_form_date: new Date().toISOString().split("T")[0], // Default ke hari ini
   });
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -460,7 +468,6 @@ const LeaveRequestForm = ({
 
     // Validate quota year (if new columns are available)
     if (hasNewColumns) {
-      const currentYear = new Date().getFullYear();
       const quotaYear = parseInt(formData.leave_quota_year);
 
       if (quotaYear < currentYear - 1) {
@@ -845,25 +852,21 @@ const LeaveRequestForm = ({
                   <SelectValue placeholder="Pilih tahun jatah cuti" />
                 </SelectTrigger>
                 <SelectContent className="bg-slate-700 border-slate-600">
-                  {/* Tahun berjalan dan tahun sebelumnya */}
-                  <SelectItem
-                    value={new Date().getFullYear().toString()}
-                    className="text-white hover:bg-slate-600"
-                  >
-                    {new Date().getFullYear()} (Tahun Berjalan)
-                  </SelectItem>
-                  <SelectItem
-                    value={(new Date().getFullYear() - 1).toString()}
-                    className="text-white hover:bg-slate-600"
-                  >
-                    {new Date().getFullYear() - 1} (Penangguhan)
-                  </SelectItem>
+                  {/* Dynamic years for quota selection */}
+                  {quotaYears.map((year) => (
+                    <SelectItem
+                      key={year.value}
+                      value={year.value}
+                      className="text-white hover:bg-slate-600"
+                    >
+                      {year.label}
+                    </SelectItem>
+                  ))}
                 </SelectContent>
               </Select>
               {formData.leave_quota_year && (
                 <div className="mt-2 p-2 rounded border">
-                  {parseInt(formData.leave_quota_year) <
-                  new Date().getFullYear() ? (
+                  {parseInt(formData.leave_quota_year) < currentYear ? (
                     <div className="text-xs text-yellow-400 bg-yellow-900/20 p-2 rounded">
                       ⚠️ <strong>Saldo Cuti Penangguhan</strong>
                       <br />

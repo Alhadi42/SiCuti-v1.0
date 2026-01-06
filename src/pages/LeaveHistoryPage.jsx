@@ -13,8 +13,7 @@ import {
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/components/ui/use-toast";
-import { supabase } from "@/lib/supabaseClient";
-import { AuthManager } from "@/lib/auth";
+import { supabase, useAuth } from "@/lib/supabaseClient";
 import { checkSupabaseConnection } from "@/utils/supabaseHealthChecker";
 
 import { useLeaveTypes } from "@/hooks/useLeaveTypes";
@@ -69,9 +68,11 @@ const LEAVE_HISTORY_PER_PAGE = 10;
 
 const LeaveHistoryPage = () => {
   const { toast } = useToast();
+  const { profile } = useAuth(); // Use new Supabase auth hook
   const [searchTerm, setSearchTerm] = useState("");
   const [debouncedSearchTerm, setDebouncedSearchTerm] = useState("");
-  const [selectedYear, setSelectedYear] = useState("2025");
+  // Default to current year dynamically
+  const [selectedYear, setSelectedYear] = useState(() => new Date().getFullYear().toString());
   const [selectedUnitPenempatan, setSelectedUnitPenempatan] = useState("");
   const [employeesWithBalances, setEmployeesWithBalances] = useState([]);
   const [isLoadingData, setIsLoadingData] = useState(false);
@@ -89,9 +90,25 @@ const LeaveHistoryPage = () => {
   const { departments: unitPenempatanOptions, isLoadingDepartments } =
     useDepartments();
 
+  // Dynamically generate years based on current year (5 years back and 2 years forward)
   const years = useMemo(() => {
-    return ["2025", "2026", "2027", "2028"];
+    const currentYear = new Date().getFullYear();
+    const yearsArray = [];
+    // Include 3 years back, current year, and 2 years forward
+    for (let y = currentYear - 3; y <= currentYear + 2; y++) {
+      yearsArray.push(y.toString());
+    }
+    return yearsArray;
   }, []);
+
+  // Set default selected year to current year on mount
+  useEffect(() => {
+    const currentYear = new Date().getFullYear().toString();
+    // Only set if selectedYear is not in the valid years list or is outdated
+    if (!years.includes(selectedYear)) {
+      setSelectedYear(currentYear);
+    }
+  }, [years, selectedYear]);
 
   const getLeaveTypeConfig = useCallback(
     (leaveTypeName) => {
@@ -149,33 +166,24 @@ const LeaveHistoryPage = () => {
           }
         }
 
-        // Apply unit-based filtering for admin_unit users
-        const currentUser = AuthManager.getUserSession();
+        // Apply unit-based filtering for admin_unit users using Supabase auth
+        const currentUser = profile;
 
-        // DEBUG: Log user session for leave history
-        console.log("🔍 DEBUG LeaveHistory - User session:");
-        console.log("🔍 Raw user object:", currentUser);
-        console.log("🔍 User JSON:", JSON.stringify(currentUser, null, 2));
-        console.log("🔍 User session details:", {
-          hasUser: !!currentUser,
-          userId: currentUser?.id,
-          userName: currentUser?.name,
-          role: currentUser?.role,
-          unit_kerja: currentUser?.unit_kerja,
-          unitKerja: currentUser?.unitKerja,
-          permissions: currentUser?.permissions,
-          userType: typeof currentUser
-        });
-
-        // Safety check for user session
-        if (!currentUser) {
-          console.error("❌ No user session found in LeaveHistory");
-          toast({
-            variant: "destructive",
-            title: "Session Error",
-            description: "User session not found. Please login again.",
+        // DEBUG: Log user session for leave history (only in dev mode)
+        if (import.meta.env.DEV) {
+          console.log("🔍 DEBUG LeaveHistory - User session:", {
+            hasUser: !!currentUser,
+            userId: currentUser?.id,
+            userName: currentUser?.name,
+            role: currentUser?.role,
+            unit_kerja: currentUser?.unit_kerja,
           });
-          return;
+        }
+
+        // Safety check for user session - allow to continue without auth for now
+        // as data access is controlled by RLS policies
+        if (!currentUser && import.meta.env.DEV) {
+          console.warn("⚠️ No user profile found, continuing without auth filter");
         }
 
         // Build the base query for employees
