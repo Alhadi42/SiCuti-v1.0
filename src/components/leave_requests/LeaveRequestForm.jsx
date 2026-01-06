@@ -553,6 +553,24 @@ const LeaveRequestForm = ({
 
     // Validate quota year based on selected period
     if (hasNewColumns) {
+      const startYear = formData.start_date
+        ? new Date(formData.start_date).getFullYear()
+        : null;
+      const periodYear = parseInt(formData.leave_period);
+
+      if (Number.isFinite(periodYear) && Number.isFinite(startYear)) {
+        if (periodYear > startYear || periodYear < startYear - 1) {
+          toast({
+            variant: "destructive",
+            title: "Periode Cuti Tidak Valid",
+            description:
+              `Untuk tanggal cuti tahun ${startYear}, periode hanya boleh ${startYear} atau ${startYear - 1}.`,
+          });
+          setIsSubmitting(false);
+          return;
+        }
+      }
+
       const quotaYear = parseInt(formData.leave_quota_year);
 
       if (quotaYear < selectedPeriod - 1) {
@@ -584,6 +602,23 @@ const LeaveRequestForm = ({
         variant: "destructive",
         title: "Terdapat Tanggal Cuti yang Beririsan",
         description: "Mohon ganti tanggal cuti karena bertabrakan dengan pengajuan lain.",
+      });
+      setIsSubmitting(false);
+      return;
+    }
+
+    if (
+      hasNewColumns &&
+      formData.start_date &&
+      formData.end_date &&
+      new Date(formData.start_date).getFullYear() !==
+        new Date(formData.end_date).getFullYear()
+    ) {
+      toast({
+        variant: "destructive",
+        title: "Rentang Tanggal Tidak Valid",
+        description:
+          "Tanggal mulai dan tanggal selesai harus berada pada tahun yang sama.",
       });
       setIsSubmitting(false);
       return;
@@ -624,6 +659,23 @@ const LeaveRequestForm = ({
         ? formData.submitted_date
         : new Date().toISOString(),
     };
+
+    if (
+      import.meta.env.DEV &&
+      formData.employee_name &&
+      formData.employee_name.toLowerCase().includes("nana")
+    ) {
+      console.log("🔍 DEBUG Nana - dataToSubmit (before save):", {
+        employee_name: formData.employee_name,
+        employee_id: formData.employee_id,
+        start_date: dataToSubmit.start_date,
+        end_date: dataToSubmit.end_date,
+        days_requested: dataToSubmit.days_requested,
+        leave_period: dataToSubmit.leave_period,
+        leave_quota_year: dataToSubmit.leave_quota_year,
+        leave_type_id: dataToSubmit.leave_type_id,
+      });
+    }
     // Convert empty strings to null
     Object.keys(dataToSubmit).forEach((key) => {
       if (dataToSubmit[key] === "") {
@@ -646,10 +698,10 @@ const LeaveRequestForm = ({
         const oldDays = initialData.days_requested;
         const newDays = days_requested;
         const oldYear =
-          initialData.leave_quota_year ||
+          parseInt(initialData.leave_period) ||
           new Date(initialData.start_date).getFullYear();
         const newYear =
-          dataToSubmit.leave_quota_year ||
+          parseInt(dataToSubmit.leave_period) ||
           new Date(dataToSubmit.start_date).getFullYear();
         const oldType = initialData.leave_type_id;
         const newType = dataToSubmit.leave_type_id;
@@ -693,15 +745,15 @@ const LeaveRequestForm = ({
         if (error) throw error;
 
         // Use smart splitting function for balance update
-        const quotaYear =
-          parseInt(formData.leave_quota_year) ||
+        const requestPeriodYear =
+          parseInt(dataToSubmit.leave_period) ||
           new Date(dataToSubmit.start_date).getFullYear();
         const { error: rpcError } = await supabase.rpc(
           "update_leave_balance_with_splitting",
           {
             p_employee_id: dataToSubmit.employee_id,
             p_leave_type_id: dataToSubmit.leave_type_id,
-            p_requested_year: quotaYear,
+            p_requested_year: requestPeriodYear,
             p_days: days_requested,
           },
         );
@@ -904,7 +956,37 @@ const LeaveRequestForm = ({
               name="start_date"
               type="date"
               value={formData.start_date}
-              onChange={(e) => handleChange("start_date", e.target.value)}
+              onChange={(e) => {
+                const value = e.target.value;
+                handleChange("start_date", value);
+                if (hasNewColumns && value) {
+                  const startYear = new Date(value).getFullYear();
+                  setFormData((prev) => {
+                    const currentPeriodYear = parseInt(prev.leave_period);
+                    const desiredPeriodYear =
+                      Number.isFinite(currentPeriodYear) &&
+                      currentPeriodYear <= startYear &&
+                      currentPeriodYear >= startYear - 1
+                        ? currentPeriodYear
+                        : startYear;
+
+                    const currentQuotaYear = parseInt(prev.leave_quota_year);
+                    const desiredQuotaYear =
+                      Number.isFinite(currentQuotaYear) &&
+                      currentQuotaYear <= desiredPeriodYear &&
+                      currentQuotaYear >= desiredPeriodYear - 1
+                        ? currentQuotaYear
+                        : desiredPeriodYear;
+
+                    setSelectedPeriod(desiredPeriodYear);
+                    return {
+                      ...prev,
+                      leave_period: desiredPeriodYear.toString(),
+                      leave_quota_year: desiredQuotaYear.toString(),
+                    };
+                  });
+                }
+              }}
               className="bg-slate-700 border-slate-600 text-white"
               required
             />
@@ -948,12 +1030,20 @@ const LeaveRequestForm = ({
                 onValueChange={(value) => {
                   const newPeriod = parseInt(value);
                   setSelectedPeriod(newPeriod);
-                  // Reset leave_quota_year to the new period when period changes
-                  setFormData(prev => ({
-                    ...prev,
-                    leave_quota_year: value,
-                    leave_period: value
-                  }));
+                  setFormData((prev) => {
+                    const currentQuotaYear = parseInt(prev.leave_quota_year);
+                    const desiredQuotaYear =
+                      Number.isFinite(currentQuotaYear) &&
+                      currentQuotaYear <= newPeriod &&
+                      currentQuotaYear >= newPeriod - 1
+                        ? currentQuotaYear
+                        : newPeriod;
+                    return {
+                      ...prev,
+                      leave_period: value,
+                      leave_quota_year: desiredQuotaYear.toString(),
+                    };
+                  });
                 }}
               >
                 <SelectTrigger

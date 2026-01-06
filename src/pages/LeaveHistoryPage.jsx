@@ -405,17 +405,16 @@ const LeaveHistoryPage = () => {
 
         if (balancesError) throw balancesError;
 
-        // Fetch leave requests based on start_date for history display
-        // leave_period is used for balance calculation, not for filtering history
-        // History shows when leave was taken, not which period's quota was used
+        // Fetch leave requests with a wider window so period-based balances remain accurate
+        // Some leaves taken in early year (e.g. Jan 2026) may still use previous period (leave_period=2025)
         const { data: leaveRequestsData, error: requestsError } = await supabase
           .from("leave_requests")
           .select(
             "employee_id, leave_type_id, days_requested, leave_quota_year, leave_period, start_date",
           )
           .in("employee_id", employeeIds)
-          .gte("start_date", `${year - 1}-01-01`) // Get requests from previous year onwards
-          .lte("start_date", `${year}-12-31`); // Filter by execution date, not period
+          .gte("start_date", `${year - 1}-01-01`)
+          .lte("start_date", `${year + 1}-12-31`);
 
         if (requestsError) throw requestsError;
 
@@ -458,6 +457,24 @@ const LeaveHistoryPage = () => {
             leaveRequestsData?.filter((lr) => lr.employee_id === emp.id) || [];
           const balances = {};
 
+          if (
+            import.meta.env.DEV &&
+            emp.name &&
+            emp.name.toLowerCase().includes("nana")
+          ) {
+            console.log("🔍 DEBUG Nana - fetched leave requests (selectedYear):", {
+              selectedYear: year,
+              employee: { id: emp.id, name: emp.name },
+              requests: empLeaveRequests.map((r) => ({
+                start_date: r.start_date,
+                days_requested: r.days_requested,
+                leave_quota_year: r.leave_quota_year,
+                leave_period: r.leave_period,
+                leave_type_id: r.leave_type_id,
+              })),
+            });
+          }
+
           // Debug logging for specific employee
           if (
             emp.name &&
@@ -486,6 +503,19 @@ const LeaveHistoryPage = () => {
               year,
               currentYear,
             });
+
+            if (
+              import.meta.env.DEV &&
+              emp.name &&
+              emp.name.toLowerCase().includes("nana") &&
+              leaveType.name === "Cuti Tahunan"
+            ) {
+              console.log("🔍 DEBUG Nana - calculated balance (Cuti Tahunan):", {
+                selectedYear: year,
+                dbBalance,
+                calculatedBalance,
+              });
+            }
 
             // Extract values from calculated balance
             const total = calculatedBalance.total;
@@ -910,18 +940,37 @@ const LeaveHistoryPage = () => {
         const jatah_tahun_berjalan = balance.total_days || 0;
         const jatah_penangguhan = balance.deferred_days || 0;
 
+        const normalizeYear = (value) => {
+          if (value == null) return null;
+          const parsed = typeof value === "string" ? parseInt(value, 10) : value;
+          return Number.isFinite(parsed) ? parsed : null;
+        };
+
+        const isRequestPeriod = (r) => {
+          const executionYear = r?.start_date
+            ? new Date(r.start_date).getFullYear()
+            : null;
+          const requestPeriod = normalizeYear(r?.leave_period) || executionYear;
+          return requestPeriod === year;
+        };
+
         // Digunakan tahun berjalan: leave_requests dengan leave_quota_year == year
         const digunakan_tahun_berjalan = cutiTahunanRequests
           .filter(
-            (r) => r.employee_id === employee_id && r.leave_quota_year === year,
+            (r) =>
+              r.employee_id === employee_id &&
+              isRequestPeriod(r) &&
+              normalizeYear(r.leave_quota_year) === year,
           )
           .reduce((sum, r) => sum + (r.days_requested || r.days || 0), 0);
 
-        // Digunakan penangguhan: leave_requests dengan leave_quota_year == year - 1
+        // Digunakan penangguhan: leave_requests dengan leave_quota_year < year
         const digunakan_penangguhan = cutiTahunanRequests
           .filter(
             (r) =>
-              r.employee_id === employee_id && r.leave_quota_year === year - 1,
+              r.employee_id === employee_id &&
+              isRequestPeriod(r) &&
+              (normalizeYear(r.leave_quota_year) ?? year) < year,
           )
           .reduce((sum, r) => sum + (r.days_requested || r.days || 0), 0);
 

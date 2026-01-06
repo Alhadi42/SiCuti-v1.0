@@ -348,8 +348,8 @@ const LeaveRequests = () => {
         .eq("id", requestId);
       if (deleteError) throw deleteError;
 
-      const quotaYear =
-        requestToDelete.leave_quota_year ||
+      const requestPeriodYear =
+        parseInt(requestToDelete.leave_period) ||
         new Date(requestToDelete.start_date).getFullYear();
 
       const { error: rpcError } = await supabase.rpc(
@@ -357,7 +357,7 @@ const LeaveRequests = () => {
         {
           p_employee_id: requestToDelete.employee_id,
           p_leave_type_id: requestToDelete.leave_type_id,
-          p_requested_year: quotaYear,
+          p_requested_year: requestPeriodYear,
           p_days: -requestToDelete.days_requested,
         },
       );

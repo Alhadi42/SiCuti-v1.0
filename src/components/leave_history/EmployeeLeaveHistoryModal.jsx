@@ -119,16 +119,19 @@ const EmployeeLeaveHistoryModal = ({
         .eq("id", recordId);
       if (error) throw error;
 
-      const quotaYear =
-        recordToDelete.leave_quota_year ||
+      const requestPeriodYear =
+        parseInt(recordToDelete.leave_period) ||
         new Date(recordToDelete.start_date).getFullYear();
 
-      const { error: rpcError } = await supabase.rpc("update_leave_balance", {
-        p_employee_id: recordToDelete.employee_id,
-        p_leave_type_id: recordToDelete.leave_type_id,
-        p_year: quotaYear,
-        p_days: -recordToDelete.days_requested,
-      });
+      const { error: rpcError } = await supabase.rpc(
+        "update_leave_balance_with_splitting",
+        {
+          p_employee_id: recordToDelete.employee_id,
+          p_leave_type_id: recordToDelete.leave_type_id,
+          p_requested_year: requestPeriodYear,
+          p_days: -recordToDelete.days_requested,
+        },
+      );
 
       if (rpcError) {
         console.error(

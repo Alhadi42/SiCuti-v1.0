@@ -40,20 +40,9 @@ const LeaveBalanceBar = ({ typeConfig, balance, year }) => {
   const totalDeferred = balance.deferred || 0;
   const totalAvailableBalance = totalCurrentYear + totalDeferred;
 
-  // Hitung total used dari balance.used atau fallback ke perhitungan manual
-  const totalUsedFromBalance =
-    balance.used || (balance.used_current || 0) + (balance.used_deferred || 0);
-
-  // Jika total sisa sudah benar (11), maka total used = total available - total remaining
-  const calculatedTotalUsed = totalAvailableBalance - (balance.remaining || 0);
-
-  // Gunakan perhitungan yang konsisten dengan total sisa yang benar
-  const actualTotalUsed =
-    calculatedTotalUsed > 0 ? calculatedTotalUsed : totalUsedFromBalance;
-
-  // Distribusi penggunaan: prioritas ke saldo penangguhan dulu, baru tahun berjalan
-  const usedDeferred = Math.min(actualTotalUsed, totalDeferred);
-  const usedCurrentYear = Math.max(0, actualTotalUsed - usedDeferred);
+  const usedCurrentYear = balance.used_current || 0;
+  const usedDeferred = balance.used_deferred || 0;
+  const totalUsed = usedCurrentYear + usedDeferred;
 
   const currentYearBalance = {
     total: totalCurrentYear,
@@ -68,7 +57,7 @@ const LeaveBalanceBar = ({ typeConfig, balance, year }) => {
       totalCurrentYear,
       totalDeferred,
       totalAvailableBalance,
-      actualTotalUsed,
+      totalUsed,
       usedCurrentYear,
       usedDeferred,
       currentYearRemaining: currentYearBalance.remaining,
@@ -80,13 +69,11 @@ const LeaveBalanceBar = ({ typeConfig, balance, year }) => {
     totalDeferred > 0
       ? {
         total: totalDeferred,
-        used: usedDeferred, // Menggunakan perhitungan yang sudah diperbaiki
+        used: usedDeferred,
         remaining: Math.max(0, totalDeferred - usedDeferred),
       }
       : null;
 
-  // FIXED: Gunakan total used yang sudah dihitung dengan splitting logic yang diperbaiki
-  const totalUsed = actualTotalUsed;
   const totalAvailable = totalAvailableBalance;
   const usagePercentage =
     totalAvailable > 0 ? (totalUsed / totalAvailable) * 100 : 0;

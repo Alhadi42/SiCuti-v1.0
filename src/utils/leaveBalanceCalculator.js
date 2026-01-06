@@ -48,6 +48,12 @@ export const calculateLeaveBalance = ({
   const yearNum = typeof year === 'string' ? parseInt(year, 10) : year;
   const currentYearNum = typeof currentYear === 'string' ? parseInt(currentYear, 10) : currentYear;
 
+  const normalizeYear = (value) => {
+    if (value == null) return null;
+    const parsed = typeof value === 'string' ? parseInt(value, 10) : value;
+    return Number.isFinite(parsed) ? parsed : null;
+  };
+
   // Filter requests for this leave type
   const typeRequests = (leaveRequests || []).filter(
     (lr) => lr.leave_type_id === leaveType.id
@@ -56,18 +62,36 @@ export const calculateLeaveBalance = ({
   // Calculate usage split based on leave_quota_year and leave_period
   const usedFromCurrentYear = typeRequests
     .filter((lr) => {
-      const quotaYear = lr.leave_quota_year || lr.leave_period || new Date(lr.start_date).getFullYear();
+      const executionYear = lr.start_date
+        ? new Date(lr.start_date).getFullYear()
+        : null;
+      const requestPeriod =
+        normalizeYear(lr.leave_period) ||
+        executionYear;
+      if (requestPeriod !== yearNum) return false;
+      const quotaYear =
+        normalizeYear(lr.leave_quota_year) ||
+        requestPeriod ||
+        executionYear;
       return quotaYear === yearNum;
     })
     .reduce((sum, lr) => sum + (lr.days_requested || 0), 0);
 
   const usedFromDeferred = typeRequests
     .filter((lr) => {
-      const quotaYear = lr.leave_quota_year || lr.leave_period || new Date(lr.start_date).getFullYear();
-      const requestPeriod = lr.leave_period || new Date(lr.start_date).getFullYear();
-      // Deferred usage: quota year is less than the year we're viewing
-      // AND the request period is the viewing year
-      return quotaYear < yearNum && requestPeriod === yearNum;
+      const executionYear = lr.start_date
+        ? new Date(lr.start_date).getFullYear()
+        : null;
+      const requestPeriod =
+        normalizeYear(lr.leave_period) ||
+        executionYear;
+      if (requestPeriod !== yearNum) return false;
+      const quotaYear =
+        normalizeYear(lr.leave_quota_year) ||
+        requestPeriod ||
+        executionYear;
+      // Deferred usage: quota year is less than the period we're viewing
+      return quotaYear < yearNum;
     })
     .reduce((sum, lr) => sum + (lr.days_requested || 0), 0);
 
@@ -112,7 +136,6 @@ export const calculateLeaveBalance = ({
  */
 export const ensureLeaveBalance = async (supabase, employeeId, leaveTypeId, year, leaveType) => {
   const yearNum = typeof year === 'string' ? parseInt(year, 10) : year;
-  const currentYear = new Date().getFullYear();
   const previousYear = yearNum - 1;
 
   // Check if balance exists
@@ -130,6 +153,34 @@ export const ensureLeaveBalance = async (supabase, employeeId, leaveTypeId, year
   }
 
   if (existingBalance) {
+    // Keep deferred_days in sync with manual deferral log
+    if (leaveType?.can_defer && previousYear >= 2020) {
+      const { data: deferralLog, error: deferralError } = await supabase
+        .from('leave_deferrals')
+        .select('days_deferred')
+        .eq('employee_id', employeeId)
+        .eq('year', previousYear)
+        .single();
+
+      if (!deferralError && deferralLog && deferralLog.days_deferred != null) {
+        const desiredDeferred = deferralLog.days_deferred;
+        const currentDeferred = existingBalance.deferred_days || 0;
+
+        if (currentDeferred !== desiredDeferred) {
+          const { data: updatedBalance, error: updateError } = await supabase
+            .from('leave_balances')
+            .update({ deferred_days: desiredDeferred })
+            .eq('id', existingBalance.id)
+            .select()
+            .single();
+
+          if (!updateError && updatedBalance) {
+            return updatedBalance;
+          }
+        }
+      }
+    }
+
     return existingBalance;
   }
 
@@ -138,9 +189,8 @@ export const ensureLeaveBalance = async (supabase, employeeId, leaveTypeId, year
   // Do NOT automatically calculate from previous year balance
   let deferredDays = 0;
 
-  // Only check deferral log if this is a new year and leave type can be deferred
   // Deferred days should ONLY come from deferral log (manual input)
-  if (yearNum === currentYear && leaveType.can_defer && previousYear >= 2020) {
+  if (leaveType.can_defer && previousYear >= 2020) {
     const { data: deferralLog } = await supabase
       .from('leave_deferrals')
       .select('days_deferred')
@@ -295,6 +345,12 @@ export const initializeYearBalances = async (supabase, year = null) => {
 export const recalculateLeaveBalance = async (supabase, employeeId, leaveTypeId, year) => {
   const yearNum = typeof year === 'string' ? parseInt(year, 10) : year;
 
+  const normalizeYear = (value) => {
+    if (value == null) return null;
+    const parsed = typeof value === 'string' ? parseInt(value, 10) : value;
+    return Number.isFinite(parsed) ? parsed : null;
+  };
+
   // Get all leave requests for this employee and leave type
   const { data: requests, error: requestsError } = await supabase
     .from('leave_requests')
@@ -309,7 +365,17 @@ export const recalculateLeaveBalance = async (supabase, employeeId, leaveTypeId,
   // Calculate used days from current year quota
   const usedFromCurrent = (requests || [])
     .filter((lr) => {
-      const quotaYear = lr.leave_quota_year || lr.leave_period || new Date(lr.start_date).getFullYear();
+      const executionYear = lr.start_date
+        ? new Date(lr.start_date).getFullYear()
+        : null;
+      const requestPeriod =
+        normalizeYear(lr.leave_period) ||
+        executionYear;
+      if (requestPeriod !== yearNum) return false;
+      const quotaYear =
+        normalizeYear(lr.leave_quota_year) ||
+        requestPeriod ||
+        executionYear;
       return quotaYear === yearNum;
     })
     .reduce((sum, lr) => sum + (lr.days_requested || 0), 0);
@@ -317,9 +383,18 @@ export const recalculateLeaveBalance = async (supabase, employeeId, leaveTypeId,
   // Calculate used days from deferred (previous year quota used in this year)
   const usedFromDeferred = (requests || [])
     .filter((lr) => {
-      const quotaYear = lr.leave_quota_year || lr.leave_period || new Date(lr.start_date).getFullYear();
-      const requestPeriod = lr.leave_period || new Date(lr.start_date).getFullYear();
-      return quotaYear < yearNum && requestPeriod === yearNum;
+      const executionYear = lr.start_date
+        ? new Date(lr.start_date).getFullYear()
+        : null;
+      const requestPeriod =
+        normalizeYear(lr.leave_period) ||
+        executionYear;
+      if (requestPeriod !== yearNum) return false;
+      const quotaYear =
+        normalizeYear(lr.leave_quota_year) ||
+        requestPeriod ||
+        executionYear;
+      return quotaYear < yearNum;
     })
     .reduce((sum, lr) => sum + (lr.days_requested || 0), 0);
 
