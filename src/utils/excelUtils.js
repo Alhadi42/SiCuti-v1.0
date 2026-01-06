@@ -5,6 +5,16 @@
 import ExcelJS from 'exceljs';
 import { saveAs } from 'file-saver';
 
+// Helper to sanitize strings for Excel
+const sanitizeString = (str) => {
+  if (str === null || str === undefined) return '';
+  // Remove control characters (ASCII 0-31) except newlines/tabs
+  // Also limit length to avoid Excel cell limits (32767 chars)
+  return String(str)
+    .replace(/[\x00-\x08\x0B\x0C\x0E-\x1F]/g, '')
+    .substring(0, 32000);
+};
+
 /**
  * Create and download Excel template
  */
@@ -17,7 +27,7 @@ export const createExcelTemplate = async (data, filename, sheetName = 'Sheet1') 
     if (data && data.length > 0) {
       const headers = Object.keys(data[0]);
       worksheet.addRow(headers);
-      
+
       // Style header row
       const headerRow = worksheet.getRow(1);
       headerRow.font = { bold: true };
@@ -57,8 +67,8 @@ export const createExcelTemplate = async (data, filename, sheetName = 'Sheet1') 
 
     // Generate and download file
     const buffer = await workbook.xlsx.writeBuffer();
-    const blob = new Blob([buffer], { 
-      type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' 
+    const blob = new Blob([buffer], {
+      type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
     });
     saveAs(blob, filename);
 
@@ -89,7 +99,7 @@ export const readExcelFile = async (file) => {
       'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
       'application/vnd.ms-excel'
     ];
-    
+
     if (!allowedTypes.includes(file.type) && !file.name.match(/\.(xlsx|xls)$/i)) {
       throw new Error('Format file tidak didukung. Gunakan file Excel (.xlsx atau .xls).');
     }
@@ -149,7 +159,7 @@ export const exportToExcel = async (data, filename, sheetName = 'Data') => {
     if (data && data.length > 0) {
       const headers = Object.keys(data[0]);
       worksheet.addRow(headers);
-      
+
       // Style header row
       const headerRow = worksheet.getRow(1);
       headerRow.font = { bold: true };
@@ -189,8 +199,8 @@ export const exportToExcel = async (data, filename, sheetName = 'Data') => {
 
     // Generate and download file
     const buffer = await workbook.xlsx.writeBuffer();
-    const blob = new Blob([buffer], { 
-      type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' 
+    const blob = new Blob([buffer], {
+      type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
     });
     saveAs(blob, filename);
 
@@ -207,294 +217,201 @@ export const exportToExcel = async (data, filename, sheetName = 'Data') => {
 export const exportToExcelWithMultipleSheets = async (dataObj, filename) => {
   try {
     console.log('📊 Starting Excel export with data:', dataObj);
-    console.log('📋 Leave requests count:', dataObj.leaveRequests?.length || 0);
-    console.log('📋 Deferrals count:', dataObj.deferrals?.length || 0);
-    console.log('📋 Leave balances count:', dataObj.leaveBalances?.length || 0);
-    
-    const workbook = new ExcelJS.Workbook();
-    
-    // Debug: Check if dataObj has the expected structure
-    console.log('🔍 Debug - dataObj structure:', {
-      hasLeaveRequests: !!dataObj.leaveRequests,
-      leaveRequestsLength: dataObj.leaveRequests?.length,
-      hasDeferrals: !!dataObj.deferrals,
-      deferralsLength: dataObj.deferrals?.length,
-      hasLeaveBalances: !!dataObj.leaveBalances,
-      leaveBalancesLength: dataObj.leaveBalances?.length,
-      leaveRequestsType: typeof dataObj.leaveRequests,
-      deferralsType: typeof dataObj.deferrals,
-      leaveBalancesType: typeof dataObj.leaveBalances
-    });
-    
-    if (dataObj.leaveRequests && dataObj.leaveRequests.length > 0) {
-      console.log('🔍 Debug - First leave request:', dataObj.leaveRequests[0]);
-    }
-    
-    if (dataObj.deferrals && dataObj.deferrals.length > 0) {
-      console.log('🔍 Debug - First deferral:', dataObj.deferrals[0]);
+
+    // Validate request data before creating workbook
+    if (!dataObj) {
+      throw new Error('Data export tidak valid');
     }
 
-    if (dataObj.leaveBalances && dataObj.leaveBalances.length > 0) {
-      console.log('🔍 Debug - First leave balance:', dataObj.leaveBalances[0]);
-    }
-    
+    const workbook = new ExcelJS.Workbook();
+
     // Sheet 1: Data Pengajuan Cuti
     if (dataObj.leaveRequests && dataObj.leaveRequests.length > 0) {
       console.log('📝 Creating Sheet 1: Data Pengajuan Cuti');
-      const worksheet1 = workbook.addWorksheet('Data Pengajuan Cuti');
-      
-      // Add headers for leave requests with new "Jatah Cuti Tahun" column
-      const leaveRequestHeaders = [
-        'ID Pegawai',
-        'Nama Pegawai',
-        'NIP',
-        'Departemen',
-        'Jenis Cuti',
-        'Tanggal Mulai',
-        'Tanggal Selesai',
-        'Jumlah Hari',
-        'Jatah Cuti Tahun',
-        'Status',
-        'Alasan',
-        'Tanggal Pengajuan',
-        'Catatan'
-      ];
-      
-      // Add header row
-      const headerRow = worksheet1.addRow(leaveRequestHeaders);
-      console.log('✅ Header row added to worksheet 1, row number:', headerRow.number);
-      
-      // Style header row
-      headerRow.font = { bold: true };
-      headerRow.fill = {
-        type: 'pattern',
-        pattern: 'solid',
-        fgColor: { argb: 'FFE0E0E0' }
-      };
-      
-      // Add data rows
-      dataObj.leaveRequests.forEach((request, index) => {
-        console.log(`📝 Processing leave request ${index + 1}:`, request);
-        
-        const rowData = [
-          String(request.employee_id || ''),
-          String(request.employee_name || ''),
-          String(request.employee_nip || ''),
-          String(request.employee_department || ''),
-          String(request.leave_type || ''),
-          String(request.start_date || ''),
-          String(request.end_date || ''),
-          String(request.days || request.days_requested || ''),
-          String(request.leave_quota_year || request.start_date?.split('-')[0] || ''),
-          String(request.status || ''),
-          String(request.reason || ''),
-          String(request.created_at || ''),
-          String(request.notes || '')
-        ];
-        
-        console.log(`📝 Row data for leave request ${index + 1}:`, rowData);
-        
-        // Add row to worksheet
-        const addedRow = worksheet1.addRow(rowData);
-        console.log(`✅ Row ${index + 1} added to worksheet 1, row number:`, addedRow.number);
-        
-        // Verify the row was added correctly
-        const actualRow = worksheet1.getRow(addedRow.number);
-        console.log(`🔍 Verification - Row ${addedRow.number} has ${actualRow.cellCount} cells`);
+      // Force NORMAL view with A1 selected to prevent scrolling/hiding issues
+      const worksheet1 = workbook.addWorksheet('Data Pengajuan Cuti', {
+        views: [{ state: 'normal', activeCell: 'A1', showGridLines: true }]
       });
-      
-      console.log(`📊 Total rows in worksheet 1: ${worksheet1.rowCount}`);
-      console.log('✅ Sheet 1 completed');
-      
-      // Auto-fit columns for worksheet 1
+
+      const leaveRequestHeaders = [
+        'ID Pegawai', 'Nama Pegawai', 'NIP', 'Departemen', 'Jenis Cuti',
+        'Tanggal Mulai', 'Tanggal Selesai', 'Jumlah Hari', 'Jatah Cuti Tahun',
+        'Status', 'Alasan', 'Tanggal Pengajuan', 'Catatan'
+      ];
+
+      // Header
+      const headerRow = worksheet1.addRow(leaveRequestHeaders);
+      headerRow.font = { bold: true };
+      headerRow.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFE0E0E0' } };
+
+      // Data
+      dataObj.leaveRequests.forEach((request) => {
+        const rowData = [
+          sanitizeString(request.employee_id),
+          sanitizeString(request.employee_name),
+          sanitizeString(request.employee_nip),
+          sanitizeString(request.employee_department),
+          sanitizeString(request.leave_type),
+          sanitizeString(request.start_date),
+          sanitizeString(request.end_date),
+          sanitizeString(request.days || request.days_requested),
+          sanitizeString(request.leave_quota_year || request.start_date?.split('-')[0]),
+          sanitizeString(request.status),
+          sanitizeString(request.reason),
+          sanitizeString(request.created_at),
+          sanitizeString(request.notes)
+        ];
+
+        const row = worksheet1.addRow(rowData);
+        // Force black text
+        row.eachCell((cell) => {
+          cell.font = { color: { argb: 'FF000000' } };
+          cell.alignment = { vertical: 'top', wrapText: true };
+        });
+      });
+
+      // Auto-fit with safe defaults and explicit unhide
       worksheet1.columns.forEach(column => {
-        column.width = Math.max(
-          column.header ? column.header.length : 10,
-          ...column.values.map(v => String(v).length)
-        );
+        column.hidden = false; // Force visible
+        let maxLength = 10;
+        if (column.values) {
+          column.values.forEach(v => {
+            const len = v ? String(v).length : 0;
+            if (len > maxLength) maxLength = len;
+          });
+        }
+        // Cap max width to prevent giant columns
+        column.width = Math.min(maxLength + 2, 50);
       });
     } else {
       console.log('⚠️ No leave requests data to export');
     }
-    
+
     // Sheet 2: Data Penangguhan
     if (dataObj.deferrals && dataObj.deferrals.length > 0) {
       console.log('📝 Creating Sheet 2: Data Penangguhan');
-      const worksheet2 = workbook.addWorksheet('Data Penangguhan');
-      
-      // Add headers for deferrals
-      const deferralHeaders = [
-        'ID Pegawai',
-        'Nama Pegawai',
-        'NIP',
-        'Departemen',
-        'Tahun Penangguhan',
-        'Jumlah Hari Ditangguhkan',
-        'Link Google Drive',
-        'Catatan',
-        'Tanggal Dibuat',
-        'Status'
-      ];
-      
-      // Add header row
-      const headerRow2 = worksheet2.addRow(deferralHeaders);
-      console.log('✅ Header row added to worksheet 2, row number:', headerRow2.number);
-      
-      // Style header row
-      headerRow2.font = { bold: true };
-      headerRow2.fill = {
-        type: 'pattern',
-        pattern: 'solid',
-        fgColor: { argb: 'FFE0E0E0' }
-      };
-      
-      // Add data rows
-      dataObj.deferrals.forEach((deferral, index) => {
-        console.log(`📝 Processing deferral ${index + 1}:`, deferral);
-        
-        const rowData = [
-          String(deferral.employee_id || ''),
-          String(deferral.employee_name || ''),
-          String(deferral.employee_nip || ''),
-          String(deferral.employee_department || ''),
-          String(deferral.year || ''),
-          String(deferral.days_deferred || ''),
-          String(deferral.google_drive_link || ''),
-          String(deferral.notes || ''),
-          String(deferral.created_at || ''),
-          String(deferral.status || 'Aktif')
-        ];
-        
-        console.log(`📝 Row data for deferral ${index + 1}:`, rowData);
-        
-        // Add row to worksheet
-        const addedRow = worksheet2.addRow(rowData);
-        console.log(`✅ Row ${index + 1} added to worksheet 2, row number:`, addedRow.number);
-        
-        // Verify the row was added correctly
-        const actualRow = worksheet2.getRow(addedRow.number);
-        console.log(`🔍 Verification - Row ${addedRow.number} has ${actualRow.cellCount} cells`);
+      const worksheet2 = workbook.addWorksheet('Data Penangguhan', {
+        views: [{ state: 'normal', activeCell: 'A1', showGridLines: true }]
       });
-      
-      console.log(`📊 Total rows in worksheet 2: ${worksheet2.rowCount}`);
-      console.log('✅ Sheet 2 completed');
-      
-      // Auto-fit columns for worksheet 2
+
+      const deferralHeaders = [
+        'ID Pegawai', 'Nama Pegawai', 'NIP', 'Departemen', 'Tahun Penangguhan',
+        'Jumlah Hari Ditangguhkan', 'Link Google Drive', 'Catatan', 'Tanggal Dibuat', 'Status'
+      ];
+
+      const headerRow2 = worksheet2.addRow(deferralHeaders);
+      headerRow2.font = { bold: true };
+      headerRow2.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFE0E0E0' } };
+
+      dataObj.deferrals.forEach((deferral) => {
+        const rowData = [
+          sanitizeString(deferral.employee_id),
+          sanitizeString(deferral.employee_name),
+          sanitizeString(deferral.employee_nip),
+          sanitizeString(deferral.employee_department),
+          sanitizeString(deferral.year),
+          sanitizeString(deferral.days_deferred),
+          sanitizeString(deferral.google_drive_link),
+          sanitizeString(deferral.notes),
+          sanitizeString(deferral.created_at),
+          sanitizeString(deferral.status || 'Aktif')
+        ];
+
+        const row = worksheet2.addRow(rowData);
+        row.eachCell((cell) => {
+          cell.font = { color: { argb: 'FF000000' } };
+          cell.alignment = { vertical: 'top', wrapText: true };
+        });
+      });
+
+      // Auto-fit with safe defaults and explicit unhide
       worksheet2.columns.forEach(column => {
-        column.width = Math.max(
-          column.header ? column.header.length : 10,
-          ...column.values.map(v => String(v).length)
-        );
+        column.hidden = false;
+        let maxLength = 10;
+        if (column.values) {
+          column.values.forEach(v => {
+            const len = v ? String(v).length : 0;
+            if (len > maxLength) maxLength = len;
+          });
+        }
+        column.width = Math.min(maxLength + 2, 50);
       });
     } else {
       console.log('⚠️ No deferrals data to export');
     }
 
-    // Sheet 3: Saldo Cuti (only for employees with leave requests)
+    // Sheet 3: Saldo Cuti
     if (dataObj.leaveBalances && dataObj.leaveBalances.length > 0) {
       console.log('📝 Creating Sheet 3: Saldo Cuti');
-      const worksheet3 = workbook.addWorksheet('Saldo Cuti');
-      
-      // Add headers untuk saldo cuti tahunan breakdown
-      const leaveBalanceHeaders = [
-        'NIP',
-        'Nama Pegawai',
-        'Departemen',
-        'Tahun',
-        'Jatah Cuti Tahun Berjalan',
-        'Digunakan Tahun Berjalan',
-        'Sisa Tahun Berjalan',
-        'Jatah Penangguhan',
-        'Digunakan Penangguhan',
-        'Sisa Penangguhan'
-      ];
-      
-      // Add header row
-      const headerRow3 = worksheet3.addRow(leaveBalanceHeaders);
-      console.log('✅ Header row added to worksheet 3, row number:', headerRow3.number);
-      
-      // Style header row
-      headerRow3.font = { bold: true };
-      headerRow3.fill = {
-        type: 'pattern',
-        pattern: 'solid',
-        fgColor: { argb: 'FFE0E0E0' }
-      };
-      
-      // Add data rows
-      dataObj.leaveBalances.forEach((balance, index) => {
-        console.log(`📝 Processing leave balance ${index + 1}:`, balance);
-        
-        const rowData = [
-          String(balance.employee_nip || ''),
-          String(balance.employee_name || ''),
-          String(balance.employee_department || ''),
-          String(balance.year || ''),
-          String(balance.jatah_tahun_berjalan || 0),
-          String(balance.digunakan_tahun_berjalan || 0),
-          String(balance.sisa_tahun_berjalan || 0),
-          String(balance.jatah_penangguhan || 0),
-          String(balance.digunakan_penangguhan || 0),
-          String(balance.sisa_penangguhan || 0)
-        ];
-        
-        console.log(`📝 Row data for leave balance ${index + 1}:`, rowData);
-        
-        // Add row to worksheet
-        const addedRow = worksheet3.addRow(rowData);
-        console.log(`✅ Row ${index + 1} added to worksheet 3, row number:`, addedRow.number);
-        
-        // Verify the row was added correctly
-        const actualRow = worksheet3.getRow(addedRow.number);
-        console.log(`🔍 Verification - Row ${addedRow.number} has ${actualRow.cellCount} cells`);
+      const worksheet3 = workbook.addWorksheet('Saldo Cuti', {
+        views: [{ state: 'normal', activeCell: 'A1', showGridLines: true }]
       });
-      
-      console.log(`📊 Total rows in worksheet 3: ${worksheet3.rowCount}`);
-      console.log('✅ Sheet 3 completed');
-      
-      // Auto-fit columns for worksheet 3
+
+      const leaveBalanceHeaders = [
+        'NIP', 'Nama Pegawai', 'Departemen', 'Tahun',
+        'Jatah Cuti Tahun Berjalan', 'Digunakan Tahun Berjalan', 'Sisa Tahun Berjalan',
+        'Jatah Penangguhan', 'Digunakan Penangguhan', 'Sisa Penangguhan'
+      ];
+
+      const headerRow3 = worksheet3.addRow(leaveBalanceHeaders);
+      headerRow3.font = { bold: true };
+      headerRow3.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFE0E0E0' } };
+
+      dataObj.leaveBalances.forEach((balance) => {
+        const rowData = [
+          sanitizeString(balance.employee_nip),
+          sanitizeString(balance.employee_name),
+          sanitizeString(balance.employee_department),
+          sanitizeString(balance.year),
+          sanitizeString(balance.jatah_tahun_berjalan || 0),
+          sanitizeString(balance.digunakan_tahun_berjalan || 0),
+          sanitizeString(balance.sisa_tahun_berjalan || 0),
+          sanitizeString(balance.jatah_penangguhan || 0),
+          sanitizeString(balance.digunakan_penangguhan || 0),
+          sanitizeString(balance.sisa_penangguhan || 0)
+        ];
+
+        const row = worksheet3.addRow(rowData);
+        row.eachCell((cell) => {
+          cell.font = { color: { argb: 'FF000000' } };
+          cell.alignment = { vertical: 'top', wrapText: true };
+        });
+      });
+
+      // Auto-fit with safe defaults and explicit unhide
       worksheet3.columns.forEach(column => {
-        column.width = Math.max(
-          column.header ? column.header.length : 10,
-          ...column.values.map(v => String(v).length)
-        );
+        column.hidden = false;
+        let maxLength = 10;
+        if (column.values) {
+          column.values.forEach(v => {
+            const len = v ? String(v).length : 0;
+            if (len > maxLength) maxLength = len;
+          });
+        }
+        column.width = Math.min(maxLength + 2, 50);
       });
     } else {
       console.log('⚠️ No leave balances data to export');
     }
-    
-    console.log('📦 Generating Excel file...');
-    console.log('📊 Workbook worksheets count:', workbook.worksheets.length);
-    workbook.worksheets.forEach((ws, index) => {
-      console.log(`📊 Worksheet ${index + 1}: "${ws.name}" with ${ws.rowCount} rows`);
-    });
-    
-    // Set workbook properties for better compatibility
+
+    // Set workbook properties
     workbook.creator = 'SiCuti';
     workbook.created = new Date();
     workbook.modified = new Date();
     workbook.lastModifiedBy = 'SiCuti Export';
 
-    // Ensure all worksheets have at least 2 rows (header + 1 data/dummy row)
+    // Ensure all worksheets have at least 2 rows
     workbook.worksheets.forEach((ws) => {
       if (ws.rowCount === 1) {
-        // Add dummy row with empty strings (jumlah kolom sesuai header)
         ws.addRow(Array(ws.columnCount).fill(''));
       }
     });
 
-    // Generate and download file
+    // Generate and download
     const buffer = await workbook.xlsx.writeBuffer();
-    console.log('📦 Buffer generated, size:', buffer.byteLength);
-    
-    const blob = new Blob([buffer], { 
-      type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' 
-    });
-    console.log('📦 Blob created, size:', blob.size);
-    
+    const blob = new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
     saveAs(blob, filename);
 
-    console.log('✅ Excel file generated and downloaded:', filename);
     return true;
   } catch (error) {
     console.error('❌ Error exporting to Excel with multiple sheets:', error);
@@ -503,24 +420,104 @@ export const exportToExcelWithMultipleSheets = async (dataObj, filename) => {
 };
 
 /**
- * Validate Excel file before processing
+ * Export employee data to Excel file
  */
+export const exportEmployeesToExcel = async (employees, filename) => {
+  try {
+    console.log('📊 Starting Employee Excel export with count:', employees?.length);
+
+    if (!employees || employees.length === 0) {
+      throw new Error('Tidak ada data pegawai untuk diexport');
+    }
+
+    const workbook = new ExcelJS.Workbook();
+
+    // Sheet 1: Data Pegawai
+    console.log('📝 Creating Sheet: Data Pegawai');
+    // Force NORMAL view with A1 selected to prevent scrolling/hiding issues
+    const worksheet = workbook.addWorksheet('Data Pegawai', {
+      views: [{ state: 'normal', activeCell: 'A1', showGridLines: true }]
+    });
+
+    const headers = [
+      'ID', 'NIP', 'Nama Lengkap', 'Unit Kerja',
+      'Jabatan', 'Jenis Jabatan', 'Status ASN', 'Golongan'
+    ];
+
+    // Header
+    const headerRow = worksheet.addRow(headers);
+    headerRow.font = { bold: true };
+    headerRow.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFE0E0E0' } };
+
+    // Data
+    employees.forEach((emp) => {
+      const rowData = [
+        sanitizeString(emp.id),
+        sanitizeString(emp.nip),
+        sanitizeString(emp.name),
+        sanitizeString(emp.department),
+        sanitizeString(emp.position_name),
+        sanitizeString(emp.position_type),
+        sanitizeString(emp.asn_status),
+        sanitizeString(emp.rank_group)
+      ];
+
+      const row = worksheet.addRow(rowData);
+      // Force black text
+      row.eachCell((cell) => {
+        cell.font = { color: { argb: 'FF000000' } };
+        cell.alignment = { vertical: 'top', wrapText: true };
+      });
+    });
+
+    // Auto-fit with safe defaults and explicit unhide
+    worksheet.columns.forEach(column => {
+      column.hidden = false;
+      let maxLength = 10;
+      if (column.values) {
+        column.values.forEach(v => {
+          const len = v ? String(v).length : 0;
+          if (len > maxLength) maxLength = len;
+        });
+      }
+      // Cap max width
+      column.width = Math.min(maxLength + 2, 50);
+    });
+
+    // Set workbook properties
+    workbook.creator = 'SiCuti';
+    workbook.created = new Date();
+    workbook.modified = new Date();
+    workbook.lastModifiedBy = 'SiCuti Export';
+
+    // Generate and download
+    const buffer = await workbook.xlsx.writeBuffer();
+    const blob = new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+    saveAs(blob, filename);
+
+    return true;
+  } catch (error) {
+    console.error('❌ Error exporting employees to Excel:', error);
+    throw new Error('Gagal mengekspor data pegawai');
+  }
+};
+
 export const validateExcelFile = (file) => {
   // Check file size (max 10MB)
   if (file.size > 10 * 1024 * 1024) {
     throw new Error('File terlalu besar. Maksimal 10MB.');
   }
-  
+
   // Check file type
   const allowedTypes = [
     'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
     'application/vnd.ms-excel'
   ];
-  
+
   if (!allowedTypes.includes(file.type) && !file.name.match(/\.(xlsx|xls)$/i)) {
     throw new Error('Format file tidak didukung. Gunakan file Excel (.xlsx atau .xls).');
   }
-  
+
   return true;
 };
 
@@ -529,5 +526,6 @@ export default {
   readExcelFile,
   exportToExcel,
   exportToExcelWithMultipleSheets,
+  exportEmployeesToExcel,
   validateExcelFile
 }; 

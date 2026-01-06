@@ -1,8 +1,8 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { 
-  Search, 
-  Plus, 
+import {
+  Search,
+  Plus,
   Download,
   Upload,
   RefreshCw,
@@ -14,7 +14,7 @@ import {
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { 
+import {
   Select,
   SelectContent,
   SelectGroup,
@@ -38,6 +38,8 @@ import EmployeeTable from '@/components/employees/EmployeeTable';
 import { useEmployeeData } from '@/hooks/useEmployeeData';
 import { Combobox } from '@/components/ui/combobox';
 import { Label } from '@/components/ui/label';
+import { exportEmployeesToExcel } from '@/utils/excelUtils';
+import { AuthManager } from '@/lib/auth';
 
 const Employees = () => {
   const { toast } = useToast();
@@ -48,7 +50,7 @@ const Employees = () => {
   const [selectedAsnStatus, setSelectedAsnStatus] = useState('ALL');
   const [selectedRankGroup, setSelectedRankGroup] = useState('ALL');
   const [currentPage, setCurrentPage] = useState(1);
-  
+
   const {
     displayedEmployees,
     totalEmployeeCount,
@@ -112,6 +114,85 @@ const Employees = () => {
     });
   };
 
+  const handleExportData = async () => {
+    try {
+      toast({
+        title: "⏳ Sedang Mengunduh...",
+        description: "Mohon tunggu, sedang menyiapkan file Excel.",
+      });
+
+      let query = supabase
+        .from("employees")
+        .select("id, nip, name, position_name, department, asn_status, rank_group, position_type");
+
+      // Apply unit-based filtering for admin_unit users
+      const currentUser = AuthManager.getUserSession();
+      const userUnit = currentUser?.unit_kerja || currentUser?.unitKerja;
+
+      if (currentUser && currentUser.role === 'admin_unit' && userUnit) {
+        query = query.eq("department", userUnit);
+      }
+
+      // Apply all active filters
+      if (debouncedSearchTerm) {
+        query = query.or(
+          `name.ilike.%${debouncedSearchTerm}%,` +
+          `nip.ilike.%${debouncedSearchTerm}%,` +
+          `department.ilike.%${debouncedSearchTerm}%,` +
+          `position_name.ilike.%${debouncedSearchTerm}%,` +
+          `position_type.ilike.%${debouncedSearchTerm}%,` +
+          `asn_status.ilike.%${debouncedSearchTerm}%,` +
+          `rank_group.ilike.%${debouncedSearchTerm}%`
+        );
+      }
+
+      if (selectedUnitPenempatan && selectedUnitPenempatan !== "ALL") {
+        query = query.ilike("department", `%${selectedUnitPenempatan}%`);
+      }
+
+      if (selectedPositionType && selectedPositionType !== "ALL") {
+        query = query.eq("position_type", selectedPositionType);
+      }
+
+      if (selectedAsnStatus && selectedAsnStatus !== "ALL") {
+        query = query.eq("asn_status", selectedAsnStatus);
+      }
+
+      if (selectedRankGroup && selectedRankGroup !== "ALL") {
+        query = query.eq("rank_group", selectedRankGroup);
+      }
+
+      const { data, error } = await query.order("name", { ascending: true });
+
+      if (error) throw error;
+
+      if (!data || data.length === 0) {
+        toast({
+          variant: "destructive",
+          title: "❌ Data Kosong",
+          description: "Tidak ada data pegawai yang sesuai untuk diexport.",
+        });
+        return;
+      }
+
+      const dateStr = new Date().toISOString().split('T')[0];
+      await exportEmployeesToExcel(data, `Data_Pegawai_${dateStr}.xlsx`);
+
+      toast({
+        title: "✅ Export Berhasil",
+        description: "File Excel data pegawai berhasil diunduh.",
+      });
+
+    } catch (error) {
+      console.error("Export error:", error);
+      toast({
+        variant: "destructive",
+        title: "❌ Gagal Export",
+        description: "Terjadi kesalahan saat mengunduh data pegawai.",
+      });
+    }
+  };
+
   const onImportSuccess = useCallback(() => {
     handleRefreshData();
   }, [refreshData]);
@@ -128,15 +209,15 @@ const Employees = () => {
   };
 
   const handleDeleteEmployee = async (employeeId) => {
-    if(!window.confirm("Apakah Anda yakin ingin menghapus pegawai ini? Data terkait seperti riwayat cuti juga akan terpengaruh.")) return;
-    
+    if (!window.confirm("Apakah Anda yakin ingin menghapus pegawai ini? Data terkait seperti riwayat cuti juga akan terpengaruh.")) return;
+
     try {
       const { error } = await supabase.from('employees').delete().eq('id', employeeId);
       if (error) throw error;
-      toast({title: "✅ Pegawai Dihapus", description: "Data pegawai berhasil dihapus."});
+      toast({ title: "✅ Pegawai Dihapus", description: "Data pegawai berhasil dihapus." });
       handleRefreshData();
     } catch (error) {
-      toast({variant: "destructive", title: "❌ Gagal Menghapus Pegawai", description: error.message});
+      toast({ variant: "destructive", title: "❌ Gagal Menghapus Pegawai", description: error.message });
     }
   };
 
@@ -192,11 +273,11 @@ const Employees = () => {
                 </Button>
                 <Button
                   variant="outline"
-                  onClick={() => handleFeatureClick('Export Data')}
+                  onClick={handleExportData}
                   className="border-slate-600 text-slate-300 hover:text-white"
                 >
                   <Download className="w-4 h-4 mr-2" />
-                  Export
+                  Export Data
                 </Button>
               </div>
             </div>
@@ -266,7 +347,7 @@ const Employees = () => {
               </div>
             </div>
             {/* Employee Table */}
-            <EmployeeTable 
+            <EmployeeTable
               employees={displayedEmployees}
               isLoading={isLoading}
               onEdit={handleEditEmployee}
