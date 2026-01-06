@@ -659,23 +659,6 @@ const LeaveRequestForm = ({
         ? formData.submitted_date
         : new Date().toISOString(),
     };
-
-    if (
-      import.meta.env.DEV &&
-      formData.employee_name &&
-      formData.employee_name.toLowerCase().includes("nana")
-    ) {
-      console.log("🔍 DEBUG Nana - dataToSubmit (before save):", {
-        employee_name: formData.employee_name,
-        employee_id: formData.employee_id,
-        start_date: dataToSubmit.start_date,
-        end_date: dataToSubmit.end_date,
-        days_requested: dataToSubmit.days_requested,
-        leave_period: dataToSubmit.leave_period,
-        leave_quota_year: dataToSubmit.leave_quota_year,
-        leave_type_id: dataToSubmit.leave_type_id,
-      });
-    }
     // Convert empty strings to null
     Object.keys(dataToSubmit).forEach((key) => {
       if (dataToSubmit[key] === "") {

@@ -20,20 +20,6 @@ const LeaveBalanceBar = ({ typeConfig, balance, year }) => {
   const systemCurrentYear = new Date().getFullYear();
   const isCurrentYear = displayYear === systemCurrentYear;
 
-  // Debug logging untuk melihat data balance yang diterima (only in dev)
-  if (import.meta.env.DEV && typeConfig.name === "Cuti Tahunan") {
-    console.log(`🔍 LeaveBalanceBar Debug - ${typeConfig.name}:`, {
-      balance,
-      displayYear,
-      systemCurrentYear,
-      used_current: balance.used_current,
-      used_deferred: balance.used_deferred,
-      total: balance.total,
-      deferred: balance.deferred,
-      remaining: balance.remaining,
-    });
-  }
-
   // FIXED: Gunakan data yang sudah dihitung dengan benar dari LeaveHistoryPage
   // Pastikan menggunakan data yang benar untuk perhitungan saldo tahun berjalan
   const totalCurrentYear = balance.total || 0;
@@ -50,21 +36,6 @@ const LeaveBalanceBar = ({ typeConfig, balance, year }) => {
     remaining: Math.max(0, totalCurrentYear - usedCurrentYear),
   };
 
-  // Debug logging untuk verifikasi (only in dev mode)
-  if (import.meta.env.DEV && typeConfig.name === "Cuti Tahunan") {
-    console.log(`🔍 FIXED CALCULATION - ${typeConfig.name}:`, {
-      displayYear,
-      totalCurrentYear,
-      totalDeferred,
-      totalAvailableBalance,
-      totalUsed,
-      usedCurrentYear,
-      usedDeferred,
-      currentYearRemaining: currentYearBalance.remaining,
-      originalBalance: balance,
-    });
-  }
-
   const deferredBalance =
     totalDeferred > 0
       ? {
@@ -77,19 +48,6 @@ const LeaveBalanceBar = ({ typeConfig, balance, year }) => {
   const totalAvailable = totalAvailableBalance;
   const usagePercentage =
     totalAvailable > 0 ? (totalUsed / totalAvailable) * 100 : 0;
-
-  // Debug logging untuk perhitungan (only in dev mode)
-  if (import.meta.env.DEV && typeConfig.name === "Cuti Tahunan") {
-    console.log(`🔍 LeaveBalanceBar Final Calculations - ${typeConfig.name}:`, {
-      displayYear,
-      currentYearBalance,
-      deferredBalance,
-      totalUsed,
-      totalAvailable,
-      usagePercentage,
-      expectedTotalRemaining: totalAvailable - totalUsed,
-    });
-  }
 
   // Progress bar color based on usage percentage
   const getProgressColor = () => {

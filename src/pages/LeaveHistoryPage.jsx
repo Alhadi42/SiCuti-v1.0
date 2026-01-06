@@ -457,24 +457,6 @@ const LeaveHistoryPage = () => {
             leaveRequestsData?.filter((lr) => lr.employee_id === emp.id) || [];
           const balances = {};
 
-          if (
-            import.meta.env.DEV &&
-            emp.name &&
-            emp.name.toLowerCase().includes("nana")
-          ) {
-            console.log("🔍 DEBUG Nana - fetched leave requests (selectedYear):", {
-              selectedYear: year,
-              employee: { id: emp.id, name: emp.name },
-              requests: empLeaveRequests.map((r) => ({
-                start_date: r.start_date,
-                days_requested: r.days_requested,
-                leave_quota_year: r.leave_quota_year,
-                leave_period: r.leave_period,
-                leave_type_id: r.leave_type_id,
-              })),
-            });
-          }
-
           // Debug logging for specific employee
           if (
             emp.name &&
@@ -503,19 +485,6 @@ const LeaveHistoryPage = () => {
               year,
               currentYear,
             });
-
-            if (
-              import.meta.env.DEV &&
-              emp.name &&
-              emp.name.toLowerCase().includes("nana") &&
-              leaveType.name === "Cuti Tahunan"
-            ) {
-              console.log("🔍 DEBUG Nana - calculated balance (Cuti Tahunan):", {
-                selectedYear: year,
-                dbBalance,
-                calculatedBalance,
-              });
-            }
 
             // Extract values from calculated balance
             const total = calculatedBalance.total;
