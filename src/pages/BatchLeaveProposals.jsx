@@ -720,14 +720,13 @@ const BatchLeaveProposals = () => {
 
       // Restore using simple manager
       console.log('🔄 Restoring proposal...');
-      // The new simplified manager doesn't have a restore function.
-      // We will directly update the status using supabaseAdmin client for simplicity.
-      const { data: restoredProposal, error } = await supabaseAdmin
+      // Instead of updating status to 'draft' (which violates the constraint),
+      // we delete the completion record to restore the proposal to active status.
+      const { error } = await supabase
         .from('leave_proposals')
-        .update({ status: 'draft', completed_at: null, completed_by: null })
+        .delete()
         .eq('proposer_unit', unit.unitName)
-        .eq('proposal_date', unit.proposalDate)
-        .select();
+        .eq('proposal_date', unit.proposalDate);
 
       if (error) throw error;
 
@@ -749,7 +748,7 @@ const BatchLeaveProposals = () => {
         description: `Usulan cuti dari ${unit.unitName} telah dikembalikan ke daftar aktif`,
       });
 
-      console.log('✅ Proposal restored:', restoredProposal.success);
+      console.log('✅ Proposal restored successfully');
 
     } catch (error) {
       console.error("Error restoring proposal:", error);
@@ -758,7 +757,7 @@ const BatchLeaveProposals = () => {
       if (error.message?.includes('User not authenticated')) {
         errorMessage = "Anda harus login untuk mengembalikan usulan";
       } else if (error.code === '42501') {
-        errorMessage = "Fitur ini menggunakan penyimpanan lokal karena ada pembatasan database";
+        errorMessage = "Anda tidak memiliki izin untuk mengembalikan usulan";
       } else {
         errorMessage = `Gagal mengembalikan usulan: ${safeErrorMessage(error)}`;
       }
