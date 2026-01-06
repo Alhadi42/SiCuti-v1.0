@@ -79,10 +79,10 @@ const LeaveBalanceBar = ({ typeConfig, balance, year }) => {
   const deferredBalance =
     totalDeferred > 0
       ? {
-          total: totalDeferred,
-          used: usedDeferred, // Menggunakan perhitungan yang sudah diperbaiki
-          remaining: Math.max(0, totalDeferred - usedDeferred),
-        }
+        total: totalDeferred,
+        used: usedDeferred, // Menggunakan perhitungan yang sudah diperbaiki
+        remaining: Math.max(0, totalDeferred - usedDeferred),
+      }
       : null;
 
   // FIXED: Gunakan total used yang sudah dihitung dengan splitting logic yang diperbaiki
@@ -272,13 +272,19 @@ const LeaveHistoryEmployeeCard = ({
         </div>
 
         <div className="flex flex-wrap gap-2">
-          {/* Penangguhan indicator - use global Input Data Penangguhan for edits */}
-          {employee.deferralLog ? (
-            <div className="px-3 py-1 rounded-md bg-yellow-900/10 text-yellow-300 text-sm flex items-center">
-              <PlusCircle className="w-4 h-4 mr-2" />
-              Penangguhan tersimpan
-            </div>
-          ) : null}
+          {/* Penangguhan Action Button */}
+          <Button
+            size="sm"
+            variant="outline"
+            onClick={() => onAddDeferredLeave(employee, employee.deferralLog)}
+            className={`border-yellow-600/50 ${employee.deferralLog
+                ? "text-yellow-400 bg-yellow-900/10 hover:bg-yellow-900/20"
+                : "text-yellow-500 hover:text-white hover:bg-yellow-700/50"
+              }`}
+          >
+            <PlusCircle className="w-4 h-4 mr-1.5" />
+            {employee.deferralLog ? "Edit Penangguhan" : "Input Penangguhan"}
+          </Button>
 
           {/* View History Button - Always shown */}
           <Button

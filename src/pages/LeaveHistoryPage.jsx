@@ -1162,6 +1162,7 @@ const LeaveHistoryPage = () => {
         isOpen={isHistoryOpen}
         onOpenChange={setIsHistoryOpen}
         employee={selectedEmployee}
+        year={parseInt(selectedYear)}
         onDataChange={handleDataChange}
       />
     </>

@@ -26,6 +26,7 @@ const EmployeeLeaveHistoryModal = ({
   isOpen,
   onOpenChange,
   employee,
+  year,
   onDataChange,
 }) => {
   const { toast } = useToast();
@@ -38,21 +39,29 @@ const EmployeeLeaveHistoryModal = ({
     if (!employee?.id) return;
     setIsLoading(true);
     try {
-      console.log(`Fetching leave history for employee ID: ${employee.id}`);
-      const { data, error } = await supabase
+      console.log(`Fetching leave history for employee ID: ${employee.id} year: ${year}`);
+
+      let query = supabase
         .from("leave_requests")
-        .select(
-          `
+        .select(`
           *,
           leave_types ( name )
-        `,
-        )
+        `)
         .eq("employee_id", employee.id)
         .order("start_date", { ascending: false });
 
+      // Apply year filter if year is provided
+      if (year) {
+        const startOfYear = `${year}-01-01`;
+        const endOfYear = `${year}-12-31`;
+        query = query.gte('start_date', startOfYear).lte('start_date', endOfYear);
+      }
+
+      const { data, error } = await query;
+
       if (error) throw error;
       console.log(
-        `Found ${data?.length || 0} leave records for employee ${employee.id}`,
+        `Found ${data?.length || 0} leave records for employee ${employee.id} in ${year}`,
       );
       setHistory(data || []);
     } catch (error) {
@@ -65,7 +74,7 @@ const EmployeeLeaveHistoryModal = ({
     } finally {
       setIsLoading(false);
     }
-  }, [employee?.id, toast]);
+  }, [employee?.id, year, toast]);
 
   useEffect(() => {
     if (isOpen && employee?.id) {
@@ -160,10 +169,10 @@ const EmployeeLeaveHistoryModal = ({
       <Dialog open={isOpen} onOpenChange={onOpenChange}>
         <DialogContent className="bg-slate-800 border-slate-700 text-white max-w-3xl">
           <DialogHeader>
-            <DialogTitle>Riwayat Cuti - {employee.employeeName}</DialogTitle>
+            <DialogTitle>Riwayat Cuti {year ? `Tahun ${year}` : ''} - {employee.employeeName}</DialogTitle>
             <DialogDescription>
-              Berikut adalah daftar semua cuti yang pernah diambil oleh{" "}
-              {employee.employeeName}.
+              Berikut adalah daftar semua cuti yang diambil oleh{" "}
+              {employee.employeeName} {year ? `pada tahun ${year}` : ''}.
             </DialogDescription>
           </DialogHeader>
           <div className="max-h-[60vh] overflow-y-auto pr-4 -mr-4 mt-4">
