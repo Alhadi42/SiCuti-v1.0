@@ -26,6 +26,8 @@ import EmployeeLeaveHistoryModal from "@/components/leave_history/EmployeeLeaveH
 
 import LeaveHistoryFilters from "@/components/leave_history/LeaveHistoryFilters";
 import { exportToExcelWithMultipleSheets } from "@/utils/excelUtils";
+import { calculateLeaveBalance, ensureLeaveBalance } from "@/utils/leaveBalanceCalculator";
+import { useLeaveBalanceYear } from "@/hooks/useLeaveBalanceYear";
 
 const STATIC_LEAVE_TYPES_CONFIG = {
   "Cuti Tahunan": {
@@ -90,6 +92,7 @@ const LeaveHistoryPage = () => {
   const { leaveTypes, isLoadingLeaveTypes } = useLeaveTypes();
   const { departments: unitPenempatanOptions, isLoadingDepartments } =
     useDepartments();
+  const { currentYear } = useLeaveBalanceYear();
 
   // Dynamically generate years based on current year (5 years back and 2 years forward)
   const years = useMemo(() => {
@@ -378,7 +381,20 @@ const LeaveHistoryPage = () => {
         const employeeIds = employeesData.map((emp) => emp.id);
         const year = parseInt(selectedYear);
 
-        // Fetch leave balances for the current year
+        // Ensure balances exist for all employees and leave types for the selected year
+        // This handles automatic initialization when viewing a new year
+        for (const emp of employeesData) {
+          for (const leaveType of leaveTypes) {
+            try {
+              await ensureLeaveBalance(supabase, emp.id, leaveType.id, year, leaveType);
+            } catch (error) {
+              console.warn(`Failed to ensure balance for ${emp.name} - ${leaveType.name}:`, error);
+              // Continue with other employees/types
+            }
+          }
+        }
+
+        // Fetch leave balances for the selected year
         const { data: leaveBalancesData, error: balancesError } = await supabase
           .from("leave_balances")
           .select(
@@ -460,42 +476,27 @@ const LeaveHistoryPage = () => {
               (b) => b.leave_type_id === leaveType.id,
             );
 
-            // Calculate separate usage for current year and deferred
+            // Use the new utility function for accurate calculation
+            const calculatedBalance = calculateLeaveBalance({
+              dbBalance,
+              leaveRequests: empLeaveRequests,
+              leaveType,
+              year,
+              currentYear,
+            });
+
+            // Extract values from calculated balance
+            const total = calculatedBalance.total;
+            const deferred = calculatedBalance.deferred;
+            const usedFromCurrentYear = calculatedBalance.used_current;
+            const usedFromDeferred = calculatedBalance.used_deferred;
+            const totalUsed = calculatedBalance.used;
+            const remaining = calculatedBalance.remaining;
+
+            // Get employee type requests for debugging
             const empTypeRequests = empLeaveRequests.filter(
               (lr) => lr.leave_type_id === leaveType.id,
             );
-
-            // Calculate usage from current year vs deferred (accurate with leave_quota_year)
-            const usedFromCurrentYear = empTypeRequests
-              .filter((lr) => {
-                const quotaYear =
-                  lr.leave_quota_year || new Date(lr.start_date).getFullYear();
-                return quotaYear === year;
-              })
-              .reduce((sum, lr) => sum + (lr.days_requested || 0), 0);
-
-            const usedFromDeferred = empTypeRequests
-              .filter((lr) => {
-                const quotaYear =
-                  lr.leave_quota_year || new Date(lr.start_date).getFullYear();
-                return quotaYear < year; // Previous year quota (deferred)
-              })
-              .reduce((sum, lr) => sum + (lr.days_requested || 0), 0);
-
-            // Calculate balance values - FIXED IMPLEMENTATION
-            const deferred = dbBalance?.deferred_days || 0;
-            let total = ltConfig?.default_days || 0;
-
-            // Use database total_days if available and not 0, otherwise use default_days
-            if (dbBalance?.total_days != null && dbBalance.total_days > 0) {
-              total = dbBalance.total_days;
-            } else {
-              // If no balance record exists or total_days is 0, use default_days from config
-              total = ltConfig?.default_days || 0;
-            }
-
-            // CRITICAL FIX: Calculate total used from actual leave requests with splitting logic
-            let totalUsed = usedFromCurrentYear + usedFromDeferred;
 
             // Log detailed calculation for debugging
             if (
@@ -510,6 +511,7 @@ const LeaveHistoryPage = () => {
               console.log("Used Current Year:", usedFromCurrentYear);
               console.log("Used Deferred:", usedFromDeferred);
               console.log("Total Used:", totalUsed);
+              console.log("Remaining:", remaining);
               console.log("Employee Type Requests:", empTypeRequests);
               console.log("DB Balance:", dbBalance);
             }
@@ -526,8 +528,6 @@ const LeaveHistoryPage = () => {
                 },
               );
             }
-
-            const remaining = Math.max(0, total + deferred - totalUsed);
 
             // Debug logging for specific employee and leave type
             if (
@@ -565,7 +565,7 @@ const LeaveHistoryPage = () => {
             if (ltConfig) {
               balances[ltConfig.key] = {
                 total,
-                used: (usedFromCurrentYear || 0) + (usedFromDeferred || 0),
+                used: totalUsed,
                 used_current: usedFromCurrentYear,
                 used_deferred: usedFromDeferred,
                 remaining,

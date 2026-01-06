@@ -3,9 +3,13 @@ import React, { useState } from 'react';
 import { motion } from 'framer-motion';
 import Sidebar from '@/components/Sidebar';
 import Header from '@/components/Header';
+import { useAutoInitializeBalances } from '@/hooks/useAutoInitializeBalances';
 
 const Layout = ({ children }) => {
   const [sidebarOpen, setSidebarOpen] = useState(true);
+  
+  // Auto-initialize leave balances for new year
+  useAutoInitializeBalances();
 
   return (
     <div className="flex h-screen bg-gradient-to-br from-slate-900 via-purple-900 to-slate-900">

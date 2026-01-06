@@ -13,6 +13,7 @@ import { Label } from '@/components/ui/label';
 import { useToast } from '@/components/ui/use-toast';
 import { supabase } from '@/lib/supabaseClient';
 import { Loader2, ExternalLink } from 'lucide-react';
+import { calculateDeferrableDays, ensureLeaveBalance } from '@/utils/leaveBalanceCalculator';
 
 const AddDeferredLeaveDialog = ({ isOpen, onOpenChange, employee, year, onSuccess, leaveTypes, deferralLog }) => {
   const { toast } = useToast();
@@ -83,6 +84,16 @@ const AddDeferredLeaveDialog = ({ isOpen, onOpenChange, employee, year, onSucces
           description: `Berhasil mengubah penangguhan menjadi ${days} hari untuk ${employee.employeeName}.`,
         });
       } else {
+        // Get annual leave type config
+        const annualType = leaveTypes.find(lt => lt.id === annualLeaveTypeId);
+        if (!annualType) {
+          throw new Error("Jenis cuti tahunan tidak ditemukan");
+        }
+
+        // Ensure balance exists for the target year
+        await ensureLeaveBalance(supabase, employee.id, annualLeaveTypeId, year, annualType);
+
+        // Get the balance record
         const { data: balance, error: balanceError } = await supabase
           .from('leave_balances')
           .select('id, deferred_days, total_days')
@@ -91,52 +102,89 @@ const AddDeferredLeaveDialog = ({ isOpen, onOpenChange, employee, year, onSucces
           .eq('year', year)
           .single();
 
-        if (balanceError && balanceError.code !== 'PGRST116') { // PGRST116 = no rows returned
+        if (balanceError) {
           throw balanceError;
         }
-        let newTotalDays;
-        if (balance) {
-          newTotalDays = balance.total_days; // Keep existing total_days if balance record exists
-          const { error: updateError } = await supabase
-            .from('leave_balances')
-            .update({ deferred_days: (balance.deferred_days || 0) + days })
-            .eq('id', balance.id);
-          if (updateError) throw updateError;
-        } else {
-          // Fetch default days for Cuti Tahunan if creating new balance
-          const annualType = leaveTypes.find(lt => lt.id === annualLeaveTypeId);
-          newTotalDays = annualType ? annualType.default_days : 12; // Fallback default
 
-          const { error: insertError } = await supabase
-            .from('leave_balances')
+        // Check if there's already a deferral log for previous year
+        const { data: existingDeferral } = await supabase
+          .from('leave_deferrals')
+          .select('id, days_deferred')
+          .eq('employee_id', employee.id)
+          .eq('year', previousYear)
+          .single();
+
+        // Calculate maximum deferrable days from previous year
+        const { data: previousBalance } = await supabase
+          .from('leave_balances')
+          .select('*')
+          .eq('employee_id', employee.id)
+          .eq('leave_type_id', annualLeaveTypeId)
+          .eq('year', previousYear)
+          .single();
+
+        const maxDeferrable = previousBalance 
+          ? calculateDeferrableDays(previousBalance)
+          : 0;
+
+        // Validate: days cannot exceed maximum deferrable
+        if (days > maxDeferrable && maxDeferrable > 0) {
+          toast({
+            variant: "destructive",
+            title: "Jumlah Hari Melebihi Batas",
+            description: `Maksimal hari yang dapat ditangguhkan adalah ${maxDeferrable} hari (sisa dari tahun ${previousYear}).`,
+          });
+          return;
+        }
+
+        // Update balance with new deferred days
+        // If updating existing, replace the value; if new, set it
+        const newDeferredDays = existingDeferral ? days : days; // Use input value
+        
+        const { error: updateError } = await supabase
+          .from('leave_balances')
+          .update({ deferred_days: newDeferredDays })
+          .eq('id', balance.id);
+        
+        if (updateError) throw updateError;
+
+        // Update or create deferral log
+        if (existingDeferral) {
+          const { error: updateDeferralError } = await supabase
+            .from('leave_deferrals')
+            .update({ days_deferred: days })
+            .eq('id', existingDeferral.id);
+          
+          if (updateDeferralError) {
+            console.warn("Gagal memperbarui log penangguhan:", updateDeferralError);
+            toast({
+              variant: "warning",
+              title: "Peringatan",
+              description: "Saldo berhasil diperbarui, namun gagal memperbarui log penangguhan.",
+            });
+          }
+        } else {
+          const { error: deferralLogError } = await supabase
+            .from('leave_deferrals')
             .insert({
               employee_id: employee.id,
-              leave_type_id: annualLeaveTypeId,
-              year: year,
-              total_days: newTotalDays, 
-              used_days: 0,
-              deferred_days: days,
+              year: previousYear,
+              days_deferred: days
             });
-          if (insertError) throw insertError;
-        }
-        const { error: deferralLogError } = await supabase
-          .from('leave_deferrals')
-          .insert({
-            employee_id: employee.id,
-            year: previousYear,
-            days_deferred: days
-          });
-        if (deferralLogError) {
-           console.warn("Gagal mencatat log penangguhan, tapi saldo berhasil diperbarui.", deferralLogError);
-           toast({
+          
+          if (deferralLogError) {
+            console.warn("Gagal mencatat log penangguhan:", deferralLogError);
+            toast({
               variant: "warning",
               title: "Peringatan",
               description: "Saldo berhasil diperbarui, namun gagal mencatat log penangguhan.",
             });
+          }
         }
+
         toast({
           title: "✅ Berhasil",
-          description: `Berhasil menambahkan ${days} hari cuti ditangguhkan untuk ${employee.employeeName}.`,
+          description: `Berhasil ${existingDeferral ? 'mengubah' : 'menambahkan'} ${days} hari cuti ditangguhkan untuk ${employee.employeeName}.`,
         });
       }
       onSuccess();
