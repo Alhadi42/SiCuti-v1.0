@@ -119,7 +119,7 @@ const BatchLeaveProposals = () => {
       return false;
     }
   };
-  
+
   const [unitProposals, setUnitProposals] = useState([]);
   const [isLoading, setIsLoading] = useState(false);
   const [selectedUnit, setSelectedUnit] = useState("all");
@@ -278,7 +278,7 @@ const BatchLeaveProposals = () => {
 
       // Use more reasonable timeouts based on network conditions
       const timeoutMs = retryCount === 0 ? 15000 : 8000; // 15s first try, 8s retries
-      console.log(`⏱️ Setting query timeout to ${timeoutMs/1000} seconds`);
+      console.log(`⏱️ Setting query timeout to ${timeoutMs / 1000} seconds`);
 
       // Fetch leave requests with complete data
       console.log("🔄 Starting Supabase query execution...");
@@ -305,7 +305,7 @@ const BatchLeaveProposals = () => {
           `)
           .order("created_at", { ascending: false }),
         new Promise((_, reject) =>
-          setTimeout(() => reject(new Error(`Query timeout after ${timeoutMs/1000} seconds`)), timeoutMs)
+          setTimeout(() => reject(new Error(`Query timeout after ${timeoutMs / 1000} seconds`)), timeoutMs)
         )
       ]);
 
@@ -326,26 +326,26 @@ const BatchLeaveProposals = () => {
 
         // Analyze error type and decide on retry strategy
         const isNetworkError = requestsError.message?.includes("Failed to fetch") ||
-                              requestsError.message?.includes("fetch") ||
-                              requestsError.message?.includes("Network") ||
-                              requestsError.message?.includes("network") ||
-                              requestsError.message?.includes("TypeError: fetch") ||
-                              requestsError.code === "NETWORK_ERROR" ||
-                              !navigator.onLine;
+          requestsError.message?.includes("fetch") ||
+          requestsError.message?.includes("Network") ||
+          requestsError.message?.includes("network") ||
+          requestsError.message?.includes("TypeError: fetch") ||
+          requestsError.code === "NETWORK_ERROR" ||
+          !navigator.onLine;
 
         const isTimeoutError = requestsError.message?.includes("timeout") ||
-                              requestsError.message?.includes("Query timeout");
+          requestsError.message?.includes("Query timeout");
 
         const isServerError = requestsError.code?.startsWith("5") ||
-                             requestsError.message?.includes("Internal server error");
+          requestsError.message?.includes("Internal server error");
 
         const isAuthError = requestsError.code === "42501" ||
-                           requestsError.message?.includes("row-level security") ||
-                           requestsError.message?.includes("permission");
+          requestsError.message?.includes("row-level security") ||
+          requestsError.message?.includes("permission");
 
         const isTableError = requestsError.code === "42P01" ||
-                            requestsError.message?.includes("relation") ||
-                            requestsError.message?.includes("does not exist");
+          requestsError.message?.includes("relation") ||
+          requestsError.message?.includes("does not exist");
 
         console.log("🔍 Error classification:", {
           isNetworkError,
@@ -449,7 +449,7 @@ const BatchLeaveProposals = () => {
 
           if (!dbError && dbCompletedProposals) {
             console.log(`📊 Found ${dbCompletedProposals.length} completed proposals in database`);
-            
+
             dbCompletedProposals.forEach(completion => {
               const proposalKey = `${completion.proposer_unit}|${completion.proposal_date}`;
               completedSet.add(proposalKey);
@@ -473,7 +473,7 @@ const BatchLeaveProposals = () => {
         // Then, check individual groups for any that weren't found in the bulk query
         for (const group of groupedRequests) {
           const proposalKey = `${group.unitName}|${group.proposalDate}`;
-          
+
           // Skip if already found in database
           if (completedSet.has(proposalKey)) {
             continue;
@@ -1327,7 +1327,7 @@ const BatchLeaveProposals = () => {
             disabled
           >
             <Database className="w-4 h-4 mr-2" />
-            Status tersimpan lokal
+            Status tersimpan di server (Realtime)
           </Button>
 
           <Button
@@ -1388,23 +1388,21 @@ const BatchLeaveProposals = () => {
                 <div className="flex items-center space-x-3 mt-2">
                   <button
                     onClick={() => setShowCompleted(false)}
-                    className={`px-3 py-2 rounded-lg text-sm transition-colors ${
-                      !showCompleted
-                        ? 'bg-blue-600 text-white'
-                        : 'bg-slate-700/50 text-slate-300 hover:bg-slate-700'
-                    }`}
+                    className={`px-3 py-2 rounded-lg text-sm transition-colors ${!showCompleted
+                      ? 'bg-blue-600 text-white'
+                      : 'bg-slate-700/50 text-slate-300 hover:bg-slate-700'
+                      }`}
                   >
                     Aktif ({unitProposals.filter(unit => !completedProposals.has(`${unit.unitName}|${unit.proposalDate}`)).length})
                   </button>
                   <button
                     onClick={() => setShowCompleted(true)}
-                    className={`px-3 py-2 rounded-lg text-sm transition-colors ${
-                      showCompleted
-                        ? 'bg-green-600 text-white'
-                        : 'bg-slate-700/50 text-slate-300 hover:bg-slate-700'
-                    }`}
+                    className={`px-3 py-2 rounded-lg text-sm transition-colors ${showCompleted
+                      ? 'bg-green-600 text-white'
+                      : 'bg-slate-700/50 text-slate-300 hover:bg-slate-700'
+                      }`}
                   >
-                    Selesai ({completedProposals.size})
+                    Selesai ({unitProposals.filter(unit => completedProposals.has(`${unit.unitName}|${unit.proposalDate}`)).length})
                   </button>
                 </div>
               </div>
@@ -1586,13 +1584,13 @@ const BatchLeaveProposals = () => {
                 <div className="text-center">
                   <p className="text-slate-400 text-sm">Rentang Tanggal</p>
                   <p className="text-white font-bold text-sm">
-                    {selectedUnitDetail.dateRange.earliest && selectedUnitDetail.dateRange.latest && 
+                    {selectedUnitDetail.dateRange.earliest && selectedUnitDetail.dateRange.latest &&
                       `${format(selectedUnitDetail.dateRange.earliest, "dd/MM", { locale: id })} - ${format(selectedUnitDetail.dateRange.latest, "dd/MM", { locale: id })}`
                     }
                   </p>
                 </div>
               </div>
-              
+
               <div className="space-y-2">
                 {unitLeaveRequests.map((request, index) => (
                   <div key={request.id} className="p-3 bg-slate-700/50 rounded border border-slate-600/50">
