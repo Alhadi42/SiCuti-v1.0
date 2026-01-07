@@ -103,7 +103,7 @@ export const calculateLeaveBalance = ({
   // If used_deferred exceeds available deferred, move excess to used_current
   let actualUsedDeferred = usedFromDeferred;
   let actualUsedCurrent = usedFromCurrentYear;
-  
+
   if (usedFromDeferred > deferred) {
     actualUsedDeferred = deferred;
     actualUsedCurrent = usedFromCurrentYear + (usedFromDeferred - deferred);

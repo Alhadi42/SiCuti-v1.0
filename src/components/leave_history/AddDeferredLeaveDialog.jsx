@@ -13,7 +13,7 @@ import { Label } from '@/components/ui/label';
 import { useToast } from '@/components/ui/use-toast';
 import { supabase } from '@/lib/supabaseClient';
 import { Loader2, ExternalLink } from 'lucide-react';
-import { calculateDeferrableDays, ensureLeaveBalance } from '@/utils/leaveBalanceCalculator';
+import { ensureLeaveBalance } from '@/utils/leaveBalanceCalculator';
 
 const AddDeferredLeaveDialog = ({ isOpen, onOpenChange, employee, year, onSuccess, leaveTypes, deferralLog }) => {
   const { toast } = useToast();
@@ -116,29 +116,6 @@ const AddDeferredLeaveDialog = ({ isOpen, onOpenChange, employee, year, onSucces
           .eq('employee_id', employee.id)
           .eq('year', previousYear)
           .single();
-
-        // Calculate maximum deferrable days from previous year
-        const { data: previousBalance } = await supabase
-          .from('leave_balances')
-          .select('*')
-          .eq('employee_id', employee.id)
-          .eq('leave_type_id', annualLeaveTypeId)
-          .eq('year', previousYear)
-          .single();
-
-        const maxDeferrable = previousBalance
-          ? calculateDeferrableDays(previousBalance)
-          : 0;
-
-        // Validate: days cannot exceed maximum deferrable
-        if (days > maxDeferrable && maxDeferrable > 0) {
-          toast({
-            variant: "destructive",
-            title: "Jumlah Hari Melebihi Batas",
-            description: `Maksimal hari yang dapat ditangguhkan adalah ${maxDeferrable} hari (sisa dari tahun ${previousYear}).`,
-          });
-          return;
-        }
 
         // Update balance with new deferred days
         // If updating existing, replace the value; if new, set it
