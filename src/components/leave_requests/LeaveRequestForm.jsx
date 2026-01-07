@@ -18,6 +18,7 @@ import {
   fetchNationalHolidays,
   fetchNationalHolidaysFromDB,
 } from "@/utils/workingDays";
+import { calculateLeaveBalance, ensureLeaveBalance } from "@/utils/leaveBalanceCalculator";
 import EmployeeForm from "@/components/employees/EmployeeForm";
 import {
   Dialog,
@@ -82,6 +83,35 @@ const LeaveRequestForm = ({
   const [departments, setDepartments] = useState([]);
   const [overlapWarning, setOverlapWarning] = useState("");
   const [isCheckingOverlap, setIsCheckingOverlap] = useState(false);
+  const [leaveBalanceSummary, setLeaveBalanceSummary] = useState(null);
+  const [isLoadingLeaveBalance, setIsLoadingLeaveBalance] = useState(false);
+  const [leaveBalanceError, setLeaveBalanceError] = useState("");
+
+  const selectedLeaveType = useMemo(() => {
+    return leaveTypes.find((t) => t.id === formData.leave_type_id) || null;
+  }, [leaveTypes, formData.leave_type_id]);
+
+  const selectedQuotaYear = useMemo(() => {
+    const parsed = parseInt(formData.leave_quota_year);
+    return Number.isFinite(parsed) ? parsed : null;
+  }, [formData.leave_quota_year]);
+
+  const selectedQuotaRemaining = useMemo(() => {
+    if (!leaveBalanceSummary || selectedQuotaYear == null) return null;
+    if (selectedQuotaYear === leaveBalanceSummary.periodYear) {
+      return {
+        label: `Saldo jatah ${selectedQuotaYear}`,
+        value: leaveBalanceSummary.remaining_current,
+      };
+    }
+    if (selectedQuotaYear < leaveBalanceSummary.periodYear) {
+      return {
+        label: `Saldo penangguhan ${selectedQuotaYear}`,
+        value: leaveBalanceSummary.remaining_deferred,
+      };
+    }
+    return null;
+  }, [leaveBalanceSummary, selectedQuotaYear]);
 
   const fetchEmployees = useCallback(
     async (query) => {
@@ -228,6 +258,7 @@ const LeaveRequestForm = ({
         signed_by: "",
         address_during_leave: "",
         leave_quota_year: new Date().getFullYear().toString(),
+        leave_period: new Date().getFullYear().toString(),
         application_form_date: new Date().toISOString().split("T")[0],
       });
       setSearchTerm("");
@@ -334,6 +365,8 @@ const LeaveRequestForm = ({
     setSearchTerm("");
     setSearchResults([]);
     setShowDropdown(false);
+    setLeaveBalanceSummary(null);
+    setLeaveBalanceError("");
   };
 
   const handleSelectSigner = (signer) => {
@@ -767,6 +800,89 @@ const LeaveRequestForm = ({
     }
   };
 
+  useEffect(() => {
+    const employeeId = formData.employee_id;
+    const leaveType = selectedLeaveType;
+    const periodYear = parseInt(formData.leave_period || selectedPeriod);
+    if (!employeeId || !leaveType || !Number.isFinite(periodYear)) {
+      setLeaveBalanceSummary(null);
+      setLeaveBalanceError("");
+      return;
+    }
+
+    let cancelled = false;
+    (async () => {
+      setIsLoadingLeaveBalance(true);
+      setLeaveBalanceError("");
+      try {
+        const dbBalance = await ensureLeaveBalance(
+          supabase,
+          employeeId,
+          leaveType.id,
+          periodYear,
+          leaveType,
+        );
+
+        const { data: leaveRequests, error: leaveRequestsError } =
+          await supabase
+            .from("leave_requests")
+            .select(
+              "days_requested, leave_quota_year, leave_period, start_date, leave_type_id",
+            )
+            .eq("employee_id", employeeId)
+            .eq("leave_type_id", leaveType.id);
+
+        if (leaveRequestsError) throw leaveRequestsError;
+
+        const calculated = calculateLeaveBalance({
+          dbBalance,
+          leaveRequests: leaveRequests || [],
+          leaveType,
+          year: periodYear,
+          currentYear,
+        });
+
+        const remaining_current = Math.max(
+          0,
+          (calculated.total || 0) - (calculated.used_current || 0),
+        );
+        const remaining_deferred = Math.max(
+          0,
+          (calculated.deferred || 0) - (calculated.used_deferred || 0),
+        );
+
+        if (!cancelled) {
+          setLeaveBalanceSummary({
+            ...calculated,
+            periodYear,
+            remaining_current,
+            remaining_deferred,
+          });
+        }
+      } catch (error) {
+        console.error("Error fetching leave balance summary:", error);
+        if (!cancelled) {
+          setLeaveBalanceSummary(null);
+          setLeaveBalanceError(
+            error?.message || "Gagal memuat saldo cuti.",
+          );
+        }
+      } finally {
+        if (!cancelled) setIsLoadingLeaveBalance(false);
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [
+    formData.employee_id,
+    formData.leave_period,
+    selectedPeriod,
+    selectedLeaveType,
+    currentYear,
+  ]);
+
   return (
     <form
       onSubmit={handleSubmit}
@@ -1055,6 +1171,34 @@ const LeaveRequestForm = ({
                   atau <strong className="text-slate-300">2026</strong> untuk periode 2026.
                 </p>
               </div>
+              <div className="mt-2 p-2 rounded border border-slate-600/50 bg-slate-800/30">
+                {!formData.employee_id || !formData.leave_type_id ? (
+                  <p className="text-xs text-slate-400">
+                    Pilih pegawai dan jenis cuti untuk melihat saldo cuti.
+                  </p>
+                ) : isLoadingLeaveBalance ? (
+                  <div className="text-xs text-slate-400 flex items-center">
+                    <Loader2 className="mr-2 h-3 w-3 animate-spin" />
+                    Memuat saldo cuti...
+                  </div>
+                ) : leaveBalanceError ? (
+                  <p className="text-xs text-red-300">{leaveBalanceError}</p>
+                ) : leaveBalanceSummary ? (
+                  <div className="text-xs text-slate-300 space-y-1">
+                    <p>
+                      <strong>Saldo Periode {leaveBalanceSummary.periodYear}</strong>: {leaveBalanceSummary.remaining} hari
+                    </p>
+                    <p className="text-slate-400">
+                      Tahun berjalan: {leaveBalanceSummary.remaining_current} hari
+                    </p>
+                    <p className="text-slate-400">
+                      Penangguhan: {leaveBalanceSummary.remaining_deferred} hari
+                    </p>
+                  </div>
+                ) : (
+                  <p className="text-xs text-slate-400">Saldo cuti tidak tersedia.</p>
+                )}
+              </div>
             </div>
             <div>
               <Label htmlFor="leave_quota_year" className="text-slate-300">
@@ -1089,24 +1233,33 @@ const LeaveRequestForm = ({
                   ))}
                 </SelectContent>
               </Select>
-              {formData.leave_quota_year && (
-                <div className="mt-2 p-2 rounded border">
-                  {parseInt(formData.leave_quota_year) < currentYear ? (
-                    <div className="text-xs text-yellow-400 bg-yellow-900/20 p-2 rounded">
-                      ⚠️ <strong>Saldo Cuti Penangguhan</strong>
-                      <br />
-                      Menggunakan saldo cuti yang ditangguhkan dari tahun{" "}
-                      {formData.leave_quota_year}. Pastikan pegawai memiliki
-                      saldo penangguhan yang cukup.
-                    </div>
-                  ) : (
-                    <div className="text-xs text-green-400 bg-green-900/20 p-2 rounded">
-                      ✓ <strong>Saldo Cuti Tahun Berjalan</strong>
-                      <br />
-                      Menggunakan saldo cuti normal tahun{" "}
-                      {formData.leave_quota_year}.
-                    </div>
-                  )}
+
+				  {formData.leave_quota_year && (
+				    <div className="mt-2 p-2 rounded border">
+				      {parseInt(formData.leave_quota_year) < currentYear ? (
+				        <div className="text-xs text-yellow-400 bg-yellow-900/20 p-2 rounded">
+				          ⚠️ <strong>Saldo Cuti Penangguhan</strong>
+				          <br />
+				          Menggunakan saldo cuti yang ditangguhkan dari tahun{" "}
+				          {formData.leave_quota_year}. Pastikan pegawai memiliki
+				          saldo penangguhan yang cukup.
+				        </div>
+				      ) : (
+				        <div className="text-xs text-green-400 bg-green-900/20 p-2 rounded">
+				          ✓ <strong>Saldo Cuti Tahun Berjalan</strong>
+				          <br />
+				          Menggunakan saldo cuti normal tahun{" "}
+				          {formData.leave_quota_year}.
+				        </div>
+				      )}
+				    </div>
+				  )}
+
+              {formData.leave_quota_year && selectedQuotaRemaining && (
+                <div className="mt-2 p-2 rounded border border-slate-600/50 bg-slate-800/30">
+                  <p className="text-xs text-slate-300">
+                    <strong>{selectedQuotaRemaining.label}</strong>: {selectedQuotaRemaining.value} hari
+                  </p>
                 </div>
               )}
             </div>
