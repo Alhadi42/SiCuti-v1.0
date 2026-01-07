@@ -59,38 +59,33 @@ export const calculateLeaveBalance = ({
     (lr) => lr.leave_type_id === leaveType.id
   );
 
-  // Calculate usage split based on leave_quota_year and leave_period
-  const usedFromCurrentYear = typeRequests
+  // 🔧 FIX: Use execution year (start_date) for primary filtering, not leave_period
+  // This ensures we count leave requests that are actually taken in the target year
+  const requestsInExecutionYear = typeRequests.filter((lr) => {
+    const executionYear = lr.start_date
+      ? new Date(lr.start_date).getFullYear()
+      : null;
+    return executionYear === yearNum;
+  });
+
+  // Calculate usage split based on leave_quota_year
+  const usedFromCurrentYear = requestsInExecutionYear
     .filter((lr) => {
-      const executionYear = lr.start_date
-        ? new Date(lr.start_date).getFullYear()
-        : null;
-      const requestPeriod =
-        normalizeYear(lr.leave_period) ||
-        executionYear;
-      if (requestPeriod !== yearNum) return false;
       const quotaYear =
         normalizeYear(lr.leave_quota_year) ||
-        requestPeriod ||
-        executionYear;
+        normalizeYear(lr.leave_period) ||
+        (lr.start_date ? new Date(lr.start_date).getFullYear() : null);
       return quotaYear === yearNum;
     })
     .reduce((sum, lr) => sum + (lr.days_requested || 0), 0);
 
-  const usedFromDeferred = typeRequests
+  const usedFromDeferred = requestsInExecutionYear
     .filter((lr) => {
-      const executionYear = lr.start_date
-        ? new Date(lr.start_date).getFullYear()
-        : null;
-      const requestPeriod =
-        normalizeYear(lr.leave_period) ||
-        executionYear;
-      if (requestPeriod !== yearNum) return false;
       const quotaYear =
         normalizeYear(lr.leave_quota_year) ||
-        requestPeriod ||
-        executionYear;
-      // Deferred usage: quota year is less than the period we're viewing
+        normalizeYear(lr.leave_period) ||
+        (lr.start_date ? new Date(lr.start_date).getFullYear() : null);
+      // Deferred usage: quota year is less than execution year
       return quotaYear < yearNum;
     })
     .reduce((sum, lr) => sum + (lr.days_requested || 0), 0);
@@ -104,8 +99,18 @@ export const calculateLeaveBalance = ({
     total = dbBalance.total_days;
   }
 
-  // Calculate total used
-  const totalUsed = usedFromCurrentYear + usedFromDeferred;
+  // 🔧 FIX: Cap used_deferred at available deferred days
+  // If used_deferred exceeds available deferred, move excess to used_current
+  let actualUsedDeferred = usedFromDeferred;
+  let actualUsedCurrent = usedFromCurrentYear;
+  
+  if (usedFromDeferred > deferred) {
+    actualUsedDeferred = deferred;
+    actualUsedCurrent = usedFromCurrentYear + (usedFromDeferred - deferred);
+  }
+
+  // Calculate total used with adjusted values
+  const totalUsed = actualUsedCurrent + actualUsedDeferred;
 
   // Calculate remaining
   const remaining = Math.max(0, total + deferred - totalUsed);
@@ -114,8 +119,8 @@ export const calculateLeaveBalance = ({
     total,
     deferred,
     used: totalUsed,
-    used_current: usedFromCurrentYear,
-    used_deferred: usedFromDeferred,
+    used_current: actualUsedCurrent,
+    used_deferred: actualUsedDeferred,
     remaining,
     // Additional info
     isCurrentYear: yearNum === currentYearNum,
