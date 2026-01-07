@@ -14,9 +14,10 @@ CREATE OR REPLACE FUNCTION public.update_leave_balance(
 )
 RETURNS VOID AS $$
 DECLARE
-    current_year INTEGER := EXTRACT(YEAR FROM CURRENT_DATE);
-    balance_record RECORD;
+    current_year INTEGER;
 BEGIN
+    -- Use the requested year as the reference year
+    current_year := p_year;
     -- Get or create the leave balance record for the specified year
     SELECT * INTO balance_record
     FROM leave_balances 
@@ -84,7 +85,7 @@ CREATE OR REPLACE FUNCTION public.update_leave_balance_with_splitting(
 )
 RETURNS VOID AS $$
 DECLARE
-    current_year INTEGER := EXTRACT(YEAR FROM CURRENT_DATE);
+    current_year INTEGER;
     requested_balance RECORD;
     current_balance RECORD;
     default_days INTEGER := 0;
@@ -92,6 +93,8 @@ DECLARE
     days_from_requested INTEGER;
     days_from_current INTEGER;
 BEGIN
+    -- Use the requested year as the reference year
+    current_year := p_requested_year;
     -- Get default days for this leave type
     SELECT COALESCE(lt.default_days, 0) INTO default_days
     FROM leave_types lt 

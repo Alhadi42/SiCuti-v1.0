@@ -61,9 +61,9 @@ const LeaveRequestForm = ({
     leave_letter_date: "",
     signed_by: "",
     address_during_leave: "",
-    leave_quota_year: currentYear.toString(), // Default ke tahun berjalan (dynamic)
-    leave_period: currentYear.toString(), // Periode cuti yang sedang diinput
-    application_form_date: new Date().toISOString().split("T")[0], // Default ke hari ini
+    leave_quota_year: new Date().getFullYear().toString(),
+    leave_period: new Date().getFullYear().toString(),
+    application_form_date: new Date().toISOString().split("T")[0],
   });
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
@@ -645,7 +645,7 @@ const LeaveRequestForm = ({
       formData.start_date &&
       formData.end_date &&
       new Date(formData.start_date).getFullYear() !==
-        new Date(formData.end_date).getFullYear()
+      new Date(formData.end_date).getFullYear()
     ) {
       toast({
         variant: "destructive",
@@ -1061,19 +1061,20 @@ const LeaveRequestForm = ({
                 if (hasNewColumns && value) {
                   const startYear = new Date(value).getFullYear();
                   setFormData((prev) => {
+                    // When date changes, we only adjust the period if it's completely out of range (more than 1 year difference)
+                    // Otherwise, we respect the current period selection.
                     const currentPeriodYear = parseInt(prev.leave_period);
                     const desiredPeriodYear =
                       Number.isFinite(currentPeriodYear) &&
-                      currentPeriodYear <= startYear &&
-                      currentPeriodYear >= startYear - 1
+                        Math.abs(currentPeriodYear - startYear) <= 1
                         ? currentPeriodYear
                         : startYear;
 
                     const currentQuotaYear = parseInt(prev.leave_quota_year);
                     const desiredQuotaYear =
                       Number.isFinite(currentQuotaYear) &&
-                      currentQuotaYear <= desiredPeriodYear &&
-                      currentQuotaYear >= desiredPeriodYear - 1
+                        currentQuotaYear <= desiredPeriodYear &&
+                        currentQuotaYear >= desiredPeriodYear - 1
                         ? currentQuotaYear
                         : desiredPeriodYear;
 
@@ -1133,8 +1134,8 @@ const LeaveRequestForm = ({
                     const currentQuotaYear = parseInt(prev.leave_quota_year);
                     const desiredQuotaYear =
                       Number.isFinite(currentQuotaYear) &&
-                      currentQuotaYear <= newPeriod &&
-                      currentQuotaYear >= newPeriod - 1
+                        currentQuotaYear <= newPeriod &&
+                        currentQuotaYear >= newPeriod - 1
                         ? currentQuotaYear
                         : newPeriod;
                     return {
@@ -1234,26 +1235,26 @@ const LeaveRequestForm = ({
                 </SelectContent>
               </Select>
 
-				  {formData.leave_quota_year && (
-				    <div className="mt-2 p-2 rounded border">
-				      {parseInt(formData.leave_quota_year) < currentYear ? (
-				        <div className="text-xs text-yellow-400 bg-yellow-900/20 p-2 rounded">
-				          ⚠️ <strong>Saldo Cuti Penangguhan</strong>
-				          <br />
-				          Menggunakan saldo cuti yang ditangguhkan dari tahun{" "}
-				          {formData.leave_quota_year}. Pastikan pegawai memiliki
-				          saldo penangguhan yang cukup.
-				        </div>
-				      ) : (
-				        <div className="text-xs text-green-400 bg-green-900/20 p-2 rounded">
-				          ✓ <strong>Saldo Cuti Tahun Berjalan</strong>
-				          <br />
-				          Menggunakan saldo cuti normal tahun{" "}
-				          {formData.leave_quota_year}.
-				        </div>
-				      )}
-				    </div>
-				  )}
+              {formData.leave_quota_year && (
+                <div className="mt-2 p-2 rounded border">
+                  {parseInt(formData.leave_quota_year) < currentYear ? (
+                    <div className="text-xs text-yellow-400 bg-yellow-900/20 p-2 rounded">
+                      ⚠️ <strong>Saldo Cuti Penangguhan</strong>
+                      <br />
+                      Menggunakan saldo cuti yang ditangguhkan dari tahun{" "}
+                      {formData.leave_quota_year}. Pastikan pegawai memiliki
+                      saldo penangguhan yang cukup.
+                    </div>
+                  ) : (
+                    <div className="text-xs text-green-400 bg-green-900/20 p-2 rounded">
+                      ✓ <strong>Saldo Cuti Tahun Berjalan</strong>
+                      <br />
+                      Menggunakan saldo cuti normal tahun{" "}
+                      {formData.leave_quota_year}.
+                    </div>
+                  )}
+                </div>
+              )}
 
               {formData.leave_quota_year && selectedQuotaRemaining && (
                 <div className="mt-2 p-2 rounded border border-slate-600/50 bg-slate-800/30">

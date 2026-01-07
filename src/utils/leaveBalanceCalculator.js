@@ -59,33 +59,30 @@ export const calculateLeaveBalance = ({
     (lr) => lr.leave_type_id === leaveType.id
   );
 
-  // 🔧 FIX: Use execution year (start_date) for primary filtering, not leave_period
-  // This ensures we count leave requests that are actually taken in the target year
-  const requestsInExecutionYear = typeRequests.filter((lr) => {
-    const executionYear = lr.start_date
-      ? new Date(lr.start_date).getFullYear()
-      : null;
-    return executionYear === yearNum;
+  // Filter requests that belong to this period (yearNum)
+  // We prioritize leave_period, falling back to execution year (start_date) if missing
+  const requestsInPeriod = typeRequests.filter((lr) => {
+    const periodYear = normalizeYear(lr.leave_period) ||
+      (lr.start_date ? new Date(lr.start_date).getFullYear() : null);
+    return periodYear === yearNum;
   });
 
   // Calculate usage split based on leave_quota_year
-  const usedFromCurrentYear = requestsInExecutionYear
+  const usedFromCurrentYear = requestsInPeriod
     .filter((lr) => {
-      const quotaYear =
-        normalizeYear(lr.leave_quota_year) ||
+      const quotaYear = normalizeYear(lr.leave_quota_year) ||
         normalizeYear(lr.leave_period) ||
         (lr.start_date ? new Date(lr.start_date).getFullYear() : null);
       return quotaYear === yearNum;
     })
     .reduce((sum, lr) => sum + (lr.days_requested || 0), 0);
 
-  const usedFromDeferred = requestsInExecutionYear
+  const usedFromDeferred = requestsInPeriod
     .filter((lr) => {
-      const quotaYear =
-        normalizeYear(lr.leave_quota_year) ||
+      const quotaYear = normalizeYear(lr.leave_quota_year) ||
         normalizeYear(lr.leave_period) ||
         (lr.start_date ? new Date(lr.start_date).getFullYear() : null);
-      // Deferred usage: quota year is less than execution year
+      // Deferred usage: quota year is less than the effective period year
       return quotaYear < yearNum;
     })
     .reduce((sum, lr) => sum + (lr.days_requested || 0), 0);
