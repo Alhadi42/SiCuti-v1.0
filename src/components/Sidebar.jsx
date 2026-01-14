@@ -37,7 +37,7 @@ const menuItems = [
   { icon: Settings, label: "Pengaturan", path: "/settings" },
 ];
 
-const getMenuItemsByPermissions = (permissions = []) => {
+const getMenuItemsByPermissions = (permissions = [], user) => {
   if (permissions.includes("all")) return menuItems;
   return menuItems.filter((item) => {
     if (item.label === "Dashboard" && permissions.includes("dashboard"))
@@ -121,7 +121,7 @@ const Sidebar = ({ isOpen, setIsOpen }) => {
       </div>
       {/* Navigation */}
       <nav className="flex-1 p-4 space-y-2 overflow-y-auto">
-        {(getMenuItemsByPermissions(user?.permissions) || []).map((item) => {
+        {(getMenuItemsByPermissions(user?.permissions, user) || []).map((item) => {
           if (item.type === "group") {
             return (
               <div key={item.label} className="space-y-1">
