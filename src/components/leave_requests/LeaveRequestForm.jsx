@@ -386,22 +386,42 @@ const LeaveRequestForm = ({
     setFormData((prev) => ({ ...prev, [name]: value }));
   };
 
-  // Fetch holidays from DB when year changes
+  // Fetch holidays from DB when dates change (support multi-year)
   useEffect(() => {
-    const year = formData.start_date
-      ? new Date(formData.start_date).getFullYear()
-      : new Date().getFullYear();
-    setHolidaysYear(year);
-    fetchNationalHolidaysFromDB(year)
-      .then(setHolidays)
-      .catch((err) => {
-        console.warn(
-          "Gagal mengambil hari libur nasional dari DB:",
-          err.message,
+    const fetchHolidays = async () => {
+      const startYear = formData.start_date
+        ? new Date(formData.start_date).getFullYear()
+        : new Date().getFullYear();
+      const endYear = formData.end_date
+        ? new Date(formData.end_date).getFullYear()
+        : startYear;
+
+      try {
+        const yearsToFetch = [startYear];
+        if (endYear !== startYear) {
+          yearsToFetch.push(endYear);
+        }
+
+        const holidaySets = await Promise.all(
+          yearsToFetch.map(y => fetchNationalHolidaysFromDB(y))
         );
+
+        // Merge sets
+        const mergedHolidays = new Set();
+        holidaySets.forEach(set => {
+          set.forEach(h => mergedHolidays.add(h));
+        });
+
+        setHolidays(mergedHolidays);
+        setHolidaysYear(startYear);
+      } catch (err) {
+        console.warn("Gagal mengambil hari libur nasional from DB:", err.message);
         setHolidays(new Set());
-      });
-  }, [formData.start_date]);
+      }
+    };
+
+    fetchHolidays();
+  }, [formData.start_date, formData.end_date]);
 
   // Fetch departments for EmployeeForm
   useEffect(() => {
@@ -640,22 +660,23 @@ const LeaveRequestForm = ({
       return;
     }
 
-    if (
-      hasNewColumns &&
-      formData.start_date &&
-      formData.end_date &&
-      new Date(formData.start_date).getFullYear() !==
-      new Date(formData.end_date).getFullYear()
-    ) {
-      toast({
-        variant: "destructive",
-        title: "Rentang Tanggal Tidak Valid",
-        description:
-          "Tanggal mulai dan tanggal selesai harus berada pada tahun yang sama.",
-      });
-      setIsSubmitting(false);
-      return;
-    }
+    // Cross-year validation removed to allow flexible leave dates
+    // if (
+    //   hasNewColumns &&
+    //   formData.start_date &&
+    //   formData.end_date &&
+    //   new Date(formData.start_date).getFullYear() !==
+    //   new Date(formData.end_date).getFullYear()
+    // ) {
+    //   toast({
+    //     variant: "destructive",
+    //     title: "Rentang Tanggal Tidak Valid",
+    //     description:
+    //       "Tanggal mulai dan tanggal selesai harus berada pada tahun yang sama.",
+    //   });
+    //   setIsSubmitting(false);
+    //   return;
+    // }
 
     const days_requested = calculateDaysRequested(
       formData.start_date,
