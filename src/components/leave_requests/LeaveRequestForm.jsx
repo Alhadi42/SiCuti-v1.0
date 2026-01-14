@@ -12,7 +12,7 @@ import {
 import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/components/ui/use-toast";
 import { supabase } from "@/lib/supabaseClient";
-import { Loader2, Search, X, Edit } from "lucide-react";
+import { Loader2, Search, X, Edit, Plus } from "lucide-react";
 import {
   countWorkingDays,
   fetchNationalHolidays,
@@ -75,6 +75,9 @@ const LeaveRequestForm = ({
   const [signerSearchTerm, setSignerSearchTerm] = useState("");
   const [selectedSigner, setSelectedSigner] = useState(null);
   const [showSignerDropdown, setShowSignerDropdown] = useState(false);
+  const [isManageSignersOpen, setIsManageSignersOpen] = useState(false);
+  const [signerSearchResults, setSignerSearchResults] = useState([]);
+  const [isSearchingSigner, setIsSearchingSigner] = useState(false);
   const [hasNewColumns, setHasNewColumns] = useState(true); // True after migration
   const [holidays, setHolidays] = useState(new Set());
   const [holidaysYear, setHolidaysYear] = useState(new Date().getFullYear());
@@ -298,32 +301,61 @@ const LeaveRequestForm = ({
     checkDatabaseColumns();
   }, [toast]);
 
+  // Load saved signers from localStorage on mount
   useEffect(() => {
-    const fetchSigners = async () => {
-      setIsLoadingSigners(true);
+    const saved = localStorage.getItem("saved_signers");
+    if (saved) {
       try {
-        const { data, error } = await supabase
-          .from("employees")
-          .select("name, nip, position_name")
-          .or(
-            "name.ilike.%AGUNG NUR ROHMAD%,name.ilike.%MEMEY MEIRITA HANDAYANI%",
-          );
-
-        if (error) throw error;
-        setSignersData(data || []);
-      } catch (error) {
-        console.error("Error fetching signers:", error);
-        toast({
-          variant: "destructive",
-          title: "Gagal Memuat Data Penandatangan",
-          description: "Tidak dapat mengambil data dari database.",
-        });
-      } finally {
-        setIsLoadingSigners(false);
+        setSignersData(JSON.parse(saved));
+      } catch (e) {
+        console.error("Error parsing saved_signers", e);
       }
+    }
+  }, []);
+
+  // Save signers to localStorage whenever they change
+  useEffect(() => {
+    if (signersData.length > 0) {
+      localStorage.setItem("saved_signers", JSON.stringify(signersData));
+    }
+  }, [signersData]);
+
+  const handleAddSigner = (employee) => {
+    // Check if already exists
+    if (signersData.some(s => s.id === employee.id)) {
+      toast({
+        title: "Sudah ada",
+        description: "Pegawai ini sudah ada dalam daftar penandatangan",
+      });
+      return;
+    }
+
+    const newSigner = {
+      id: employee.id,
+      name: employee.name,
+      nip: employee.nip,
+      position_name: employee.position_name,
+      rank_group: employee.rank_group,
+      department: employee.department
     };
-    fetchSigners();
-  }, [toast]);
+
+    setSignersData(prev => [...prev, newSigner]);
+    toast({
+      title: "Berhasil ditambahkan",
+      description: "Pegawai ditambahkan ke daftar penandatangan",
+    });
+    // Close modal if open (handled in UI)
+  };
+
+  const handleRemoveSigner = (id) => {
+    const newSigners = signersData.filter(s => s.id !== id);
+    setSignersData(newSigners);
+    localStorage.setItem("saved_signers", JSON.stringify(newSigners)); // Force update
+
+    if (selectedSigner?.id === id) {
+      handleClearSigner();
+    }
+  };
 
   useEffect(() => {
     if (initialData?.signed_by && signersData.length > 0) {
@@ -1366,81 +1398,176 @@ const LeaveRequestForm = ({
             <Label htmlFor="signer_search" className="text-slate-300">
               Pejabat yang Menandatangani
             </Label>
-            <div
-              className="relative mt-1"
-              onBlur={(e) => {
-                if (!e.currentTarget.contains(e.relatedTarget)) {
-                  setShowSignerDropdown(false);
-                }
-              }}
-            >
-              <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                <Search className="h-4 w-4 text-gray-400" />
+            <div className="flex gap-2 mt-1 px-1">
+              <div className="relative flex-1">
+                <Input
+                  id="signed_by"
+                  placeholder="Pilih atau cari penandatangan..."
+                  value={signerSearchTerm}
+                  onChange={(e) => {
+                    setSignerSearchTerm(e.target.value);
+                    setShowSignerDropdown(true);
+                    handleChange("signed_by", e.target.value);
+                  }}
+                  onClick={() => setShowSignerDropdown(true)}
+                  className="w-full bg-slate-700 border-slate-600 text-white"
+                  autoComplete="off"
+                />
+                {/* Dropdown for saved signers */}
+                {showSignerDropdown && (
+                  <div className="absolute z-10 w-full mt-1 bg-slate-800 border border-slate-700 rounded-md shadow-lg max-h-60 overflow-y-auto">
+                    {signersData.length === 0 ? (
+                      <div className="p-3 text-sm text-slate-400 text-center">
+                        Belum ada daftar penandatangan.
+                        <br />Klik "Kelola" untuk menambah.
+                      </div>
+                    ) : (
+                      signersData
+                        .filter(s => s.name.toLowerCase().includes(signerSearchTerm.toLowerCase()))
+                        .map((signer) => (
+                          <div
+                            key={signer.id || signer.name}
+                            className="p-2 hover:bg-slate-700 cursor-pointer text-sm"
+                            onClick={() => handleSelectSigner(signer)}
+                          >
+                            <div className="font-medium text-slate-200">{signer.name}</div>
+                            <div className="text-xs text-slate-400">
+                              {signer.position_name}
+                            </div>
+                          </div>
+                        ))
+                    )}
+                  </div>
+                )}
+                {showSignerDropdown && (
+                  <div className="fixed inset-0 z-0" onClick={() => setShowSignerDropdown(false)}></div>
+                )}
               </div>
-              <Input
-                id="signer_search"
-                name="signer_search"
-                type="text"
-                placeholder={isLoadingSigners ? "Memuat..." : "Cari pejabat..."}
-                className="pl-10 bg-slate-700 border-slate-600 text-white"
-                value={signerSearchTerm}
-                onChange={(e) => {
-                  setSignerSearchTerm(e.target.value);
-                  setShowSignerDropdown(true);
-                }}
-                onFocus={() => setShowSignerDropdown(true)}
-                autoComplete="off"
-                disabled={isLoadingSigners}
-              />
-              {selectedSigner && (
-                <button
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => setIsManageSignersOpen(true)}
+                className="whitespace-nowrap border-slate-600 text-slate-200 hover:bg-slate-700"
+              >
+                Kelola
+              </Button>
+            </div>
+
+            {selectedSigner && (
+              <div className="mt-2 p-3 bg-slate-800/50 rounded-lg border border-slate-700/50 flex justify-between items-start">
+                <div>
+                  <div className="text-sm font-medium text-slate-300">
+                    {selectedSigner.name}
+                  </div>
+                  <div className="text-xs text-slate-500">
+                    {selectedSigner.nip && <div>NIP: {selectedSigner.nip}</div>}
+                    {selectedSigner.position_name && (
+                      <div>Jabatan: {selectedSigner.position_name}</div>
+                    )}
+                  </div>
+                </div>
+                <Button
                   type="button"
-                  className="absolute inset-y-0 right-0 pr-3 flex items-center"
+                  variant="ghost"
+                  size="icon"
+                  className="h-6 w-6 text-slate-400 hover:text-red-400"
                   onClick={handleClearSigner}
                 >
-                  <X className="h-4 w-4 text-gray-400 hover:text-white" />
-                </button>
-              )}
-              {showSignerDropdown && (
-                <div className="absolute z-10 w-full mt-1 bg-slate-800 border border-slate-700 rounded-md shadow-lg max-h-60 overflow-y-auto">
-                  {isLoadingSigners ? (
-                    <div className="p-4 text-center text-slate-400">
-                      Memuat...
+                  <X className="h-4 w-4" />
+                </Button>
+              </div>
+            )}
+
+            {/* Manage Signatories Modal */}
+            <Dialog open={isManageSignersOpen} onOpenChange={setIsManageSignersOpen}>
+              <DialogContent className="sm:max-w-md bg-slate-900 border-slate-800 text-slate-200">
+                <DialogHeader>
+                  <DialogTitle>Kelola Daftar Penandatangan</DialogTitle>
+                  <DialogDescription className="text-slate-400">
+                    Tambahkan pimpinan ke daftar untuk akses cepat.
+                  </DialogDescription>
+                </DialogHeader>
+
+                <div className="space-y-4 py-4">
+                  <div className="space-y-2">
+                    <Label>Cari Pegawai / Pimpinan</Label>
+                    <div className="relative">
+                      <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-slate-500" />
+                      <Input
+                        placeholder="Ketik nama atau NIP..."
+                        className="pl-9 bg-slate-800 border-slate-700 text-white"
+                        onChange={(e) => {
+                          const val = e.target.value;
+                          if (val.length > 2) {
+                            setIsSearchingSigner(true);
+                            supabase
+                              .from("employees")
+                              .select("*")
+                              .or(`name.ilike.%${val}%,nip.ilike.%${val}%`)
+                              .limit(5)
+                              .then(({ data }) => {
+                                setSignerSearchResults(data || []);
+                                setIsSearchingSigner(false);
+                              });
+                          } else {
+                            setSignerSearchResults([]);
+                          }
+                        }}
+                      />
                     </div>
-                  ) : signersData.filter((s) =>
-                    s.name
-                      .toLowerCase()
-                      .includes(signerSearchTerm.toLowerCase()),
-                  ).length > 0 ? (
-                    signersData
-                      .filter((s) =>
-                        s.name
-                          .toLowerCase()
-                          .includes(signerSearchTerm.toLowerCase()),
-                      )
-                      .map((signer) => (
-                        <div
-                          key={signer.nip}
-                          className="px-4 py-2 cursor-pointer hover:bg-slate-700"
-                          onMouseDown={(e) => {
-                            e.preventDefault();
-                            handleSelectSigner(signer);
-                          }}
-                        >
-                          <p className="text-white">{signer.name}</p>
-                          <p className="text-sm text-slate-400">
-                            {signer.position_name}
-                          </p>
-                        </div>
-                      ))
-                  ) : (
-                    <div className="p-4 text-center text-slate-400">
-                      Pejabat tidak ditemukan.
+                    {/* Search Results */}
+                    {signerSearchResults.length > 0 && (
+                      <div className="border border-slate-700 rounded-md max-h-40 overflow-y-auto mt-2 bg-slate-800">
+                        {signerSearchResults.map(emp => (
+                          <div
+                            key={emp.id}
+                            className="p-2 hover:bg-slate-700 cursor-pointer flex justify-between items-center border-b border-slate-700 last:border-0"
+                            onClick={() => {
+                              handleAddSigner(emp);
+                              setSignerSearchResults([]); // Clear search after add
+                            }}
+                          >
+                            <div>
+                              <div className="text-sm font-medium">{emp.name}</div>
+                              <div className="text-xs text-slate-400">{emp.position_name}</div>
+                            </div>
+                            <Button size="sm" variant="ghost" className="h-6 w-6 p-0 hover:bg-slate-600">
+                              <Plus className="h-4 w-4" />
+                            </Button>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label>Daftar Tersimpan</Label>
+                    <div className="space-y-2 max-h-[200px] overflow-y-auto pr-1">
+                      {signersData.length === 0 ? (
+                        <p className="text-sm text-slate-500 italic">Belum ada data tersimpan.</p>
+                      ) : (
+                        signersData.map((signer) => (
+                          <div key={signer.id} className="flex justify-between items-center p-2 bg-slate-800 rounded border border-slate-700 mb-2">
+                            <div>
+                              <div className="text-sm font-medium">{signer.name}</div>
+                              <div className="text-xs text-slate-400">{signer.position_name}</div>
+                            </div>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              className="text-red-400 hover:text-red-300 hover:bg-red-950/20 h-8"
+                              onClick={() => handleRemoveSigner(signer.id)}
+                            >
+                              Hapus
+                            </Button>
+                          </div>
+                        ))
+                      )}
                     </div>
-                  )}
+                  </div>
                 </div>
-              )}
-            </div>
+              </DialogContent>
+            </Dialog>
           </div>
         </div>
 

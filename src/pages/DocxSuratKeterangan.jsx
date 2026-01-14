@@ -10,6 +10,7 @@ import {
   CheckCircle,
   AlertCircle,
   Plus,
+  ExternalLink,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -89,102 +90,57 @@ const dummyEmployees = [
   },
 ];
 
-// Data atasan/penandatangan - dalam aplikasi nyata, ini akan diambil dari database
-const signatoryData = [
-  {
-    id: "6",
-    nip: "197001011992032001",
-    nama: "Dr. Memey Meyrita Handayani, M.Kes",
-    jabatan: "Dekan Fakultas Kedokteran",
-    unit_kerja: "Fakultas Kedokteran",
-  },
-  {
-    id: "7",
-    nip: "196505151990031001",
-    nama: "Prof. Dr. Ir. Bambang Supriyanto, M.T.",
-    jabatan: "Rektor",
-    unit_kerja: "Universitas",
-  },
-  {
-    id: "8",
-    nip: "197203121998032001",
-    nama: "Dr. Sri Wahyuni, S.E., M.M.",
-    jabatan: "Dekan Fakultas Ekonomi",
-    unit_kerja: "Fakultas Ekonomi",
-  },
-  {
-    id: "9",
-    nip: "196812101995031001",
-    nama: "Prof. Dr. Andi Hamzah, S.H., M.H.",
-    jabatan: "Dekan Fakultas Hukum",
-    unit_kerja: "Fakultas Hukum",
-  },
-  {
-    id: "3",
-    nip: "197512032001121001",
-    nama: "Ahmad Budiman",
-    jabatan: "Dekan Fakultas Teknik",
-    unit_kerja: "Fakultas Teknik",
-  },
-];
-
 // Helper function to get signatory data based on signed_by name from leave request
 const getSignatoryByName = async (signatoryName) => {
   if (!signatoryName) return null;
 
-  // Cari di signatoryData berdasarkan nama
-  const foundSignatory = signatoryData.find(
-    (s) =>
-      s.nama.toLowerCase().includes(signatoryName.toLowerCase()) ||
-      signatoryName.toLowerCase().includes(s.nama.toLowerCase()),
-  );
-
-  if (foundSignatory) return foundSignatory;
-
-  // Jika tidak ditemukan di signatoryData, coba cari di database employees
   try {
-    const { data: employeeData, error } = await supabase
+    // Cari di database employees
+    // Prioritize exact match first
+    let { data: employeeData, error } = await supabase
       .from("employees")
       .select("name, nip, position_name, rank_group, department")
-      .ilike("name", `%${signatoryName}%`)
+      .eq("name", signatoryName)
       .limit(1);
 
-    if (!error && employeeData && employeeData.length > 0) {
+    if (!employeeData || employeeData.length === 0) {
+      // Fallback to partial match if exact match fails
+      const { data: partialData, error: partialError } = await supabase
+        .from("employees")
+        .select("name, nip, position_name, rank_group, department")
+        .ilike("name", `%${signatoryName}%`)
+        .limit(1);
+
+      if (!partialError) employeeData = partialData;
+    }
+
+    if (employeeData && employeeData.length > 0) {
       const employee = employeeData[0];
       return {
         nama: employee.name,
         nip: employee.nip || "NIP tidak tersedia",
         jabatan: employee.position_name || "Jabatan tidak tersedia",
+        unit_kerja: employee.department || ""
       };
     }
   } catch (error) {
     console.warn("Error searching employee database for signatory:", error);
   }
 
-  // Jika tidak ditemukan, return null (akan diisi dengan data dari signed_by)
+  // Jika tidak ditemukan, return null
   return null;
 };
 
 // Helper function to get signatory data for an employee (fallback method)
-const getSignatoryForEmployee = (employee) => {
+const getSignatoryForEmployee = async (employee) => {
   if (!employee) return null;
 
-  // Jika employee memiliki superior_id, cari data atasan
-  if (employee.superior_id) {
-    const superior = signatoryData.find((s) => s.id === employee.superior_id);
-    if (superior) return superior;
-  }
+  // Jika employee memiliki superior_id, cari data atasan (DB lookup needed here if we had logic for it)
+  // For now, simpler fallback: try to find Dept Head? 
+  // Since we don't have easy hierarchy lookup here without more DB calls, we will return null 
+  // and let the letter be generated with placeholders if necessary.
 
-  // Fallback: cari berdasarkan unit kerja
-  const unitBasedSuperior = signatoryData.find(
-    (s) => s.unit_kerja === employee.unit_kerja && s.id !== employee.id,
-  );
-  if (unitBasedSuperior) return unitBasedSuperior;
-
-  // Default fallback ke Rektor
-  return (
-    signatoryData.find((s) => s.jabatan.includes("Rektor")) || signatoryData[0]
-  );
+  return null;
 };
 
 function DocxSuratKeterangan() {
@@ -719,8 +675,8 @@ function DocxSuratKeterangan() {
         tanggal_formulir_pengajuan: formatDateLong(
           leaveRequest.application_form_date ||
           leaveRequest.created_at ||
-            leaveRequest.tanggal_pengajuan ||
-            new Date().toISOString(),
+          leaveRequest.tanggal_pengajuan ||
+          new Date().toISOString(),
         ),
         alamat_selama_cuti:
           leaveRequest.address_during_leave ||
@@ -745,7 +701,7 @@ function DocxSuratKeterangan() {
           console.log("leaveRequest.leave_letter_date:", leaveRequest.leave_letter_date);
           console.log("leaveRequest.created_at:", leaveRequest.created_at);
           console.log("Raw leave request data:", leaveRequest);
-          
+
           const result = formatDate(leaveRequest.leave_letter_date || leaveRequest.created_at || new Date());
           console.log("Final tanggal_surat result:", result);
           console.log("=== END TANGGAL SURAT DEBUG ===");
@@ -820,8 +776,8 @@ function DocxSuratKeterangan() {
       tanggal_formulir_pengajuan: formatDateLong(
         leaveRequest.application_form_date ||
         leaveRequest.created_at ||
-          leaveRequest.tanggal_pengajuan ||
-          new Date().toISOString(),
+        leaveRequest.tanggal_pengajuan ||
+        new Date().toISOString(),
       ),
       lama_cuti:
         workingDays > 0
@@ -838,7 +794,7 @@ function DocxSuratKeterangan() {
         console.log("leaveRequest.leave_letter_date:", leaveRequest.leave_letter_date);
         console.log("leaveRequest.created_at:", leaveRequest.created_at);
         console.log("Raw leave request data:", leaveRequest);
-        
+
         const result = formatDate(leaveRequest.leave_letter_date || leaveRequest.created_at || new Date());
         console.log("Final tanggal_surat result:", result);
         console.log("=== END TANGGAL SURAT DEBUG (FORM DATA) ===");
@@ -857,7 +813,19 @@ function DocxSuratKeterangan() {
   // Render template selection UI
   const renderTemplateSelection = () => (
     <div className="space-y-2">
-      <Label>Pilih Template DOCX</Label>
+
+      <div className="flex justify-between items-center">
+        <Label>Pilih Template DOCX</Label>
+        <Button
+          variant="outline"
+          size="sm"
+          className="h-8 text-blue-500 border-blue-200 hover:bg-blue-50 hover:text-blue-600"
+          onClick={() => window.open("https://drive.google.com/drive/folders/1wOcdhROICJjoFxh16G2kRe0RIqY4PCcX?usp=sharing", "_blank")}
+        >
+          <ExternalLink className="w-3 h-3 mr-2" />
+          Download Contoh Template
+        </Button>
+      </div>
       {savedTemplates.length > 0 ? (
         <Select
           value={selectedTemplate?.id || ""}
@@ -1000,7 +968,7 @@ function DocxSuratKeterangan() {
         console.log("firstEmployeeData.tanggal_surat:", firstEmployeeData.tanggal_surat);
         console.log("firstEmployeeData raw:", firstEmployeeData);
         console.log("employees[0] raw:", employees[0]);
-        
+
         const result = firstEmployeeData.tanggal_surat || formatDate(new Date().toISOString());
         console.log("Final batch tanggal_surat result:", result);
         console.log("=== END BATCH TANGGAL SURAT DEBUG ===");
@@ -1691,9 +1659,8 @@ function DocxSuratKeterangan() {
                     formData={formData}
                     onFormDataChange={handleFormDataChange}
                     onGenerate={handleGenerate}
-                    fileName={`surat-${selectedTemplate.name}-${
-                      new Date().toISOString().split("T")[0]
-                    }.docx`}
+                    fileName={`surat-${selectedTemplate.name}-${new Date().toISOString().split("T")[0]
+                      }.docx`}
                     autoFillData={autoFillData}
                   />
                 )
@@ -1750,11 +1717,10 @@ function DocxSuratKeterangan() {
                   {filteredLeaveRequests.map((request) => (
                     <div
                       key={request.id}
-                      className={`p-3 border rounded-lg cursor-pointer transition-colors ${
-                        isLeaveRequestSelected(request)
-                          ? "border-blue-500 bg-blue-50"
-                          : "border-slate-300 hover:border-slate-400"
-                      }`}
+                      className={`p-3 border rounded-lg cursor-pointer transition-colors ${isLeaveRequestSelected(request)
+                        ? "border-blue-500 bg-blue-50"
+                        : "border-slate-300 hover:border-slate-400"
+                        }`}
                       onClick={() => toggleLeaveRequestSelection(request)}
                     >
                       <div className="flex justify-between items-start">
