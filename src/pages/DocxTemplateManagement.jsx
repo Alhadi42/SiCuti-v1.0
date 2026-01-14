@@ -33,6 +33,8 @@ import { Link } from "react-router-dom";
 import { supabase } from "@/lib/supabaseClient";
 import { copyToClipboard } from "@/utils/clipboardUtils";
 
+import { AuthManager } from "@/lib/auth";
+
 const DocxTemplateManagement = () => {
   // State management
   const [templates, setTemplates] = useState([]);
@@ -109,9 +111,34 @@ const DocxTemplateManagement = () => {
   const loadTemplates = async () => {
     setIsLoading(true);
     try {
-      const { data, error } = await supabase
-        .from("templates")
-        .select("*")
+      console.log("Loading templates from Supabase...");
+
+      const currentUser = AuthManager.getUserSession();
+      if (!currentUser) {
+        throw new Error("User not authenticated");
+      }
+
+      console.log("Current user:", { role: currentUser.role, unit: currentUser.unit_kerja || currentUser.unitKerja });
+
+      let query = supabase.from("templates").select("*");
+
+      // Apply role-based filtering
+      if (currentUser.role === "master_admin") {
+        // Master admin sees only global templates
+        query = query.eq("template_scope", "global");
+      } else if (currentUser.role === "admin_unit") {
+        // Admin unit sees only their own unit's templates
+        const userUnit = currentUser.unit_kerja || currentUser.unitKerja;
+        if (!userUnit) {
+          throw new Error("Admin unit user must have a unit assigned");
+        }
+        query = query.eq("template_scope", "unit").eq("unit_scope", userUnit);
+      } else {
+        // Other roles have no access
+        throw new Error("Insufficient permissions to access templates");
+      }
+
+      const { data, error } = await query
         .eq("type", "docx")
         .order("name", { ascending: true });
 
@@ -278,12 +305,45 @@ const DocxTemplateManagement = () => {
 
     setIsLoading(true);
 
+    const currentUser = AuthManager.getUserSession();
+    if (!currentUser) {
+      toast({
+        title: "Gagal menyimpan template",
+        description: "Sesi pengguna tidak valid",
+        variant: "destructive"
+      });
+      setIsLoading(false);
+      return;
+    }
+
+    // Determine template scope based on user role
+    let templateScope = "global";
+    let unitScope = null;
+
+    if (currentUser.role === "admin_unit") {
+      templateScope = "unit";
+      unitScope = currentUser.unit_kerja || currentUser.unitKerja;
+
+      if (!unitScope) {
+        toast({
+          title: "Gagal menyimpan template",
+          description: "Unit kerja tidak ditemukan untuk user ini",
+          variant: "destructive"
+        });
+        setIsLoading(false);
+        return;
+      }
+    }
+
     const templateToSave = {
       id: isEditMode ? currentTemplateId : undefined,
       name: templateName,
       description: templateDescription,
       type: "docx",
       content: templateContent,
+      template_scope: templateScope,
+      unit_scope: unitScope,
+      updated_at: new Date().toISOString(),
       // user_id: (await supabase.auth.getUser()).data.user.id, // Uncomment if you have user auth
     };
 
@@ -335,6 +395,21 @@ const DocxTemplateManagement = () => {
 
     setIsLoading(true);
     try {
+      // Permission check for deletion
+      const currentUser = AuthManager.getUserSession();
+      if (!currentUser) throw new Error("User not authenticated");
+
+      // Verify ownership before delete (double check)
+      const templateToDelete = templates.find(t => t.id === templateId);
+      if (templateToDelete) {
+        if (currentUser.role === "admin_unit") {
+          const userUnit = currentUser.unit_kerja || currentUser.unitKerja;
+          if (templateToDelete.template_scope !== "unit" || templateToDelete.unit_scope !== userUnit) {
+            throw new Error("Anda hanya dapat menghapus template milik unit Anda sendiri");
+          }
+        }
+      }
+
       const { error } = await supabase
         .from("templates")
         .delete()
@@ -436,11 +511,10 @@ const DocxTemplateManagement = () => {
                 {templates.map((template) => (
                   <div
                     key={template.id}
-                    className={`p-3 rounded-lg cursor-pointer transition-colors ${
-                      selectedTemplate?.id === template.id
+                    className={`p-3 rounded-lg cursor-pointer transition-colors ${selectedTemplate?.id === template.id
                         ? "bg-blue-600 text-white"
                         : "bg-slate-700 hover:bg-slate-600 text-slate-200"
-                    }`}
+                      }`}
                     onClick={() => {
                       setSelectedTemplate(template);
                       analyzeTemplateVariables(template);
@@ -652,8 +726,8 @@ const DocxTemplateManagement = () => {
                           Ukuran:{" "}
                           {selectedTemplate.content?.size
                             ? (selectedTemplate.content.size / 1024).toFixed(
-                                1,
-                              ) + " KB"
+                              1,
+                            ) + " KB"
                             : "N/A"}
                         </div>
                         <div>
@@ -706,11 +780,10 @@ const DocxTemplateManagement = () => {
                                 return (
                                   <div
                                     key={index}
-                                    className={`flex items-center justify-between p-2 rounded text-xs ${
-                                      isMatched
+                                    className={`flex items-center justify-between p-2 rounded text-xs ${isMatched
                                         ? "bg-green-100 border border-green-300"
                                         : "bg-yellow-50 border border-yellow-300"
-                                    }`}
+                                      }`}
                                   >
                                     <div className="flex items-center space-x-2">
                                       {isMatched ? (
@@ -719,21 +792,19 @@ const DocxTemplateManagement = () => {
                                         <AlertCircle className="w-3 h-3 text-yellow-600" />
                                       )}
                                       <code
-                                        className={`font-mono ${
-                                          isMatched
+                                        className={`font-mono ${isMatched
                                             ? "text-green-700"
                                             : "text-yellow-700"
-                                        }`}
+                                          }`}
                                       >
                                         {"{" + variable.name + "}"}
                                       </code>
                                     </div>
                                     <span
-                                      className={`text-xs ${
-                                        isMatched
+                                      className={`text-xs ${isMatched
                                           ? "text-green-600"
                                           : "text-yellow-600"
-                                      }`}
+                                        }`}
                                     >
                                       {isMatched ? "Tersedia" : "Perlu Review"}
                                     </span>

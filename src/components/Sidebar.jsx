@@ -69,7 +69,7 @@ const getMenuItemsByPermissions = (permissions = []) => {
     if (
       item.type === "group" &&
       item.label === "Surat Keterangan" &&
-      (permissions.includes("surat_keterangan") || permissions.includes("surat_keterangan_unit"))
+      (permissions.includes("surat_keterangan") || permissions.includes("surat_keterangan_unit") || permissions.includes("all") || user?.role === "admin_unit" || user?.role === "master_admin")
     )
       return true;
     return false;
@@ -211,8 +211,8 @@ const Sidebar = ({ isOpen, setIsOpen }) => {
               <p className="text-slate-400 text-xs">
                 {user?.role
                   ? user.role
-                      .replace("_", " ")
-                      .replace(/\b\w/g, (c) => c.toUpperCase())
+                    .replace("_", " ")
+                    .replace(/\b\w/g, (c) => c.toUpperCase())
                   : "-"}
               </p>
               <button
