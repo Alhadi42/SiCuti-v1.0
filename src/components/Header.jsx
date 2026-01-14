@@ -12,7 +12,15 @@ const Header = ({ toggleSidebar }) => {
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.5 }}
     >
-      <div className="flex items-center justify-end">
+      <div className="flex items-center justify-between md:justify-end">
+        <Button
+          variant="ghost"
+          size="icon"
+          className="md:hidden text-white hover:bg-slate-700/50"
+          onClick={toggleSidebar}
+        >
+          <Menu className="w-6 h-6" />
+        </Button>
         <div className="flex items-center space-x-4">
           <NotificationPanel />
 

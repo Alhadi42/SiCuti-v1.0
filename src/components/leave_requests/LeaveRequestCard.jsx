@@ -21,17 +21,17 @@ const LeaveRequestCard = ({ request, index, onEdit, onDelete }) => {
       <div className="flex flex-col lg:flex-row lg:items-start lg:justify-between space-y-4 lg:space-y-0">
         <div className="flex-1">
           <div className="flex justify-end space-x-2 mb-2">
-            <Button 
-              variant="ghost" 
-              size="sm" 
+            <Button
+              variant="ghost"
+              size="sm"
               className="text-blue-400 hover:bg-blue-900/20 h-8 px-2"
               onClick={() => onEdit(request)}
             >
               <Edit2 className="w-4 h-4 mr-1" /> Edit
             </Button>
-            <Button 
-              variant="ghost" 
-              size="sm" 
+            <Button
+              variant="ghost"
+              size="sm"
               className="text-red-400 hover:bg-red-900/20 h-8 px-2"
               onClick={() => onDelete(request.id)}
             >
@@ -45,7 +45,7 @@ const LeaveRequestCard = ({ request, index, onEdit, onDelete }) => {
             <div className="flex-1">
               <h3 className="text-white font-semibold">{request.employeeName}</h3>
               <p className="text-slate-400 text-sm font-mono mb-1">{request.nip}</p>
-              
+
               <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-slate-400 mt-1">
                 {request.department && (
                   <div className="flex items-center">
@@ -70,14 +70,22 @@ const LeaveRequestCard = ({ request, index, onEdit, onDelete }) => {
               </div>
             </div>
           </div>
-          
+
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-x-4 gap-y-3 text-sm">
             <div>
               <p className="text-slate-400">Jenis Cuti:</p>
               <p className="text-white font-medium">{request.leaveTypeName}</p>
             </div>
             <div>
-              <p className="text-slate-400">Periode:</p>
+              <p className="text-slate-400">Periode Cuti:</p>
+              <p className="text-white font-medium">{request.leave_period || '-'}</p>
+            </div>
+            <div>
+              <p className="text-slate-400">Jatah Cuti Tahun:</p>
+              <p className="text-white font-medium">{request.leave_quota_year || '-'}</p>
+            </div>
+            <div>
+              <p className="text-slate-400">Tanggal Cuti:</p>
               <p className="text-white font-medium">
                 {formatDate(request.start_date)} - {formatDate(request.end_date)}
               </p>
@@ -87,10 +95,7 @@ const LeaveRequestCard = ({ request, index, onEdit, onDelete }) => {
               <p className="text-slate-400">Alasan/Keterangan:</p>
               <p className="text-white font-medium truncate" title={request.reason}>{request.reason || '-'}</p>
             </div>
-            <div>
-              <p className="text-slate-400">No. Surat Pengantar:</p>
-              <p className="text-white font-medium">{request.reference_number || '-'}</p>
-            </div>
+
             <div>
               <p className="text-slate-400">No. Surat Cuti:</p>
               <p className="text-white font-medium">{request.leave_letter_number || '-'}</p>
@@ -108,7 +113,7 @@ const LeaveRequestCard = ({ request, index, onEdit, onDelete }) => {
               <p className="text-white font-medium">{request.address_during_leave || '-'}</p>
             </div>
           </div>
-           <p className="text-xs text-slate-500 mt-3">Data diinput pada: {formatDate(request.submitted_date)}</p>
+          <p className="text-xs text-slate-500 mt-3">Data diinput pada: {formatDate(request.submitted_date)}</p>
         </div>
       </div>
     </motion.div>

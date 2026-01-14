@@ -148,7 +148,7 @@ const LeaveHistoryEmployeeCard = ({
       className="p-6 bg-slate-700/30 rounded-lg border border-slate-600/30"
     >
       <div className="flex flex-col lg:flex-row lg:items-start lg:justify-between mb-6">
-        <div className="flex items-center space-x-4 mb-4 lg:mb-0">
+        <div className="flex items-start space-x-4 mb-4 lg:mb-0 min-w-0 flex-1">
           <div className="w-12 h-12 bg-gradient-to-r from-blue-500 to-purple-600 rounded-full flex items-center justify-center flex-shrink-0">
             <span className="text-white text-xl font-bold">
               {employee.employeeName
@@ -156,19 +156,19 @@ const LeaveHistoryEmployeeCard = ({
                 : "?"}
             </span>
           </div>
-          <div>
-            <h3 className="text-white font-semibold text-lg">
+          <div className="min-w-0 flex-1">
+            <h3 className="text-white font-semibold text-lg break-words leading-tight">
               {employee.employeeName}
             </h3>
-            <p className="text-slate-400 text-sm font-mono">{employee.nip}</p>
-            <div className="flex flex-col space-y-1 text-slate-500 text-xs mt-1">
-              <div className="flex items-center">
-                <Briefcase className="w-3 h-3 mr-1.5 flex-shrink-0" />
-                <span className="truncate">{employee.department || "N/A"}</span>
+            <p className="text-slate-400 text-sm font-mono mt-0.5">{employee.nip}</p>
+            <div className="flex flex-col space-y-1.5 text-slate-500 text-xs mt-2">
+              <div className="flex items-start">
+                <Briefcase className="w-3 h-3 mr-1.5 mt-0.5 flex-shrink-0" />
+                <span className="break-words leading-snug">{employee.department || "N/A"}</span>
               </div>
               {employee.rank_group && (
-                <div className="flex items-center">
-                  <span className="w-3 h-3 mr-1.5 flex-shrink-0 inline-flex items-center justify-center">
+                <div className="flex items-start">
+                  <span className="w-3 h-3 mr-1.5 mt-0.5 flex-shrink-0 inline-flex items-center justify-center">
                     <svg
                       xmlns="http://www.w3.org/2000/svg"
                       width="12"
@@ -187,12 +187,12 @@ const LeaveHistoryEmployeeCard = ({
                       <path d="M16 3.13a4 4 0 0 1 0 7.75"></path>
                     </svg>
                   </span>
-                  <span className="truncate">{employee.rank_group}</span>
+                  <span className="break-words leading-snug">{employee.rank_group}</span>
                 </div>
               )}
               {employee.position_name && (
-                <div className="flex items-center">
-                  <span className="w-3 h-3 mr-1.5 flex-shrink-0 inline-flex items-center justify-center">
+                <div className="flex items-start">
+                  <span className="w-3 h-3 mr-1.5 mt-0.5 flex-shrink-0 inline-flex items-center justify-center">
                     <svg
                       xmlns="http://www.w3.org/2000/svg"
                       width="12"
@@ -209,7 +209,7 @@ const LeaveHistoryEmployeeCard = ({
                       <circle cx="12" cy="10" r="3"></circle>
                     </svg>
                   </span>
-                  <span className="truncate">{employee.position_name}</span>
+                  <span className="break-words leading-snug">{employee.position_name}</span>
                 </div>
               )}
             </div>
@@ -223,8 +223,8 @@ const LeaveHistoryEmployeeCard = ({
             variant="outline"
             onClick={() => onAddDeferredLeave(employee, employee.deferralLog)}
             className={`border-yellow-600/50 ${employee.deferralLog
-                ? "text-yellow-400 bg-yellow-900/10 hover:bg-yellow-900/20"
-                : "text-yellow-500 hover:text-white hover:bg-yellow-700/50"
+              ? "text-yellow-400 bg-yellow-900/10 hover:bg-yellow-900/20"
+              : "text-yellow-500 hover:text-white hover:bg-yellow-700/50"
               }`}
           >
             <PlusCircle className="w-4 h-4 mr-1.5" />

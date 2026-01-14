@@ -941,7 +941,7 @@ const LeaveRequestForm = ({
       onSubmit={handleSubmit}
       className="flex flex-col h-[70vh] min-h-[500px] max-h-[800px] overflow-hidden"
     >
-      <div className="flex-1 overflow-y-auto p-4">
+      <div className="flex-1 overflow-y-auto p-4 md:p-6">
         <div className="space-y-4">
           {/* Employee Search */}
           <div
@@ -1019,9 +1019,9 @@ const LeaveRequestForm = ({
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3 p-4 mt-4 bg-slate-800/50 rounded-md border border-slate-700/50">
               {/* Header dengan tombol Quick Edit */}
               <div className="md:col-span-2 lg:col-span-3 flex justify-between items-center mb-2">
-                <Label className="text-sm font-medium text-slate-300">
+                <span className="text-sm font-medium text-slate-300">
                   Informasi Pegawai
-                </Label>
+                </span>
                 <Button
                   type="button"
                   variant="outline"
@@ -1035,33 +1035,33 @@ const LeaveRequestForm = ({
               </div>
 
               <div>
-                <Label className="text-xs font-medium text-slate-400">
+                <span className="text-xs font-medium text-slate-400">
                   NIP
-                </Label>
+                </span>
                 <div className="mt-1 text-sm text-white">
                   {formData.employee_nip}
                 </div>
               </div>
               <div>
-                <Label className="text-xs font-medium text-slate-400">
+                <span className="text-xs font-medium text-slate-400">
                   Pangkat/Golongan
-                </Label>
+                </span>
                 <div className="mt-1 text-sm text-white">
                   {formData.employee_rank}
                 </div>
               </div>
               <div className="lg:col-span-1">
-                <Label className="text-xs font-medium text-slate-400">
+                <span className="text-xs font-medium text-slate-400">
                   Jabatan
-                </Label>
+                </span>
                 <div className="mt-1 text-sm text-white">
                   {formData.employee_position}
                 </div>
               </div>
               <div className="md:col-span-2 lg:col-span-3">
-                <Label className="text-xs font-medium text-slate-400">
+                <span className="text-xs font-medium text-slate-400">
                   Unit Penempatan
-                </Label>
+                </span>
                 <div className="mt-1 text-sm text-white">
                   {formData.employee_department}
                 </div>
@@ -1395,7 +1395,7 @@ const LeaveRequestForm = ({
             />
           </div>
           <div className="md:col-span-2">
-            <Label htmlFor="signer_search" className="text-slate-300">
+            <Label htmlFor="signed_by" className="text-slate-300">
               Pejabat yang Menandatangani
             </Label>
             <div className="flex gap-2 mt-1 px-1">
@@ -1490,10 +1490,11 @@ const LeaveRequestForm = ({
 
                 <div className="space-y-4 py-4">
                   <div className="space-y-2">
-                    <Label>Cari Pegawai / Pimpinan</Label>
+                    <Label htmlFor="signer_modal_search">Cari Pegawai / Pimpinan</Label>
                     <div className="relative">
                       <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-slate-500" />
                       <Input
+                        id="signer_modal_search"
                         placeholder="Ketik nama atau NIP..."
                         className="pl-9 bg-slate-800 border-slate-700 text-white"
                         onChange={(e) => {
@@ -1541,7 +1542,7 @@ const LeaveRequestForm = ({
                   </div>
 
                   <div className="space-y-2">
-                    <Label>Daftar Tersimpan</Label>
+                    <div className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70">Daftar Tersimpan</div>
                     <div className="space-y-2 max-h-[200px] overflow-y-auto pr-1">
                       {signersData.length === 0 ? (
                         <p className="text-sm text-slate-500 italic">Belum ada data tersimpan.</p>
@@ -1575,15 +1576,15 @@ const LeaveRequestForm = ({
         {selectedSigner && (
           <div className="md:col-span-2 grid grid-cols-1 md:grid-cols-2 gap-3 p-4 bg-slate-800/50 rounded-md border border-slate-700/50">
             <div>
-              <Label className="text-xs font-medium text-slate-400">NIP</Label>
+              <span className="text-xs font-medium text-slate-400">NIP</span>
               <div className="mt-1 text-sm text-white">
                 {selectedSigner.nip}
               </div>
             </div>
             <div>
-              <Label className="text-xs font-medium text-slate-400">
+              <span className="text-xs font-medium text-slate-400">
                 Jabatan
-              </Label>
+              </span>
               <div className="mt-1 text-sm text-white">
                 {selectedSigner.position_name}
               </div>

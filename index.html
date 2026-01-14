@@ -1,98 +1,110 @@
 <!doctype html>
 <html lang="en">
-  <head>
-    <meta charset="UTF-8" />
-    <meta name="generator" content="SiCuti_Binalavotas" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>SiCuti - Binalavotas</title>
-    <link rel="manifest" href="/manifest.json" />
-    <link
-      rel="icon"
-      type="image/png"
-      href="https://ociedycfgkqvcqwdxprt.supabase.co/storage/v1/object/public/templates//favicon.ico"
-    />
 
-    <!-- Ultra-early ResizeObserver error suppression -->
-    <script>
-      (function() {
-        'use strict';
+<head>
+  <meta charset="UTF-8" />
+  <meta name="generator" content="SiCuti_Binalavotas" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>SiCuti - Binalavotas</title>
 
-        // Comprehensive ResizeObserver error patterns
-        const patterns = [
-          'resizeobserver loop', 'resizeobserver loop completed with undelivered notifications',
-          'resizeobserver: loop completed with undelivered notifications', 'resizeobserver: loop limit exceeded',
-          'resizeobserver loop limit exceeded', 'loop completed with undelivered notifications',
-          'resizeobserver callback', 'resizeobserver.observe', 'resizeobserver entry',
-          'resizeobserver notification', 'resizeobserver iteration', 'resizeobserver observer loop',
-          'resizeobserver error', 'resize observer loop', 'resize observer error',
-          'observer loop completed', 'observer loop limit', 'undelivered notifications'
-        ];
+  <link rel="icon" type="image/png"
+    href="https://ociedycfgkqvcqwdxprt.supabase.co/storage/v1/object/public/templates//favicon.ico" />
 
-        function isResizeObserverError(text) {
-          if (!text) return false;
-          const lower = String(text).toLowerCase();
-          return patterns.some(p => lower.includes(p)) ||
-                 (lower.includes('resize') && lower.includes('observer')) ||
-                 (lower.includes('resize') && lower.includes('loop')) ||
-                 (lower.includes('observer') && lower.includes('notification'));
+  <!-- CRITICAL: Force Unregister Stale Service Workers to fix React Preamble Error -->
+  <script>
+    if ('serviceWorker' in navigator) {
+      navigator.serviceWorker.getRegistrations().then(function (registrations) {
+        for (let registration of registrations) {
+          console.log('Unregistering stale service worker:', registration);
+          registration.unregister();
         }
+      });
+    }
+  </script>
 
-        // Store original console methods immediately
-        if (!window._earlyOriginalConsole) {
-          window._earlyOriginalConsole = {
-            log: console.log, warn: console.warn, error: console.error,
-            info: console.info, debug: console.debug
-          };
-        }
+  <!-- Ultra-early ResizeObserver error suppression -->
+  <script>
+    (function () {
+      'use strict';
 
-        // Override all console methods
-        ['log', 'warn', 'error', 'info', 'debug'].forEach(method => {
-          console[method] = function() {
-            const args = Array.from(arguments);
-            if (args.some(arg => isResizeObserverError(arg) ||
-                                 (arg && arg.message && isResizeObserverError(arg.message)))) {
-              if (location.hostname === 'localhost' || location.hostname.includes('dev')) {
-                window._earlyOriginalConsole[method]('🔄 Early ResizeObserver ' + method + ' suppressed:', ...args);
-              }
-              return;
-            }
-            return window._earlyOriginalConsole[method].apply(console, args);
-          };
-        });
+      // Comprehensive ResizeObserver error patterns
+      const patterns = [
+        'resizeobserver loop', 'resizeobserver loop completed with undelivered notifications',
+        'resizeobserver: loop completed with undelivered notifications', 'resizeobserver: loop limit exceeded',
+        'resizeobserver loop limit exceeded', 'loop completed with undelivered notifications',
+        'resizeobserver callback', 'resizeobserver.observe', 'resizeobserver entry',
+        'resizeobserver notification', 'resizeobserver iteration', 'resizeobserver observer loop',
+        'resizeobserver error', 'resize observer loop', 'resize observer error',
+        'observer loop completed', 'observer loop limit', 'undelivered notifications'
+      ];
 
-        // Override window.onerror
-        window.onerror = function(message, source, lineno, colno, error) {
-          if (isResizeObserverError(message) || (error && isResizeObserverError(error.message))) {
-            if (location.hostname === 'localhost' || location.hostname.includes('dev')) {
-              window._earlyOriginalConsole.log('🔄 Early ResizeObserver window error suppressed:', message);
-            }
-            return true;
-          }
-          return false;
+      function isResizeObserverError(text) {
+        if (!text) return false;
+        const lower = String(text).toLowerCase();
+        return patterns.some(p => lower.includes(p)) ||
+          (lower.includes('resize') && lower.includes('observer')) ||
+          (lower.includes('resize') && lower.includes('loop')) ||
+          (lower.includes('observer') && lower.includes('notification'));
+      }
+
+      // Store original console methods immediately
+      if (!window._earlyOriginalConsole) {
+        window._earlyOriginalConsole = {
+          log: console.log, warn: console.warn, error: console.error,
+          info: console.info, debug: console.debug
         };
+      }
 
-        // Override unhandled promise rejection
-        window.onunhandledrejection = function(event) {
-          const reason = event.reason;
-          if (reason && isResizeObserverError(reason.message || reason.toString())) {
+      // Override all console methods
+      ['log', 'warn', 'error', 'info', 'debug'].forEach(method => {
+        console[method] = function () {
+          const args = Array.from(arguments);
+          if (args.some(arg => isResizeObserverError(arg) ||
+            (arg && arg.message && isResizeObserverError(arg.message)))) {
             if (location.hostname === 'localhost' || location.hostname.includes('dev')) {
-              window._earlyOriginalConsole.log('🔄 Early ResizeObserver promise rejection suppressed:', reason);
+              window._earlyOriginalConsole[method]('🔄 Early ResizeObserver ' + method + ' suppressed:', ...args);
             }
-            event.preventDefault();
-            return true;
+            return;
           }
-          return false;
+          return window._earlyOriginalConsole[method].apply(console, args);
         };
+      });
 
-        if (location.hostname === 'localhost' || location.hostname.includes('dev')) {
-          window._earlyOriginalConsole.log('🛡️ Ultra-early ResizeObserver suppression active');
+      // Override window.onerror
+      window.onerror = function (message, source, lineno, colno, error) {
+        if (isResizeObserverError(message) || (error && isResizeObserverError(error.message))) {
+          if (location.hostname === 'localhost' || location.hostname.includes('dev')) {
+            window._earlyOriginalConsole.log('🔄 Early ResizeObserver window error suppressed:', message);
+          }
+          return true;
         }
-      })();
-    </script>
-  </head>
-  <body>
-    <div id="root"></div>
-    <script type="module" src="/src/main.jsx"></script>
-    
-  </body>
+        return false;
+      };
+
+      // Override unhandled promise rejection
+      window.onunhandledrejection = function (event) {
+        const reason = event.reason;
+        if (reason && isResizeObserverError(reason.message || reason.toString())) {
+          if (location.hostname === 'localhost' || location.hostname.includes('dev')) {
+            window._earlyOriginalConsole.log('🔄 Early ResizeObserver promise rejection suppressed:', reason);
+          }
+          event.preventDefault();
+          return true;
+        }
+        return false;
+      };
+
+      if (location.hostname === 'localhost' || location.hostname.includes('dev')) {
+        window._earlyOriginalConsole.log('🛡️ Ultra-early ResizeObserver suppression active');
+      }
+    })();
+  </script>
+</head>
+
+<body>
+  <div id="root"></div>
+  <script type="module" src="/src/main.jsx"></script>
+
+</body>
+
 </html>

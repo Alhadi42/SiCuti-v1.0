@@ -162,7 +162,7 @@ export const ensureLeaveBalance = async (supabase, employeeId, leaveTypeId, year
         .select('days_deferred')
         .eq('employee_id', employeeId)
         .eq('year', previousYear)
-        .single();
+        .maybeSingle();
 
       if (!deferralError && deferralLog && deferralLog.days_deferred != null) {
         const desiredDeferred = deferralLog.days_deferred;
@@ -198,7 +198,7 @@ export const ensureLeaveBalance = async (supabase, employeeId, leaveTypeId, year
       .select('days_deferred')
       .eq('employee_id', employeeId)
       .eq('year', previousYear)
-      .single();
+      .maybeSingle();
 
     // Only use deferral log if it exists (manual input)
     // If no deferral log exists, deferred_days = 0
@@ -289,7 +289,7 @@ export const initializeYearBalances = async (supabase, year = null) => {
             .select('days_deferred')
             .eq('employee_id', employee.id)
             .eq('year', previousYear)
-            .single();
+            .maybeSingle();
 
           // Only use deferral log if it exists (manual input)
           if (deferralLog && deferralLog.days_deferred != null) {

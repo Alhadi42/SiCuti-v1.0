@@ -1453,40 +1453,40 @@ const BatchLeaveProposals = () => {
                     key={index}
                     className="p-4 bg-slate-700/30 rounded-lg border border-slate-600/50 hover:bg-slate-700/50 transition-colors"
                   >
-                    <div className="flex items-start justify-between">
-                      <div className="flex-1">
+                    <div className="flex flex-col md:flex-row items-start justify-between">
+                      <div className="flex-1 w-full">
                         <div className="flex items-center space-x-3 mb-2">
-                          <Building2 className="w-5 h-5 text-blue-400" />
-                          <div className="flex-1">
-                            <h3 className="text-white font-medium">{unit.unitName}</h3>
+                          <Building2 className="w-5 h-5 text-blue-400 flex-shrink-0" />
+                          <div className="flex-1 min-w-0">
+                            <h3 className="text-white font-medium truncate">{unit.unitName}</h3>
                             <p className="text-slate-400 text-sm">
                               Tanggal Usulan: {format(new Date(unit.proposalDate), "dd MMMM yyyy", { locale: id })}
                             </p>
                           </div>
-                          <Badge variant="secondary">{unit.totalRequests} usulan</Badge>
+                          <Badge variant="secondary" className="flex-shrink-0">{unit.totalRequests} usulan</Badge>
                         </div>
                         <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm text-slate-400 mb-3">
                           <div className="flex items-center">
-                            <Users className="w-4 h-4 mr-1" />
+                            <Users className="w-4 h-4 mr-1 flex-shrink-0" />
                             {unit.totalEmployees} pegawai
                           </div>
                           <div className="flex items-center">
-                            <Calendar className="w-4 h-4 mr-1" />
+                            <Calendar className="w-4 h-4 mr-1 flex-shrink-0" />
                             {unit.totalDays} hari
                           </div>
                           <div className="flex items-center">
-                            <FileText className="w-4 h-4 mr-1" />
+                            <FileText className="w-4 h-4 mr-1 flex-shrink-0" />
                             {unit.totalRequests} pengajuan
                           </div>
                           <div className="flex items-center">
-                            <Clock className="w-4 h-4 mr-1" />
+                            <Clock className="w-4 h-4 mr-1 flex-shrink-0" />
                             {unit.dateRange.earliest && unit.dateRange.latest &&
                               `${format(unit.dateRange.earliest, "dd/MM", { locale: id })} - ${format(unit.dateRange.latest, "dd/MM", { locale: id })}`
                             }
                           </div>
                         </div>
                       </div>
-                      <div className="flex flex-col space-y-2 ml-4">
+                      <div className="flex flex-col space-y-2 w-full md:w-auto md:ml-4 mt-4 md:mt-0">
                         <div className="flex space-x-2">
                           <Button
                             variant="outline"

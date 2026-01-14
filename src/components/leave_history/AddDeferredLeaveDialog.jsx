@@ -115,7 +115,7 @@ const AddDeferredLeaveDialog = ({ isOpen, onOpenChange, employee, year, onSucces
           .select('id, days_deferred')
           .eq('employee_id', employee.id)
           .eq('year', previousYear)
-          .single();
+          .maybeSingle();
 
         // Update balance with new deferred days
         // If updating existing, replace the value; if new, set it
@@ -229,7 +229,7 @@ const AddDeferredLeaveDialog = ({ isOpen, onOpenChange, employee, year, onSucces
             </div>
             {deferralLog && deferralLog.google_drive_link && (
               <div>
-                <Label>Dokumen Penangguhan</Label>
+                <div className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70">Dokumen Penangguhan</div>
                 <div className="flex items-center space-x-2 p-2 bg-slate-700/30 rounded border border-slate-600/50">
                   <ExternalLink className="h-4 w-4 text-blue-400" />
                   <a
