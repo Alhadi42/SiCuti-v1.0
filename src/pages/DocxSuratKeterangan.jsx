@@ -292,23 +292,31 @@ function DocxSuratKeterangan() {
     const loadHolidays = async () => {
       try {
         const currentYear = new Date().getFullYear();
-        const nextYear = currentYear + 1;
-
-        // Load holidays for current and next year
-        const [currentYearHolidays, nextYearHolidays] = await Promise.all([
-          fetchNationalHolidaysFromDB(currentYear),
-          fetchNationalHolidaysFromDB(nextYear),
-        ]);
-
-        // Combine holidays from both years
-        const allHolidays = new Set([
-          ...currentYearHolidays,
-          ...nextYearHolidays,
-        ]);
+        
+        // Load holidays for a wider range: current year, previous year, and next year
+        // This ensures we have data for leave requests spanning different years
+        const yearsToLoad = [currentYear - 1, currentYear, currentYear + 1];
+        
+        // Load holidays for all relevant years
+        const holidayPromises = yearsToLoad.map(year => 
+          fetchNationalHolidaysFromDB(year).catch(error => {
+            console.warn(`Failed to load holidays for year ${year}:`, error);
+            return new Set(); // Return empty set on error
+          })
+        );
+        
+        const holidayResults = await Promise.all(holidayPromises);
+        
+        // Combine holidays from all years
+        const allHolidays = new Set();
+        holidayResults.forEach(yearHolidays => {
+          yearHolidays.forEach(holiday => allHolidays.add(holiday));
+        });
+        
         setHolidays(allHolidays);
 
         console.log(
-          `📅 Loaded ${allHolidays.size} national holidays for ${currentYear}-${nextYear}`,
+          `📅 Loaded ${allHolidays.size} national holidays for years ${yearsToLoad.join(', ')}`,
           Array.from(allHolidays),
         );
 
