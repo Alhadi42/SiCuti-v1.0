@@ -9,6 +9,7 @@ import { motion } from "framer-motion";
 import {
   List,
   Users,
+  User,
   Calendar,
   FileText,
   Plus,
@@ -20,7 +21,8 @@ import {
   Clock,
   Download,
   Layers,
-  Database
+  Database,
+  Check
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -141,6 +143,8 @@ const BatchLeaveProposals = () => {
   const [selectedTemplate, setSelectedTemplate] = useState(null);
   const [loadingTemplates, setLoadingTemplates] = useState(true);
   const [databaseHealthy, setDatabaseHealthy] = useState(null);
+  // Individual / perorangan mode
+  const [selectedEmployeeForLetter, setSelectedEmployeeForLetter] = useState({}); // { [leaveType]: requestId | 'all' }
 
   // Pagination for unit proposals
   const [currentPage, setCurrentPage] = useState(1);
@@ -782,9 +786,15 @@ const BatchLeaveProposals = () => {
         leaveTypeGroups[leaveType].push(request);
       });
 
-      // Set data for batch dialog
+      // Set data for batch dialog, reset employee selection to 'all' (batch mode)
       setSelectedUnitForBatch(unit);
       setLeaveTypeClassification(leaveTypeGroups);
+      // Default: semua jenis cuti mode batch (all)
+      const defaultSelection = {};
+      Object.keys(leaveTypeGroups).forEach(lt => {
+        defaultSelection[lt] = 'all';
+      });
+      setSelectedEmployeeForLetter(defaultSelection);
       setShowBatchDialog(true);
 
     } catch (error) {
@@ -797,7 +807,7 @@ const BatchLeaveProposals = () => {
     }
   };
 
-  const handleGenerateBatchLetter = async (leaveType, requests, templateId = null) => {
+  const handleGenerateBatchLetter = async (leaveType, requests, templateId = null, individualRequestId = null) => {
     try {
       setGeneratingLetter(true);
       setCurrentlyGenerating(leaveType);
@@ -874,8 +884,16 @@ const BatchLeaveProposals = () => {
 
       console.log("📊 Complete leave data fetched:", allLeaveData?.length || 0, "records");
 
-      // Use complete data for variables
-      const completeRequests = allLeaveData || requests;
+      // Use complete data for variables — filter to single employee if perorangan mode
+      let completeRequests = allLeaveData || requests;
+      if (individualRequestId && individualRequestId !== 'all') {
+        completeRequests = completeRequests.filter(r => r.id === individualRequestId);
+        if (completeRequests.length === 0) {
+          // Fallback: search in original requests array
+          const found = requests.find(r => r.id === individualRequestId);
+          if (found) completeRequests = [found];
+        }
+      }
 
       // Prepare variables for template with complete data
       const variables = {
@@ -923,6 +941,36 @@ const BatchLeaveProposals = () => {
         total_pegawai_asn: completeRequests.filter(req => req.employees?.asn_status?.toLowerCase().includes('asn')).length,
         total_pegawai_non_asn: completeRequests.filter(req => !req.employees?.asn_status?.toLowerCase().includes('asn')).length,
         rata_rata_hari_cuti: completeRequests.length > 0 ? Math.round(completeRequests.reduce((sum, req) => sum + (req.days_requested || 0), 0) / completeRequests.length) : 0,
+
+        // ---------------------------------------------------------------
+        // Variabel flat individu dari pegawai pertama (digunakan oleh
+        // template yang hanya punya {nama}, {nip}, {jabatan}, dsb.)
+        // Pada mode batch, ini berisi data pegawai pertama.
+        // Pada mode perorangan, ini berisi data pegawai yang dipilih.
+        // ---------------------------------------------------------------
+        nama: completeRequests[0]?.employees?.name || "-",
+        nama_pegawai: completeRequests[0]?.employees?.name || "-",
+        nip: completeRequests[0]?.employees?.nip || "-",
+        jabatan: completeRequests[0]?.employees?.position_name || "-",
+        pangkat_golongan: completeRequests[0]?.employees?.rank_group || "-",
+        status_asn: completeRequests[0]?.employees?.asn_status || "-",
+        tanggal_mulai: completeRequests[0]?.start_date ? format(new Date(completeRequests[0].start_date), "dd/MM/yyyy") : "-",
+        tanggal_selesai: completeRequests[0]?.end_date ? format(new Date(completeRequests[0].end_date), "dd/MM/yyyy") : "-",
+        tanggal_mulai_lengkap: completeRequests[0]?.start_date ? format(new Date(completeRequests[0].start_date), "dd MMMM yyyy", { locale: id }) : "-",
+        tanggal_selesai_lengkap: completeRequests[0]?.end_date ? format(new Date(completeRequests[0].end_date), "dd MMMM yyyy", { locale: id }) : "-",
+        jumlah_hari: completeRequests[0]?.days_requested || 0,
+        lama_cuti: `${completeRequests[0]?.days_requested || 0} hari`,
+        alasan: completeRequests[0]?.reason || "-",
+        alamat_selama_cuti: completeRequests[0]?.address_during_leave || "-",
+        tempat_alamat_cuti: completeRequests[0]?.address_during_leave || "-",
+        periode_cuti: completeRequests[0]?.start_date && completeRequests[0]?.end_date
+          ? `${format(new Date(completeRequests[0].start_date), "dd/MM/yyyy")} - ${format(new Date(completeRequests[0].end_date), "dd/MM/yyyy")}`
+          : "-",
+        durasi_hari_terbilang: numberToWords(completeRequests[0]?.days_requested || 0),
+        // Variabel atasan (umumnya di template individu)
+        nama_atasan: "-",
+        nip_atasan: "-",
+        jabatan_atasan: "-",
 
         // Employee list variables for table/loop processing
         pegawai_list: completeRequests.map((request, index) => ({
@@ -1001,6 +1049,74 @@ const BatchLeaveProposals = () => {
         variables[`nomor_surat_referensi_${num}`] = request.reference_number || "REF tidak tersedia";
         variables[`status_asn_${num}`] = request.employees?.asn_status || "Status ASN tidak tersedia";
       });
+
+      // ===================================================================
+      // BRIDGE MAPPING: Sinkronisasi variabel flat ↔ bertingkat
+      //
+      // Tujuan: template yang menggunakan {nama} (individu) akan tetap
+      // terisi meski pembuatan surat batch; dan template yang menggunakan
+      // {nama_1} (batch) akan tetap terisi meski mode perorangan.
+      // ===================================================================
+
+      // Daftar nama variabel per-pegawai yang perlu di-bridge
+      const EMPLOYEE_VAR_KEYS = [
+        'nama', 'nama_pegawai', 'nip', 'jabatan', 'pangkat_golongan',
+        'departemen', 'unit_kerja', 'jenis_cuti',
+        'tanggal_mulai', 'tanggal_selesai', 'tanggal_mulai_lengkap',
+        'tanggal_selesai_lengkap', 'tanggal_pelaksanaan_cuti', 'tanggal_cuti',
+        'jumlah_hari', 'lama_cuti', 'lamanya_cuti',
+        'alasan', 'alamat_cuti', 'alamat_selama_cuti', 'tempat_alamat_cuti',
+        'tahun_quota', 'cuti_tahun', 'jatah_cuti_tahun',
+        'tanggal_formulir', 'tanggal_formulir_pengajuan', 'formulir_pengajuan_cuti',
+        'periode_cuti', 'durasi_hari_terbilang', 'nomor_surat_referensi',
+        'status_asn', 'nama_atasan', 'nip_atasan', 'jabatan_atasan',
+      ];
+
+      // 1. Dari variabel _1 → isi variabel flat (jika flat belum ada atau kosong)
+      //    Berguna agar template individu ({nama}) terisi dari data indexed pertama
+      EMPLOYEE_VAR_KEYS.forEach((key) => {
+        const indexedVal = variables[`${key}_1`];
+        if (indexedVal !== undefined && indexedVal !== null) {
+          if (variables[key] === undefined || variables[key] === null || variables[key] === '') {
+            variables[key] = indexedVal;
+          }
+        }
+      });
+
+      // 2. Dari variabel flat → isi _1, _2, dst. jika kosong
+      //    Berguna agar template batch ({nama_1}) terisi dari variabel flat
+      //    terutama pada mode individu di mana hanya ada 1 pegawai
+      EMPLOYEE_VAR_KEYS.forEach((key) => {
+        const flatVal = variables[key];
+        if (flatVal !== undefined && flatVal !== null) {
+          // Pastikan _1 selalu terisi
+          if (variables[`${key}_1`] === undefined || variables[`${key}_1`] === null || variables[`${key}_1`] === '') {
+            variables[`${key}_1`] = flatVal;
+          }
+        }
+      });
+
+      // 3. Khusus mode perorangan: tambahkan alias variabel bertingkat _1 hingga _5
+      //    agar template dengan {nama_1}, {nip_1} dll. tetap terisi walaupun hanya 1 pegawai
+      const _isIndividualMode = individualRequestId && individualRequestId !== 'all';
+      if (_isIndividualMode && completeRequests.length === 1) {
+        // _1 sudah dihandle di atas, tambahkan _2 - _5 sebagai empty string agar tidak error
+        for (let n = 2; n <= 5; n++) {
+          EMPLOYEE_VAR_KEYS.forEach((key) => {
+            if (variables[`${key}_${n}`] === undefined) {
+              variables[`${key}_${n}`] = '';
+            }
+          });
+        }
+      }
+
+      console.log("🔗 Bridge mapping selesai. Contoh variabel individu:");
+      console.log("  nama:", variables.nama);
+      console.log("  nip:", variables.nip);
+      console.log("  jabatan:", variables.jabatan);
+      console.log("  nama_1:", variables.nama_1);
+      console.log("  nip_1:", variables.nip_1);
+      console.log("  jabatan_1:", variables.jabatan_1);
 
       console.log("📄 Generating batch letter with variables:", {
         leaveType,
@@ -1110,14 +1226,22 @@ const BatchLeaveProposals = () => {
       // Generate filename
       const safeLeaveType = leaveType.replace(/[^a-zA-Z0-9]/g, '_');
       const safeUnitName = selectedUnitForBatch.unitName.replace(/\s+/g, '_');
-      const filename = `Usulan_${safeLeaveType}_${safeUnitName}_${format(new Date(), "yyyy-MM-dd")}.docx`;
+      const isIndividual = individualRequestId && individualRequestId !== 'all';
+      const safeEmployeeName = isIndividual
+        ? (completeRequests[0]?.employees?.name || 'Pegawai').replace(/\s+/g, '_')
+        : null;
+      const filename = isIndividual
+        ? `Surat_${safeLeaveType}_${safeEmployeeName}_${format(new Date(), "yyyy-MM-dd")}.docx`
+        : `Usulan_${safeLeaveType}_${safeUnitName}_${format(new Date(), "yyyy-MM-dd")}.docx`;
 
       // Download the file
       saveAs(processedBuffer, filename);
 
       toast({
         title: "Berhasil",
-        description: `Surat batch untuk ${completeRequests.length} usulan ${leaveType} dari ${selectedUnitForBatch.unitName} berhasil dibuat dan diunduh dengan data lengkap`,
+        description: isIndividual
+          ? `Surat keterangan perorangan untuk ${completeRequests[0]?.employees?.name || 'pegawai'} (${leaveType}) berhasil dibuat`
+          : `Surat batch untuk ${completeRequests.length} usulan ${leaveType} dari ${selectedUnitForBatch.unitName} berhasil dibuat dan diunduh dengan data lengkap`,
       });
 
     } catch (error) {
@@ -1691,7 +1815,14 @@ const BatchLeaveProposals = () => {
               </div>
 
               <div className="grid grid-cols-1 gap-4">
-                {Object.entries(leaveTypeClassification).map(([leaveType, requests]) => (
+                {Object.entries(leaveTypeClassification).map(([leaveType, requests]) => {
+                  const selectedEmpId = selectedEmployeeForLetter[leaveType] ?? 'all';
+                  const isIndividual = selectedEmpId !== 'all';
+                  const effectiveRequests = isIndividual
+                    ? requests.filter(r => r.id === selectedEmpId)
+                    : requests;
+
+                  return (
                   <div key={leaveType} className="p-4 bg-slate-700/30 rounded-lg border border-slate-600/50 hover:border-slate-500/50 transition-colors">
                     <div className="flex items-center justify-between mb-3">
                       <div>
@@ -1702,7 +1833,7 @@ const BatchLeaveProposals = () => {
                       </div>
                       <Button
                         onClick={() => {
-                          handleGenerateBatchLetter(leaveType, requests, selectedTemplate);
+                          handleGenerateBatchLetter(leaveType, requests, selectedTemplate, selectedEmpId);
                           setShowBatchDialog(false);
                         }}
                         disabled={generatingLetter || !selectedTemplate || availableTemplates.length === 0}
@@ -1713,17 +1844,108 @@ const BatchLeaveProposals = () => {
                         ) : (
                           <Download className="w-4 h-4 mr-2" />
                         )}
-                        {currentlyGenerating === leaveType ? "Membuat..." : "Buat Surat"}
+                        {currentlyGenerating === leaveType
+                          ? "Membuat..."
+                          : isIndividual
+                          ? "Buat Surat Perorangan"
+                          : "Buat Surat Batch"}
                       </Button>
+                    </div>
+
+                    {/* Mode selector: Batch vs Perorangan */}
+                    <div className="mb-3 p-3 bg-slate-800/50 rounded-lg border border-slate-600/30">
+                      <Label className="text-slate-300 text-xs font-medium mb-2 block">Mode Pembuatan Surat</Label>
+                      <div className="flex items-center gap-2 mb-2">
+                        <button
+                          onClick={() => setSelectedEmployeeForLetter(prev => ({ ...prev, [leaveType]: 'all' }))}
+                          className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-sm font-medium transition-colors ${
+                            selectedEmpId === 'all'
+                              ? 'bg-blue-600 text-white'
+                              : 'bg-slate-700 text-slate-300 hover:bg-slate-600'
+                          }`}
+                        >
+                          <Users className="w-3.5 h-3.5" />
+                          Batch (Semua Pegawai)
+                        </button>
+                        <button
+                          onClick={() => {
+                            // Select first employee by default when switching to individual
+                            if (requests.length > 0) {
+                              setSelectedEmployeeForLetter(prev => ({ ...prev, [leaveType]: requests[0].id }));
+                            }
+                          }}
+                          className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-sm font-medium transition-colors ${
+                            isIndividual
+                              ? 'bg-purple-600 text-white'
+                              : 'bg-slate-700 text-slate-300 hover:bg-slate-600'
+                          }`}
+                        >
+                          <User className="w-3.5 h-3.5" />
+                          Perorangan
+                        </button>
+                      </div>
+
+                      {/* Dropdown to pick individual employee */}
+                      {isIndividual && (
+                        <div className="mt-2">
+                          <Label className="text-slate-400 text-xs mb-1 block">Pilih Pegawai</Label>
+                          <Select
+                            value={selectedEmpId}
+                            onValueChange={(val) =>
+                              setSelectedEmployeeForLetter(prev => ({ ...prev, [leaveType]: val }))
+                            }
+                          >
+                            <SelectTrigger className="bg-slate-700/50 border-slate-600/50 text-white text-sm">
+                              <SelectValue placeholder="Pilih pegawai..." />
+                            </SelectTrigger>
+                            <SelectContent className="bg-slate-700 border-slate-600">
+                              {requests.map(req => (
+                                <SelectItem key={req.id} value={req.id} className="text-white hover:bg-slate-600 focus:bg-slate-600">
+                                  <span className="font-medium">{req.employees?.name || 'Nama tidak diketahui'}</span>
+                                  <span className="text-slate-400 ml-2 text-xs">
+                                    {req.employees?.nip} • {req.days_requested} hari
+                                  </span>
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                          {effectiveRequests.length > 0 && (
+                            <p className="text-purple-400 text-xs mt-1">
+                              ✓ Surat akan dibuat untuk: <strong className="text-white">{effectiveRequests[0]?.employees?.name}</strong>
+                            </p>
+                          )}
+                        </div>
+                      )}
+
+                      {selectedEmpId === 'all' && (
+                        <p className="text-blue-400 text-xs mt-1">
+                          ✓ Surat batch akan mencakup <strong className="text-white">{requests.length} pegawai</strong>
+                        </p>
+                      )}
                     </div>
 
                     {/* Show employee list for this leave type */}
                     <div className="space-y-2">
                       <h4 className="text-slate-300 text-sm font-medium">Daftar Pegawai:</h4>
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
-                        {requests.map((request, index) => (
-                          <div key={request.id} className="p-2 bg-slate-800/50 rounded text-sm border border-slate-600/50 hover:border-slate-500/50 transition-colors">
-                            <div className="text-white font-medium">{request.employees?.name}</div>
+                        {requests.map((request) => (
+                          <div
+                            key={request.id}
+                            onClick={() => isIndividual && setSelectedEmployeeForLetter(prev => ({ ...prev, [leaveType]: request.id }))}
+                            className={`p-2 bg-slate-800/50 rounded text-sm border transition-colors ${
+                              isIndividual
+                                ? 'cursor-pointer ' + (selectedEmpId === request.id
+                                    ? 'border-purple-500 bg-purple-900/20'
+                                    : 'border-slate-600/50 hover:border-purple-500/50 hover:bg-purple-900/10')
+                                : 'border-slate-600/50'
+                            }`}
+                          >
+                            <div className="flex items-center justify-between">
+                              <div className="text-white font-medium">{request.employees?.name}</div>
+                              {isIndividual && selectedEmpId === request.id && (
+                                <Check className="w-3.5 h-3.5 text-purple-400" />
+                              )}
+                            </div>
                             <div className="text-slate-300">
                               {request.employees?.nip} • {request.days_requested} hari
                             </div>
@@ -1736,7 +1958,8 @@ const BatchLeaveProposals = () => {
                       </div>
                     </div>
                   </div>
-                ))}
+                  );
+                })}
               </div>
 
               {/* Generate All Types Button */}
@@ -1751,7 +1974,8 @@ const BatchLeaveProposals = () => {
                   <Button
                     onClick={async () => {
                       for (const [leaveType, requests] of Object.entries(leaveTypeClassification)) {
-                        await handleGenerateBatchLetter(leaveType, requests, selectedTemplate);
+                        const empId = selectedEmployeeForLetter[leaveType] ?? 'all';
+                        await handleGenerateBatchLetter(leaveType, requests, selectedTemplate, empId);
                         // Add small delay between downloads
                         await new Promise(resolve => setTimeout(resolve, 500));
                       }

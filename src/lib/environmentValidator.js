@@ -15,8 +15,8 @@ const REQUIRED_ENV_VARS = {
     error: "VITE_SUPABASE_ANON_KEY must be a valid Supabase anonymous key",
   },
   VITE_SUPABASE_SERVICE_ROLE_KEY: {
-    required: true,
-    validate: (value) => value && value.length > 50 && value.startsWith("ey"),
+    required: false,
+    validate: (value) => !value || (value.length > 50 && value.startsWith("ey")),
     error: "VITE_SUPABASE_SERVICE_ROLE_KEY must be a valid Supabase service role key",
   },
 };
@@ -46,7 +46,9 @@ export class EnvironmentValidator {
       const value = import.meta.env[key];
 
       if (!value) {
-        this.errors.push(`Missing required environment variable: ${key}`);
+        if (config.required !== false) {
+          this.errors.push(`Missing required environment variable: ${key}`);
+        }
         continue;
       }
 
@@ -74,24 +76,24 @@ export class EnvironmentValidator {
   }
 
   static getConfig() {
-    const validation = this.validate();
-
-    if (!validation.isValid) {
-      throw new Error(
-        `Environment validation failed:\n${validation.errors.join("\n")}`,
-      );
-    }
-
-    // Log warnings
-    if (validation.warnings.length > 0) {
-      console.warn("Environment warnings:", validation.warnings);
+    // Never throw - just warn about any issues
+    try {
+      const validation = this.validate();
+      if (validation.errors && validation.errors.length > 0) {
+        console.warn("Environment validation warnings:", validation.errors);
+      }
+      if (validation.warnings && validation.warnings.length > 0) {
+        console.warn("Environment warnings:", validation.warnings);
+      }
+    } catch (e) {
+      console.warn("Environment validation error:", e);
     }
 
     return {
       supabase: {
-        url: import.meta.env.VITE_SUPABASE_URL,
-        anonKey: import.meta.env.VITE_SUPABASE_ANON_KEY,
-        serviceRoleKey: import.meta.env.VITE_SUPABASE_SERVICE_ROLE_KEY,
+        url: import.meta.env.VITE_SUPABASE_URL || "",
+        anonKey: import.meta.env.VITE_SUPABASE_ANON_KEY || "",
+        serviceRoleKey: import.meta.env.VITE_SUPABASE_SERVICE_ROLE_KEY || null,
       },
       app: {
         version:

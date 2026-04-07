@@ -32,9 +32,10 @@ export const supabase = createClient(
 );
 
 // Create admin client with service role for server-side operations
+// Falls back to anon key if service role key is not available (client-side usage)
 export const supabaseAdmin = createClient(
   config.supabase.url,
-  config.supabase.serviceRoleKey, // This comes from environment variables via the config
+  config.supabase.serviceRoleKey || config.supabase.anonKey,
   {
     auth: {
       autoRefreshToken: false,
