@@ -1,22 +1,44 @@
 <!doctype html>
-<html lang="en">
+<html lang="id">
 
 <head>
   <meta charset="UTF-8" />
   <meta name="generator" content="SiCuti_Binalavotas" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
   <title>SiCuti - Binalavotas</title>
 
-  <link rel="icon" type="image/png"
-    href="https://ociedycfgkqvcqwdxprt.supabase.co/storage/v1/object/public/templates//favicon.ico" />
+  <!-- PWA Meta Tags -->
+  <meta name="application-name" content="SiCuti" />
+  <meta name="description" content="Sistem Manajemen Cuti Pegawai Binalavotas" />
+  <meta name="theme-color" content="#3b82f6" />
+  <meta name="mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <meta name="apple-mobile-web-app-title" content="SiCuti" />
+  <meta name="msapplication-TileColor" content="#0f172a" />
+  <meta name="msapplication-tap-highlight" content="no" />
 
-  <!-- CRITICAL: Force Unregister Stale Service Workers to fix React Preamble Error -->
+  <!-- Favicon & Icons -->
+  <link rel="icon" type="image/svg+xml" href="/icons/icon.svg" />
+  <link rel="apple-touch-icon" href="/icons/icon-192x192.svg" />
+  <link rel="apple-touch-icon" sizes="152x152" href="/icons/icon-152x152.svg" />
+  <link rel="apple-touch-icon" sizes="192x192" href="/icons/icon-192x192.svg" />
+
+  <!-- PWA Manifest -->
+  <link rel="manifest" href="/manifest.json" />
+
+  <!-- CRITICAL: Force Unregister OLD/STALE Service Workers (bukan yang baru dari VitePWA) -->
   <script>
     if ('serviceWorker' in navigator) {
       navigator.serviceWorker.getRegistrations().then(function (registrations) {
         for (let registration of registrations) {
-          console.log('Unregistering stale service worker:', registration);
-          registration.unregister();
+          // Hanya unregister jika bukan service worker yang benar
+          const scriptURL = registration.active?.scriptURL || '';
+          const isSW = scriptURL.includes('sw.js') || scriptURL.includes('service-worker');
+          if (!isSW) {
+            console.log('Unregistering stale/unknown service worker:', registration);
+            registration.unregister();
+          }
         }
       });
     }

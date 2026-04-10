@@ -30,11 +30,54 @@
   border-color: hsl(var(--border));
 }
 
+html {
+  /* Prevent tap highlight on mobile */
+  -webkit-tap-highlight-color: transparent;
+  /* Better text rendering on mobile */
+  -webkit-text-size-adjust: 100%;
+}
+
 body {
   background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
   color: hsl(var(--foreground));
   font-feature-settings: "rlig" 1, "calt" 1;
   min-height: 100vh;
+  /* Safe area support for notch phones */
+  padding-top: env(safe-area-inset-top);
+  padding-bottom: env(safe-area-inset-bottom);
+}
+
+/* Responsivitas Dialog untuk mobile */
+@media (max-width: 640px) {
+  [data-radix-dialog-content] {
+    max-width: calc(100vw - 2rem) !important;
+    max-height: calc(100dvh - 4rem) !important;
+    overflow-y: auto !important;
+    margin: 1rem !important;
+  }
+  
+  /* Table scroll pada mobile */
+  .overflow-x-auto {
+    -webkit-overflow-scrolling: touch;
+  }
+  
+  /* Teks heading lebih kecil di mobile */
+  .text-3xl {
+    font-size: 1.5rem !important;
+    line-height: 2rem !important;
+  }
+}
+
+/* PWA standalone mode adjustments */
+@media (display-mode: standalone) {
+  body {
+    padding-top: max(env(safe-area-inset-top), 0px);
+  }
+  
+  /* Header di PWA butuh safe area */
+  header {
+    padding-top: calc(0.75rem + env(safe-area-inset-top));
+  }
 }
 
 .glass-effect {

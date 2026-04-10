@@ -22,6 +22,7 @@ import Login from "@/pages/Login";
 import ProtectedRoute from "@/components/ProtectedRoute";
 import ErrorBoundary from "@/components/ErrorBoundary";
 import ConnectionHealthChecker from "@/components/ConnectionHealthChecker";
+import PwaInstallBanner from "@/components/PwaInstallBanner";
 import "@/utils/removeDebugButton"; // Remove debug button
 
 function App() {
@@ -79,6 +80,7 @@ function App() {
               />
             </Routes>
             <Toaster />
+            <PwaInstallBanner />
           </div>
         </Router>
       </ConnectionHealthChecker>

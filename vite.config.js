@@ -203,10 +203,55 @@ export default defineConfig({
 		...(isDev ? [inlineEditPlugin(), editModeDevPlugin()] : []),
 		// addTransformIndexHtml,
 		VitePWA({
-			selfDestroying: true, // DESTROY the stale SW
 			registerType: 'autoUpdate',
+			includeAssets: ['icons/*.svg', 'favicon.ico'],
+			manifest: false, // gunakan manifest.json yang sudah ada di public/
 			devOptions: {
-				enabled: true
+				enabled: false // nonaktifkan di dev untuk menghindari konflik
+			},
+			workbox: {
+				globPatterns: ['**/*.{js,css,html,svg,png,ico,woff2}'],
+				cleanupOutdatedCaches: true,
+				skipWaiting: true,
+				clientsClaim: true,
+				runtimeCaching: [
+					{
+						urlPattern: /^https:\/\/.*\.supabase\.co\/.*/i,
+						handler: 'NetworkFirst',
+						options: {
+							cacheName: 'supabase-api-cache',
+							expiration: {
+								maxEntries: 50,
+								maxAgeSeconds: 5 * 60 // 5 menit
+							},
+							cacheableResponse: {
+								statuses: [0, 200]
+							}
+						}
+					},
+					{
+						urlPattern: /^https:\/\/fonts\.googleapis\.com\/.*/i,
+						handler: 'CacheFirst',
+						options: {
+							cacheName: 'google-fonts-cache',
+							expiration: {
+								maxEntries: 10,
+								maxAgeSeconds: 60 * 60 * 24 * 365 // 1 tahun
+							}
+						}
+					},
+					{
+						urlPattern: /^https:\/\/images\.unsplash\.com\/.*/i,
+						handler: 'CacheFirst',
+						options: {
+							cacheName: 'images-cache',
+							expiration: {
+								maxEntries: 30,
+								maxAgeSeconds: 60 * 60 * 24 * 7 // 1 minggu
+							}
+						}
+					}
+				]
 			}
 		}),
 	],

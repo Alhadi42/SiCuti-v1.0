@@ -7,7 +7,7 @@ import NotificationPanel from "./NotificationPanel";
 const Header = ({ toggleSidebar }) => {
   return (
     <motion.header
-      className="bg-slate-800/30 backdrop-blur-xl border-b border-slate-700/50 px-6 py-4"
+      className="bg-slate-800/30 backdrop-blur-xl border-b border-slate-700/50 px-3 sm:px-6 py-3 sm:py-4"
       initial={{ opacity: 0, y: -20 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.5 }}
