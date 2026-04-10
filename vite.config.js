@@ -214,6 +214,7 @@ export default defineConfig({
 				cleanupOutdatedCaches: true,
 				skipWaiting: true,
 				clientsClaim: true,
+				maximumFileSizeToCacheInBytes: 5 * 1024 * 1024, // 5 MB to accommodate large bundles
 				runtimeCaching: [
 					{
 						urlPattern: /^https:\/\/.*\.supabase\.co\/.*/i,
