@@ -14,6 +14,7 @@ import {
   AlertCircle,
   CheckCircle,
   Info,
+  RefreshCw,
   FileArchive as FileDocxIcon,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -32,12 +33,14 @@ import { extractDocxVariables, validateDocxFile } from "@/utils/docxTemplates";
 import { Link } from "react-router-dom";
 import { supabase } from "@/lib/supabaseClient";
 import { copyToClipboard } from "@/utils/clipboardUtils";
-
 import { AuthManager } from "@/lib/auth";
+import { useTemplates, invalidateTemplateCache } from "@/hooks/useTemplates";
 
 const DocxTemplateManagement = () => {
+  // Use shared template hook
+  const { templates, isLoading: templatesLoading, refreshTemplates } = useTemplates({ autoFetch: true });
+
   // State management
-  const [templates, setTemplates] = useState([]);
   const [selectedTemplate, setSelectedTemplate] = useState(null);
   const [isLoading, setIsLoading] = useState(false);
   const [isSaveDialogOpen, setIsSaveDialogOpen] = useState(false);
@@ -105,83 +108,20 @@ const DocxTemplateManagement = () => {
 
   // Load templates on component mount
   useEffect(() => {
-    loadTemplates();
+    // auto-handled by useTemplates hook
   }, []);
 
   const loadTemplates = async () => {
-    setIsLoading(true);
-    try {
-      console.log("Loading templates from Supabase...");
-
-      const currentUser = AuthManager.getUserSession();
-      if (!currentUser) {
-        throw new Error("User not authenticated");
-      }
-
-      console.log("Current user:", { role: currentUser.role, unit: currentUser.unit_kerja || currentUser.unitKerja });
-
-      let query = supabase.from("templates").select("*");
-
-      // Apply role-based filtering
-      if (currentUser.role === "master_admin") {
-        // Master admin sees only global templates
-        query = query.eq("template_scope", "global");
-      } else if (currentUser.role === "admin_unit") {
-        // Admin unit sees only their own unit's templates
-        const userUnit = currentUser.unit_kerja || currentUser.unitKerja;
-        if (!userUnit) {
-          throw new Error("Admin unit user must have a unit assigned");
-        }
-        query = query.eq("template_scope", "unit").eq("unit_scope", userUnit);
-      } else {
-        // Other roles have no access
-        throw new Error("Insufficient permissions to access templates");
-      }
-
-      const { data, error } = await query
-        .eq("type", "docx")
-        .order("name", { ascending: true });
-
-      if (error) {
-        throw error;
-      }
-
-      console.log("Loaded templates from Supabase:", data);
-      setTemplates(data);
-
-      if (data.length > 0 && !selectedTemplate) {
-        setSelectedTemplate(data[0]);
-        analyzeTemplateVariables(data[0]);
-      }
-    } catch (error) {
-      console.error("Error loading templates from Supabase:", error);
-      toast({
-        title: "Gagal memuat template dari database",
-        description: "Memuat dari cadangan lokal. " + error.message,
-        variant: "destructive",
-      });
-      // Fallback to localStorage
-      loadTemplatesFromLocalStorage();
-    } finally {
-      setIsLoading(false);
-    }
+    await refreshTemplates();
   };
 
-  const loadTemplatesFromLocalStorage = () => {
-    // ... existing local storage loading logic ...
-    // This is now a fallback
-    console.log("Loading templates from localStorage as fallback...");
-    const savedTemplates =
-      JSON.parse(localStorage.getItem("savedTemplates")) || [];
-    const docxTemplates = savedTemplates.filter(
-      (t) => t.type === "docx" && t.content?.type === "docx" && t.content?.data,
-    );
-    setTemplates(docxTemplates);
-    if (docxTemplates.length > 0 && !selectedTemplate) {
-      setSelectedTemplate(docxTemplates[0]);
-      analyzeTemplateVariables(docxTemplates[0]);
+  // Auto-select first template when templates load
+  useEffect(() => {
+    if (templates.length > 0 && !selectedTemplate) {
+      setSelectedTemplate(templates[0]);
+      analyzeTemplateVariables(templates[0]);
     }
-  };
+  }, [templates]);
 
   // Analyze DOCX template variables
   const analyzeTemplateVariables = async (template) => {
@@ -361,11 +301,11 @@ const DocxTemplateManagement = () => {
       toast({
         title: "Template Tersimpan",
         description: `${data.name} berhasil disimpan di database.`,
-        variant: "success",
       });
 
       resetForm();
-      loadTemplates(); // Reload templates from database
+      invalidateTemplateCache();
+      await refreshTemplates(); // Reload templates from database
     } catch (error) {
       console.error("Error saving template to Supabase:", error);
       toast({
@@ -427,7 +367,8 @@ const DocxTemplateManagement = () => {
       if (selectedTemplate?.id === templateId) {
         setSelectedTemplate(null);
       }
-      loadTemplates(); // Reload templates
+      invalidateTemplateCache();
+      await refreshTemplates(); // Reload templates
     } catch (error) {
       console.error("Error deleting template:", error);
       toast({
@@ -460,6 +401,16 @@ const DocxTemplateManagement = () => {
       <div className="flex items-center justify-between mb-6">
         <h1 className="text-2xl font-bold text-white">Kelola Template DOCX</h1>
         <div className="flex items-center space-x-4">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => { invalidateTemplateCache(); refreshTemplates(); }}
+            disabled={templatesLoading || isLoading}
+            className="border-slate-600 text-slate-300 hover:text-white"
+          >
+            <RefreshCw className={`mr-2 h-4 w-4 ${templatesLoading ? 'animate-spin' : ''}`} />
+            Refresh
+          </Button>
           <Button
             variant="outline"
             onClick={() => {
@@ -498,7 +449,16 @@ const DocxTemplateManagement = () => {
             <h2 className="text-lg font-semibold text-white mb-4">
               Daftar Template DOCX
             </h2>
-            {templates.length === 0 ? (
+            {templatesLoading ? (
+              <div className="space-y-2">
+                {[1, 2, 3].map(i => (
+                  <div key={i} className="p-3 rounded-lg bg-slate-700/40 animate-pulse">
+                    <div className="h-4 bg-slate-600 rounded w-3/4 mb-2" />
+                    <div className="h-3 bg-slate-600/60 rounded w-1/2" />
+                  </div>
+                ))}
+              </div>
+            ) : templates.length === 0 ? (
               <div className="text-center py-8 text-slate-400">
                 <FileDocxIcon className="w-8 h-8 mx-auto mb-2 text-slate-500" />
                 <p>Belum ada template DOCX yang disimpan</p>
@@ -530,9 +490,9 @@ const DocxTemplateManagement = () => {
                         )}
                         <p className="text-xs mt-1 opacity-60">
                           Diperbarui:{" "}
-                          {new Date(template.updatedAt).toLocaleDateString(
-                            "id-ID",
-                          )}
+                          {template.updated_at
+                            ? new Date(template.updated_at).toLocaleDateString("id-ID")
+                            : "-"}
                         </p>
                       </div>
                       <div className="flex space-x-1">
@@ -732,9 +692,9 @@ const DocxTemplateManagement = () => {
                         </div>
                         <div>
                           Diperbarui:{" "}
-                          {new Date(
-                            selectedTemplate.updatedAt,
-                          ).toLocaleDateString("id-ID")}
+                          {selectedTemplate.updated_at
+                            ? new Date(selectedTemplate.updated_at).toLocaleDateString("id-ID")
+                            : "-"}
                         </div>
                       </div>
                     </div>

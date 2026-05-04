@@ -1,9 +1,3 @@
-/**
- * BatchLeaveProposals Component - Fixed Issues:
- * 1. Completion status now persists in database using leave_proposals table instead of localStorage
- * 2. Document generation now fetches complete data from database to ensure all variables are filled
- * 3. Enhanced data structure with additional employee fields (rank_group, asn_status, etc.)
- */
 import React, { useState, useEffect, useCallback } from "react";
 import { motion } from "framer-motion";
 import {
@@ -46,8 +40,9 @@ import { processDocxTemplate } from "@/utils/docxTemplates";
 import { saveAs } from "file-saver";
 import ConnectionStatus from "@/components/ConnectionStatus";
 import { safeErrorMessage, getUserFriendlyErrorMessage } from "@/utils/errorDisplay";
-import { markProposalCompleted, isProposalCompleted } from '@/lib/simplifiedCompletionManager'; // Updated import
+import { markProposalCompleted, isProposalCompleted } from '@/lib/simplifiedCompletionManager';
 import DatabaseHealthChecker from "@/components/DatabaseHealthChecker";
+import { useTemplates } from "@/hooks/useTemplates";
 
 // Convert number to Indonesian words
 const numberToWords = (num) => {
@@ -139,10 +134,11 @@ const BatchLeaveProposals = () => {
   const [leaveTypeClassification, setLeaveTypeClassification] = useState({});
   const [generatingLetter, setGeneratingLetter] = useState(false);
   const [currentlyGenerating, setCurrentlyGenerating] = useState(null);
-  const [availableTemplates, setAvailableTemplates] = useState([]);
   const [selectedTemplate, setSelectedTemplate] = useState(null);
-  const [loadingTemplates, setLoadingTemplates] = useState(true);
   const [databaseHealthy, setDatabaseHealthy] = useState(null);
+
+  // Shared template hook - loads once and caches across pages
+  const { templates: availableTemplates, isLoading: loadingTemplates } = useTemplates({ autoFetch: true });
   // Individual / perorangan mode
   const [selectedEmployeeForLetter, setSelectedEmployeeForLetter] = useState({}); // { [leaveType]: requestId | 'all' }
 
@@ -284,13 +280,22 @@ const BatchLeaveProposals = () => {
       const timeoutMs = retryCount === 0 ? 15000 : 8000; // 15s first try, 8s retries
       console.log(`⏱️ Setting query timeout to ${timeoutMs / 1000} seconds`);
 
-      // Fetch leave requests with complete data
+      // Fetch leave requests with complete data - only needed columns for performance
       console.log("🔄 Starting Supabase query execution...");
       const { data: leaveRequests, error: requestsError } = await Promise.race([
         supabase
           .from("leave_requests")
           .select(`
-            *,
+            id,
+            employee_id,
+            leave_type_id,
+            start_date,
+            end_date,
+            days_requested,
+            status,
+            created_at,
+            reason,
+            address_during_leave,
             employees (
               id,
               name,
@@ -307,7 +312,8 @@ const BatchLeaveProposals = () => {
               max_days
             )
           `)
-          .order("created_at", { ascending: false }),
+          .order("created_at", { ascending: false })
+          .limit(2000),
         new Promise((_, reject) =>
           setTimeout(() => reject(new Error(`Query timeout after ${timeoutMs / 1000} seconds`)), timeoutMs)
         )
@@ -1330,82 +1336,28 @@ const BatchLeaveProposals = () => {
   const totalPages = Math.max(1, Math.ceil(filteredUnits.length / itemsPerPage));
   const paginatedUnits = filteredUnits.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage);
 
-  // Load available templates
-  const loadTemplates = useCallback(async (retryCount = 0) => {
-    try {
-      setLoadingTemplates(true);
-      console.log("📋 Loading templates...");
-
-      const { data, error } = await Promise.race([
-        supabase
-          .from("templates")
-          .select("*")
-          .eq("type", "docx")
-          .order("name"),
-        new Promise((_, reject) =>
-          setTimeout(() => reject(new Error("Template loading timeout")), 8000)
-        )
-      ]);
-
-      if (error) {
-        console.error("Error from Supabase:", JSON.stringify(error, null, 2));
-
-        // Retry logic for templates
-        if (error.message?.includes("Failed to fetch") && retryCount < 1) {
-          console.log(`🔄 Retrying template load... Attempt ${retryCount + 1}/2`);
-          await new Promise(resolve => setTimeout(resolve, 2000));
-          return loadTemplates(retryCount + 1);
-        }
-
-        throw error;
-      }
-
-      setAvailableTemplates(data || []);
-      console.log(`✅ Loaded ${data?.length || 0} templates`);
-    } catch (error) {
-      console.error("Error loading templates:", error);
-      setAvailableTemplates([]); // Set empty array on error
-
-      // Don't show error toast for template loading - it's not critical
-      console.log("ℹ️ Templates unavailable - batch letters will be disabled");
-
-      // If it's specifically a timeout, mention it in console but don't spam user
-      if (error.message?.includes('timeout')) {
-        console.log("⏰ Template loading timed out - this is usually due to slow network");
-      }
-    } finally {
-      setLoadingTemplates(false);
-    }
-  }, []);
-
   useEffect(() => {
-    // Check for localStorage data and offer migration
-    const checkForMigration = () => {
-      const localData = localStorage.getItem('completedBatchProposals');
-      if (localData) {
-        try {
-          const parsed = JSON.parse(localData);
-          const count = Object.keys(parsed).length;
-          if (count > 0) {
-            console.log(`📱 Found ${count} completed proposals in localStorage - migration available`);
-          }
-        } catch (error) {
-          console.warn('Could not parse localStorage data:', error);
+    // Check for localStorage migration data
+    const localData = localStorage.getItem('completedBatchProposals');
+    if (localData) {
+      try {
+        const parsed = JSON.parse(localData);
+        const count = Object.keys(parsed).length;
+        if (count > 0) {
+          console.log(`📱 Found ${count} completed proposals in localStorage - migration available`);
         }
+      } catch (error) {
+        console.warn('Could not parse localStorage data:', error);
       }
-    };
+    }
 
-    checkForMigration();
-
-    // Stagger the requests to avoid overwhelming the network
+    // Fetch proposals immediately (templates load via useTemplates hook in parallel)
     const timer = setTimeout(() => {
       fetchBatchProposals();
-      // Load templates after a small delay
-      setTimeout(loadTemplates, 500);
     }, 100);
 
     return () => clearTimeout(timer);
-  }, [fetchBatchProposals, loadTemplates]);
+  }, [fetchBatchProposals]);
 
   return (
     <div className="p-6 space-y-6">
@@ -1413,10 +1365,10 @@ const BatchLeaveProposals = () => {
       <motion.div
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
-        className="flex justify-between items-center"
+        className="flex flex-col sm:flex-row sm:justify-between sm:items-start gap-4"
       >
-        <div>
-          <h1 className="text-3xl font-bold text-white mb-2">Pengajuan Cuti per Unit</h1>
+        <div className="min-w-0">
+          <h1 className="text-2xl sm:text-3xl font-bold text-white mb-2">Pengajuan Cuti per Unit</h1>
           <p className="text-slate-400 mb-1">
             Kelola pengajuan cuti pegawai yang dikelompokkan berdasarkan unit kerja
           </p>
@@ -1550,9 +1502,24 @@ const BatchLeaveProposals = () => {
           </CardHeader>
           <CardContent>
             {isLoading ? (
-              <div className="text-center py-8">
-                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-500 mx-auto"></div>
-                <p className="text-slate-400 mt-2">Memuat data...</p>
+              <div className="space-y-3">
+                {[1, 2, 3, 4, 5].map(i => (
+                  <div key={i} className="p-4 bg-slate-700/30 rounded-lg border border-slate-600/50 animate-pulse">
+                    <div className="flex justify-between items-start">
+                      <div className="flex-1">
+                        <div className="h-5 bg-slate-600 rounded w-1/3 mb-2" />
+                        <div className="h-3 bg-slate-600/60 rounded w-1/4 mb-3" />
+                        <div className="grid grid-cols-4 gap-4">
+                          {[1,2,3,4].map(j => <div key={j} className="h-3 bg-slate-600/50 rounded" />)}
+                        </div>
+                      </div>
+                      <div className="flex flex-col space-y-2 ml-4 w-28">
+                        <div className="h-8 bg-slate-600/50 rounded" />
+                        <div className="h-8 bg-slate-600/50 rounded" />
+                      </div>
+                    </div>
+                  </div>
+                ))}
               </div>
             ) : filteredUnits.length === 0 ? (
               <div className="text-center py-8">
