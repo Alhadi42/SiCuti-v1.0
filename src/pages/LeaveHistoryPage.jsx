@@ -94,6 +94,9 @@ const LeaveHistoryPage = () => {
     useDepartments();
   const { currentYear } = useLeaveBalanceYear();
 
+  // Track if initial data fetch has been completed to prevent duplicates
+  const [hasInitialLoad, setHasInitialLoad] = useState(false);
+
   // Dynamically generate years based on current year (5 years back and 2 years forward)
   const years = useMemo(() => {
     const currentYear = new Date().getFullYear();
@@ -162,60 +165,9 @@ const LeaveHistoryPage = () => {
 
       setIsLoadingData(true);
       try {
-        // Test Supabase connection first if debugging
-        if (import.meta.env.DEV) {
-          const connectionTest = await checkSupabaseConnection();
-          if (!connectionTest.success) {
-            throw new Error(`Supabase connection failed: ${connectionTest.error}`);
-          }
-        }
-
-        // Apply unit-based filtering for admin_unit users using Supabase auth
         const currentUser = profile;
 
-        // DEBUG: Log user session for leave history (only in dev mode)
-        if (import.meta.env.DEV) {
-          console.log("🔍 DEBUG LeaveHistory - User session:", {
-            hasUser: !!currentUser,
-            userId: currentUser?.id,
-            userName: currentUser?.name,
-            role: currentUser?.role,
-            unit_kerja: currentUser?.unit_kerja,
-          });
-        }
-
-        // Safety check for user session - allow to continue without auth for now
-        // as data access is controlled by RLS policies
-        if (!currentUser && import.meta.env.DEV) {
-          console.warn("⚠️ No user profile found, continuing without auth filter");
-        }
-
         // Build the base query for employees
-        console.log("🔍 DEBUG LeaveHistory - Building query...");
-
-        // Test basic Supabase query first
-        console.log("🔍 Testing basic employees query...");
-        try {
-          const testQuery = await supabase
-            .from("employees")
-            .select("id")
-            .limit(1);
-
-          console.log("🔍 Basic query test result:", {
-            success: !testQuery.error,
-            error: testQuery.error,
-            dataLength: testQuery.data?.length
-          });
-
-          if (testQuery.error) {
-            console.error("❌ Basic query failed:", JSON.stringify(testQuery.error, null, 2));
-            throw new Error(`Basic query failed: ${testQuery.error.message}`);
-          }
-        } catch (basicTestError) {
-          console.error("❌ Basic query test failed:", basicTestError);
-          throw basicTestError;
-        }
-
         let query = supabase
           .from("employees")
           .select("id, name, nip, department, position_name, rank_group", {
@@ -224,21 +176,15 @@ const LeaveHistoryPage = () => {
 
         // Apply unit-based filtering for admin_unit users
         const userUnit = currentUser?.unit_kerja || currentUser?.unitKerja;
-        console.log("🔍 DEBUG LeaveHistory - User unit:", userUnit);
 
-        if (currentUser.role === 'admin_unit' && userUnit) {
-          console.log("🔍 DEBUG LeaveHistory - Applying unit filter:", userUnit);
-          // Validate unit name before using it
-          if (userUnit.length > 0 && userUnit.length < 500) { // Reasonable length check
+        if (currentUser?.role === 'admin_unit' && userUnit) {
+          if (userUnit.length > 0 && userUnit.length < 500) {
             query = query.eq("department", userUnit);
           } else {
-            console.error("❌ Invalid unit name:", userUnit);
             throw new Error("Invalid unit name in user session");
           }
-        } else if (currentUser.role === 'admin_unit') {
-          console.warn("⚠️ Admin unit user has no unit assigned");
-          // For admin_unit without unit, show no results instead of all results
-          query = query.eq("id", "00000000-0000-0000-0000-000000000000"); // Non-existent ID
+        } else if (currentUser?.role === 'admin_unit') {
+          query = query.eq("id", "00000000-0000-0000-0000-000000000000");
         }
 
         // Add search filter if search term exists
@@ -250,123 +196,39 @@ const LeaveHistoryPage = () => {
 
         // Add department filter if selected
         if (selectedUnitPenempatan && selectedUnitPenempatan.trim() !== "") {
-          // Ensure we're using the correct column name for department
           query = query.ilike(
             "department",
             `%${selectedUnitPenempatan.trim()}%`,
           );
-          console.log("Filtering by department:", selectedUnitPenempatan);
         }
 
         // Add pagination
         query = query.range(0, LEAVE_HISTORY_PER_PAGE - 1);
 
         // Execute the query
-        console.log("🔍 DEBUG LeaveHistory - Executing employees query with filters:", {
-          search: debouncedSearchTerm,
-          department: selectedUnitPenempatan,
-          userRole: currentUser.role,
-          userUnit: userUnit,
-        });
-
-        let employeesData, employeesError, count;
-
-        try {
-          const result = await query;
-          employeesData = result.data;
-          employeesError = result.error;
-          count = result.count;
-
-          console.log("🔍 DEBUG LeaveHistory - Query result:", {
-            dataLength: employeesData?.length,
-            count: count,
-            hasError: !!employeesError
-          });
-        } catch (fetchError) {
-          console.error("❌ Fetch error in LeaveHistory:", fetchError);
-          console.error("❌ Error details:", {
-            message: fetchError.message,
-            stack: fetchError.stack,
-            name: fetchError.name
-          });
-
-          // Show user-friendly error
-          toast({
-            variant: "destructive",
-            title: "Network Error",
-            description: "Failed to fetch data. Please check your connection and try again.",
-          });
-          return;
-        }
+        const { data: employeesData, error: employeesError, count } = await query;
 
         if (employeesError) {
-          console.error("❌ Supabase error fetching employees:");
-          console.error("❌ Raw error:", employeesError);
-          console.error("❌ Error JSON:", JSON.stringify(employeesError, null, 2));
-          console.error("❌ Error details:", {
-            message: employeesError?.message || "No message",
-            details: employeesError?.details || "No details",
-            hint: employeesError?.hint || "No hint",
-            code: employeesError?.code || "No code",
-            statusCode: employeesError?.statusCode || "No status code",
-            status: employeesError?.status || "No status"
-          });
           throw employeesError;
         }
 
-        console.log("Fetched employees:", employeesData?.length || 0);
-
-        // Update the total count
         setTotalEmployeesInFilter(count || 0);
 
-        // Get total employees count on initial load
-        if (isInitialLoad || overallTotalEmployees === 0) {
-          console.log("🔍 DEBUG LeaveHistory - Fetching total count...");
+        // Get total employees count on initial load only
+        if (isInitialLoad && overallTotalEmployees === 0) {
+          let totalCountQuery = supabase
+            .from("employees")
+            .select("*", { count: "exact", head: true });
 
-          try {
-            let totalCountQuery = supabase
-              .from("employees")
-              .select("*", { count: "exact", head: true });
+          if (currentUser?.role === 'admin_unit' && userUnit) {
+            totalCountQuery = totalCountQuery.eq("department", userUnit);
+          } else if (currentUser?.role === 'admin_unit') {
+            totalCountQuery = totalCountQuery.eq("id", "00000000-0000-0000-0000-000000000000");
+          }
 
-            // Apply unit filtering to total count for admin_unit users
-            if (currentUser.role === 'admin_unit' && userUnit) {
-              console.log("🔍 DEBUG LeaveHistory - Applying unit filter to total count:", userUnit);
-              totalCountQuery = totalCountQuery.eq("department", userUnit);
-            } else if (currentUser.role === 'admin_unit') {
-              // Admin unit without unit assigned - show 0 count
-              totalCountQuery = totalCountQuery.eq("id", "00000000-0000-0000-0000-000000000000");
-            }
-
-            const { count: totalCount, error: countError } = await totalCountQuery;
-
-            if (countError) {
-              console.error("❌ Error fetching total count:");
-              console.error("❌ Raw count error:", countError);
-              console.error("❌ Count error JSON:", JSON.stringify(countError, null, 2));
-              console.error("❌ Count error details:", {
-                message: countError?.message || "No message",
-                code: countError?.code || "No code",
-                details: countError?.details || "No details",
-                hint: countError?.hint || "No hint",
-                statusCode: countError?.statusCode || "No status code"
-              });
-              throw countError;
-            }
-
-            console.log("🔍 DEBUG LeaveHistory - Total count:", totalCount);
+          const { count: totalCount, error: countError } = await totalCountQuery;
+          if (!countError) {
             setOverallTotalEmployees(totalCount || 0);
-          } catch (countFetchError) {
-            console.error("❌ Failed to fetch total count:");
-            console.error("❌ Raw count fetch error:", countFetchError);
-            console.error("❌ Count fetch error JSON:", JSON.stringify(countFetchError, Object.getOwnPropertyNames(countFetchError), 2));
-            console.error("❌ Count fetch error details:", {
-              message: countFetchError?.message || "No message",
-              name: countFetchError?.name || "No name",
-              code: countFetchError?.code || "No code",
-              stack: countFetchError?.stack ? countFetchError.stack.substring(0, 200) + "..." : "No stack"
-            });
-            // Don't throw here, just log and continue with 0 count
-            setOverallTotalEmployees(0);
           }
         }
 
@@ -380,65 +242,102 @@ const LeaveHistoryPage = () => {
         // Get employee IDs for fetching related data
         const employeeIds = employeesData.map((emp) => emp.id);
         const year = parseInt(selectedYear);
+        const previousYear = year - 1;
 
-        // Ensure balances exist for all employees and leave types for the selected year
-        // This handles automatic initialization when viewing a new year
+        // Parallel fetch: balances, requests, and deferral logs
+        // This avoids sequential queries and dramatically improves performance
+        const [balancesResult, requestsResult, deferralsResult] = await Promise.all([
+          // Fetch existing balances
+          supabase
+            .from("leave_balances")
+            .select("employee_id, year, total_days, used_days, deferred_days, leave_type_id")
+            .eq("year", year)
+            .in("employee_id", employeeIds),
+
+          // Fetch leave requests
+          supabase
+            .from("leave_requests")
+            .select("employee_id, leave_type_id, days_requested, leave_quota_year, leave_period, start_date")
+            .in("employee_id", employeeIds)
+            .gte("start_date", `${year - 1}-01-01`)
+            .lte("start_date", `${year + 1}-12-31`),
+
+          // Fetch deferral logs for previous year
+          supabase
+            .from("leave_deferrals")
+            .select("id, employee_id, days_deferred, google_drive_link")
+            .eq("year", previousYear)
+            .in("employee_id", employeeIds)
+        ]);
+
+        const { data: leaveBalancesData, error: balancesError } = balancesResult;
+        const { data: leaveRequestsData, error: requestsError } = requestsResult;
+        const { data: deferralsLogData, error: deferralsLogError } = deferralsResult;
+
+        if (balancesError) throw balancesError;
+        if (requestsError) throw requestsError;
+        if (deferralsLogError) throw deferralsLogError;
+
+        // Identify missing balance records and ensure they exist
+        const existingBalanceKeys = new Set(
+          (leaveBalancesData || []).map((b) => `${b.employee_id}-${b.leave_type_id}`)
+        );
+
+        const missingBalances = [];
         for (const emp of employeesData) {
           for (const leaveType of leaveTypes) {
-            try {
-              await ensureLeaveBalance(supabase, emp.id, leaveType.id, year, leaveType);
-            } catch (error) {
-              console.warn(`Failed to ensure balance for ${emp.name} - ${leaveType.name}:`, error);
-              // Continue with other employees/types
+            const key = `${emp.id}-${leaveType.id}`;
+            if (!existingBalanceKeys.has(key)) {
+              missingBalances.push({ emp, leaveType });
             }
           }
         }
 
-        // Fetch leave balances for the selected year
-        const { data: leaveBalancesData, error: balancesError } = await supabase
-          .from("leave_balances")
-          .select(
-            "employee_id, year, total_days, used_days, deferred_days, leave_type_id",
-          )
-          .eq("year", year)
-          .in("employee_id", employeeIds);
+        // Batch ensure missing balances (much faster than individual calls)
+        if (missingBalances.length > 0) {
+          const deferralLogMap = new Map(
+            (deferralsLogData || []).map((d) => [d.employee_id, d.days_deferred])
+          );
 
-        if (balancesError) throw balancesError;
+          const batchInserts = missingBalances.map(({ emp, leaveType }) => {
+            let deferredDays = 0;
+            if (leaveType.can_defer && previousYear >= 2020) {
+              deferredDays = deferralLogMap.get(emp.id) || 0;
+            }
+            return {
+              employee_id: emp.id,
+              leave_type_id: leaveType.id,
+              year: year,
+              total_days: leaveType.default_days || 0,
+              used_days: 0,
+              deferred_days: deferredDays,
+            };
+          });
 
-        // Fetch leave requests with a wider window so period-based balances remain accurate
-        // Some leaves taken in early year (e.g. Jan 2026) may still use previous period (leave_period=2025)
-        const { data: leaveRequestsData, error: requestsError } = await supabase
-          .from("leave_requests")
-          .select(
-            "employee_id, leave_type_id, days_requested, leave_quota_year, leave_period, start_date",
-          )
-          .in("employee_id", employeeIds)
-          .gte("start_date", `${year - 1}-01-01`)
-          .lte("start_date", `${year + 1}-12-31`);
+          // Insert missing balances in batch (single query)
+          if (batchInserts.length > 0) {
+            const { error: insertError } = await supabase
+              .from("leave_balances")
+              .insert(batchInserts);
 
-        if (requestsError) throw requestsError;
+            if (insertError && insertError.code !== '23505') { // 23505 = unique constraint
+              console.warn("Non-critical batch insert error:", insertError);
+            }
+          }
 
-        console.log(
-          `📊 Leave Requests Data for ${employeeIds.length} employees:`,
-          {
-            totalRequests: leaveRequestsData?.length || 0,
-            year: year,
-            employeeIds: employeeIds.slice(0, 3), // Show first 3 IDs for debugging
-          },
-        );
-
-        // Fetch deferral info from the previous year
-        const previousYear = year - 1;
-        const { data: deferralsLogData, error: deferralsLogError } =
-          await supabase
-            .from("leave_deferrals")
-            .select("id, employee_id, days_deferred, google_drive_link")
-            .eq("year", previousYear)
+          // Fetch updated balances after batch insert
+          const { data: updatedBalances, error: updatedError } = await supabase
+            .from("leave_balances")
+            .select("employee_id, year, total_days, used_days, deferred_days, leave_type_id")
+            .eq("year", year)
             .in("employee_id", employeeIds);
 
-        if (deferralsLogError) throw deferralsLogError;
+          if (!updatedError) {
+            leaveBalancesData.push(...(updatedBalances || []));
+          }
+        }
 
-        // Create a map of employee ID to deferral log object
+        // Create maps for O(1) lookups instead of O(n) filtering
         const deferralLogMap = new Map();
         (deferralsLogData || []).forEach((d) => {
           deferralLogMap.set(d.employee_id, {
@@ -448,27 +347,31 @@ const LeaveHistoryPage = () => {
           });
         });
 
+        // Create maps for employee balances and requests by employee ID
+        const balancesByEmployeeMap = new Map();
+        (leaveBalancesData || []).forEach((balance) => {
+          const key = balance.employee_id;
+          if (!balancesByEmployeeMap.has(key)) {
+            balancesByEmployeeMap.set(key, []);
+          }
+          balancesByEmployeeMap.get(key).push(balance);
+        });
+
+        const requestsByEmployeeMap = new Map();
+        (leaveRequestsData || []).forEach((request) => {
+          const key = request.employee_id;
+          if (!requestsByEmployeeMap.has(key)) {
+            requestsByEmployeeMap.set(key, []);
+          }
+          requestsByEmployeeMap.get(key).push(request);
+        });
+
         // Process employee data with their leave balances
         const processedData = employeesData.map((emp) => {
-          // Filter balances for current employee
-          const empBalances =
-            leaveBalancesData?.filter((lb) => lb.employee_id === emp.id) || [];
-          const empLeaveRequests =
-            leaveRequestsData?.filter((lr) => lr.employee_id === emp.id) || [];
+          // Optimize: Use maps for O(1) lookups
+          const empBalances = balancesByEmployeeMap.get(emp.id) || [];
+          const empLeaveRequests = requestsByEmployeeMap.get(emp.id) || [];
           const balances = {};
-
-          // Debug logging for specific employee
-          if (
-            emp.name &&
-            emp.name.toLowerCase().includes("nurul ratna handayani")
-          ) {
-            console.log("🔍 DEBUG - Nurul Ratna Handayani Data:");
-            console.log("Employee:", emp);
-            console.log("DB Balances:", empBalances);
-            console.log("Leave Requests:", empLeaveRequests);
-            console.log("Selected Year:", year);
-            console.log("Leave Types:", leaveTypes);
-          }
 
           // Initialize balances for each leave type
           leaveTypes.forEach((leaveType) => {
@@ -493,74 +396,6 @@ const LeaveHistoryPage = () => {
             const usedFromDeferred = calculatedBalance.used_deferred;
             const totalUsed = calculatedBalance.used;
             const remaining = calculatedBalance.remaining;
-
-            // Get employee type requests for debugging
-            const empTypeRequests = empLeaveRequests.filter(
-              (lr) => lr.leave_type_id === leaveType.id,
-            );
-
-            // Log detailed calculation for debugging
-            if (
-              emp.name &&
-              emp.name.toLowerCase().includes("aris") &&
-              leaveType.name === "Cuti Tahunan"
-            ) {
-              console.log(`🔍 ARIS HERMANTO - ${leaveType.name} Calculation:`);
-              console.log("Employee:", emp.name);
-              console.log("Total Days:", total);
-              console.log("Deferred Days:", deferred);
-              console.log("Used Current Year:", usedFromCurrentYear);
-              console.log("Used Deferred:", usedFromDeferred);
-              console.log("Total Used:", totalUsed);
-              console.log("Remaining:", remaining);
-              console.log("Employee Type Requests:", empTypeRequests);
-              console.log("DB Balance:", dbBalance);
-            }
-
-            // Log warning if database shows usage but no requests found
-            if (empTypeRequests.length === 0 && dbBalance?.used_days > 0) {
-              console.warn(
-                `⚠️ BALANCE MISMATCH for ${emp.name} - ${leaveType.name}:`,
-                {
-                  dbUsedDays: dbBalance.used_days,
-                  actualRequests: empTypeRequests.length,
-                  employee: emp.name,
-                  leaveType: leaveType.name,
-                },
-              );
-            }
-
-            // Debug logging for specific employee and leave type
-            if (
-              emp.name &&
-              (emp.name.toLowerCase().includes("hany") ||
-                emp.name.toLowerCase().includes("perwitasari")) &&
-              (leaveType.name === "Cuti Sakit" ||
-                leaveType.name === "Cuti Alasan Penting" ||
-                leaveType.name === "Cuti Besar" ||
-                leaveType.name === "Cuti Melahirkan")
-            ) {
-              console.log(`🔍 DEBUG - Hany ${leaveType.name} Calculation:`);
-              console.log("Employee Name:", emp.name);
-              console.log("Employee ID:", emp.id);
-              console.log("Leave Type Config:", ltConfig);
-              console.log("DB Balance Record:", dbBalance);
-              console.log("DB Balance total_days:", dbBalance?.total_days);
-              console.log("Config default_days:", ltConfig?.default_days);
-              console.log("Employee Type Requests:", empTypeRequests);
-              console.log("Calculated Values:", {
-                total,
-                totalUsed,
-                usedFromCurrentYear,
-                usedFromDeferred,
-                deferred,
-                remaining,
-                dbUsedDays: dbBalance?.used_days,
-                requestsCount: empTypeRequests.length,
-              });
-              console.log("Balance Key:", ltConfig?.key);
-              console.log("Final total value:", total);
-            }
 
             // Set the balance for this leave type
             if (ltConfig) {
@@ -592,22 +427,6 @@ const LeaveHistoryPage = () => {
         // Update the state with processed data
         setEmployeesWithBalances(processedData);
       } catch (error) {
-        console.error("❌ Error in fetchLeaveData:");
-        console.error("❌ Raw error:", error);
-        console.error("❌ Error JSON:", JSON.stringify(error, Object.getOwnPropertyNames(error), 2));
-        console.error("❌ Error type:", typeof error);
-        console.error("❌ Error constructor:", error?.constructor?.name);
-        console.error("❌ Error details:", {
-          message: error?.message || "No message",
-          name: error?.name || "No name",
-          stack: error?.stack ? error.stack.substring(0, 500) + "..." : "No stack",
-          code: error?.code || "No code",
-          details: error?.details || "No details",
-          hint: error?.hint || "No hint",
-          statusCode: error?.statusCode || "No status code",
-          status: error?.status || "No status"
-        });
-
         // Determine appropriate error message based on error type
         let errorMessage = "Terjadi kesalahan saat mengambil data cuti. Silakan coba lagi.";
         let errorTitle = "Gagal mengambil data cuti";
@@ -753,7 +572,6 @@ const LeaveHistoryPage = () => {
   };
 
   const handleDataChange = () => {
-    console.log("Data changed - refreshing leave data...");
     // Force refresh dengan delay kecil untuk memastikan database sudah ter-update
     setTimeout(() => {
       fetchLeaveData(true); // Force full refresh including total counts
@@ -767,40 +585,23 @@ const LeaveHistoryPage = () => {
     return () => clearTimeout(timerId);
   }, [searchTerm]);
 
+  // Consolidated effect: fetch data when filters or year changes
+  // On initial load: isInitialLoad=true, on filter changes: isInitialLoad=false
   useEffect(() => {
     if (!isLoadingLeaveTypes && leaveTypes.length > 0) {
-      fetchLeaveData(true);
-    }
-  }, [selectedYear, leaveTypes, isLoadingLeaveTypes, fetchLeaveData]);
-
-  useEffect(() => {
-    if (!isLoadingLeaveTypes && leaveTypes.length > 0) {
-      fetchLeaveData(false);
+      const isYearChange = true; // Year changes should refetch counts
+      fetchLeaveData(isYearChange);
+      setHasInitialLoad(true);
     }
   }, [
+    selectedYear,
     debouncedSearchTerm,
     selectedUnitPenempatan,
-    fetchLeaveData,
     leaveTypes,
     isLoadingLeaveTypes,
+    fetchLeaveData,
   ]);
 
-  useEffect(() => {
-    const fetchTotalEmployees = async () => {
-      let query = supabase
-        .from("employees")
-        .select("*", { count: "exact", head: true });
-
-      if (selectedUnitPenempatan) {
-        query = query.ilike("department", `%${selectedUnitPenempatan}%`);
-      }
-
-      const { count } = await query;
-      setOverallTotalEmployees(count || 0);
-    };
-
-    fetchTotalEmployees();
-  }, [selectedYear, selectedUnitPenempatan]);
 
   const handleRefresh = () => {
     setSearchTerm("");
@@ -823,8 +624,6 @@ const LeaveHistoryPage = () => {
         description: "Sedang mempersiapkan data untuk export...",
       });
 
-      console.log("🔍 Fetching leave requests data...");
-
       // Fetch leave requests data
       const { data: leaveRequests, error: leaveRequestsError } = await supabase
         .from("leave_requests")
@@ -839,11 +638,6 @@ const LeaveHistoryPage = () => {
 
       if (leaveRequestsError) throw leaveRequestsError;
 
-      console.log("📋 Leave requests data:", leaveRequests);
-      console.log("📊 Total leave requests:", leaveRequests?.length || 0);
-
-      console.log("🔍 Fetching deferrals data...");
-
       // Fetch deferrals data
       const { data: deferrals, error: deferralsError } = await supabase
         .from("leave_deferrals")
@@ -857,18 +651,12 @@ const LeaveHistoryPage = () => {
 
       if (deferralsError) throw deferralsError;
 
-      console.log("📋 Deferrals data:", deferrals);
-      console.log("📊 Total deferrals:", deferrals?.length || 0);
-
       // Get unique employee IDs who have leave requests
       const employeeIdsWithRequests = [
         ...new Set(
           leaveRequests?.map((req) => req.employee_id).filter(Boolean) || [],
         ),
       ];
-      console.log("👥 Employee IDs with requests:", employeeIdsWithRequests);
-
-      console.log("🔍 Fetching leave balances for employees with requests...");
 
       // Fetch leave balances only for employees who have leave requests
       const { data: leaveBalances, error: leaveBalancesError } = await supabase
