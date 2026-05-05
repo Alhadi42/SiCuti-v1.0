@@ -11,11 +11,9 @@ import {
   Building2,
   Filter,
   RefreshCw,
-  CheckCircle,
   Clock,
   Download,
   Layers,
-  Database,
   Check
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -38,10 +36,7 @@ import { format } from "date-fns";
 import { id } from "date-fns/locale";
 import { processDocxTemplate } from "@/utils/docxTemplates";
 import { saveAs } from "file-saver";
-import ConnectionStatus from "@/components/ConnectionStatus";
 import { safeErrorMessage, getUserFriendlyErrorMessage } from "@/utils/errorDisplay";
-import { markProposalCompleted, isProposalCompleted } from '@/lib/simplifiedCompletionManager';
-import DatabaseHealthChecker from "@/components/DatabaseHealthChecker";
 import { useTemplates } from "@/hooks/useTemplates";
 
 // Convert number to Indonesian words
@@ -125,9 +120,6 @@ const BatchLeaveProposals = () => {
   const [selectedUnitDetail, setSelectedUnitDetail] = useState(null);
   const [unitLeaveRequests, setUnitLeaveRequests] = useState([]);
   const [connectionError, setConnectionError] = useState(false);
-  const [completedProposals, setCompletedProposals] = useState(new Set());
-  const [showCompleted, setShowCompleted] = useState(false);
-  const [proposalRecords, setProposalRecords] = useState(new Map());
   const [isMigrating, setIsMigrating] = useState(false);
   const [showBatchDialog, setShowBatchDialog] = useState(false);
   const [selectedUnitForBatch, setSelectedUnitForBatch] = useState(null);
@@ -135,7 +127,7 @@ const BatchLeaveProposals = () => {
   const [generatingLetter, setGeneratingLetter] = useState(false);
   const [currentlyGenerating, setCurrentlyGenerating] = useState(null);
   const [selectedTemplate, setSelectedTemplate] = useState(null);
-  const [databaseHealthy, setDatabaseHealthy] = useState(null);
+  // removed: databaseHealthy (unused)
 
   // Shared template hook - loads once and caches across pages
   const { templates: availableTemplates, isLoading: loadingTemplates } = useTemplates({ autoFetch: true });
@@ -191,8 +183,6 @@ const BatchLeaveProposals = () => {
             if (cacheAge < maxCacheAge && userRole === currentUser?.role && data?.length > 0) {
               console.log("📱 Using cached data (offline mode)");
               setUnitProposals(data);
-              setCompletedProposals(new Set());
-              setProposalRecords(new Map());
 
               const ageMinutes = Math.round(cacheAge / 1000 / 60);
               toast({
@@ -208,8 +198,6 @@ const BatchLeaveProposals = () => {
           // No usable cached data
           console.log("⚠️ No usable cached data available for offline mode");
           setUnitProposals([]);
-          setCompletedProposals(new Set());
-          setProposalRecords(new Map());
 
           toast({
             title: "Tidak Ada Internet",
@@ -292,7 +280,6 @@ const BatchLeaveProposals = () => {
             start_date,
             end_date,
             days_requested,
-            status,
             created_at,
             reason,
             address_during_leave,
@@ -442,84 +429,7 @@ const BatchLeaveProposals = () => {
       console.log("📊 Final grouped requests:", groupedRequests);
       console.log("✅ Fetched", groupedRequests.length, "unit-date groups with leave requests");
 
-      // Load completion status from database - ENHANCED to use database first
-      const completedProposalsMap = new Map();
-      const completedSet = new Set();
-
-      // Only check completion status if we have valid grouped requests
-      if (groupedRequests && groupedRequests.length > 0) {
-        console.log("🔍 Checking completion status for", groupedRequests.length, "proposal groups...");
-
-        // ENHANCED: First, get all completed proposals from database in one query
-        try {
-          const { data: dbCompletedProposals, error: dbError } = await supabase
-            .from('leave_proposals')
-            .select('id, proposer_unit, proposal_date, completed_at, completed_by, status')
-            .eq('status', 'completed');
-
-          if (!dbError && dbCompletedProposals) {
-            console.log(`📊 Found ${dbCompletedProposals.length} completed proposals in database`);
-
-            dbCompletedProposals.forEach(completion => {
-              const proposalKey = `${completion.proposer_unit}|${completion.proposal_date}`;
-              completedSet.add(proposalKey);
-              completedProposalsMap.set(proposalKey, {
-                proposalKey,
-                unitName: completion.proposer_unit,
-                proposalDate: completion.proposal_date,
-                completedAt: completion.completed_at,
-                completedBy: completion.completed_by,
-                id: completion.id,
-                source: 'database'
-              });
-            });
-          } else if (dbError) {
-            console.warn('Database query for completed proposals failed:', dbError);
-          }
-        } catch (dbQueryError) {
-          console.warn('Error querying completed proposals from database:', dbQueryError);
-        }
-
-        // Then, check individual groups for any that weren't found in the bulk query
-        for (const group of groupedRequests) {
-          const proposalKey = `${group.unitName}|${group.proposalDate}`;
-
-          // Skip if already found in database
-          if (completedSet.has(proposalKey)) {
-            continue;
-          }
-
-          try {
-            const completionStatus = await isProposalCompleted(group.unitName, group.proposalDate);
-            if (completionStatus && completionStatus.isCompleted) {
-              completedSet.add(proposalKey);
-              completedProposalsMap.set(proposalKey, {
-                proposalKey,
-                unitName: group.unitName,
-                proposalDate: group.proposalDate,
-                completedAt: completionStatus.completedAt,
-                completedBy: completionStatus.completedBy,
-                source: completionStatus.source
-              });
-            }
-          } catch (statusError) {
-            // Only log actual errors, not expected cases
-            console.warn(`Could not check completion status for ${group.unitName}|${group.proposalDate}:`, statusError.message || statusError);
-          }
-        }
-      } else {
-        console.log("📊 No proposal groups to check for completion status");
-      }
-
-      console.log("📊 Loaded completion records:", completedSet.size, "completed proposals");
-      console.log("📊 Completion sources:", Array.from(completedProposalsMap.values()).reduce((acc, record) => {
-        acc[record.source] = (acc[record.source] || 0) + 1;
-        return acc;
-      }, {}));
-
       setUnitProposals(groupedRequests);
-      setProposalRecords(completedProposalsMap);
-      setCompletedProposals(completedSet);
       setConnectionError(false); // Reset error state on successful fetch
 
       // Cache successful data for offline use
@@ -560,10 +470,6 @@ const BatchLeaveProposals = () => {
             console.log("📱 Using cached data as fallback");
             setUnitProposals(data);
 
-            // Also set empty completion state to avoid errors
-            setCompletedProposals(new Set());
-            setProposalRecords(new Map());
-
             usedCachedData = true;
 
             const ageMinutes = Math.round(cacheAge / 1000 / 60);
@@ -580,8 +486,6 @@ const BatchLeaveProposals = () => {
 
       if (!usedCachedData) {
         setUnitProposals([]);
-        setCompletedProposals(new Set());
-        setProposalRecords(new Map());
       }
 
       let errorMessage = "Gagal mengambil data usulan cuti";
@@ -645,139 +549,6 @@ const BatchLeaveProposals = () => {
     setSelectedUnitDetail(unit);
     setUnitLeaveRequests(unit.requests);
     setShowDetailDialog(true);
-  };
-
-  const handleMarkAsCompleted = async (unit) => {
-    try {
-      const proposalKey = `${unit.unitName}|${unit.proposalDate}`;
-
-      // Show confirmation dialog
-      const confirmed = window.confirm(
-        `Apakah Anda yakin ingin menandai usulan cuti dari ${unit.unitName} tanggal ${format(new Date(unit.proposalDate), "dd MMMM yyyy", { locale: id })} sebagai "Selesai di Ajukan"?\n\nUsulan ini akan disimpan di database dan disembunyikan dari daftar.`
-      );
-
-      if (!confirmed) return;
-
-      // Mark as completed using simple manager
-      console.log('🔄 Marking proposal as completed...');
-      const { success, data: completedProposal } = await markProposalCompleted(
-        unit.unitName,
-        unit.proposalDate,
-        unit.requests
-      );
-
-      if (!success) {
-        throw new Error('Failed to mark proposal as completed in the backend.');
-      }
-
-      // Create completion record for local state
-      const completionRecord = {
-        proposalKey,
-        unitName: unit.unitName,
-        proposalDate: unit.proposalDate,
-        totalEmployees: unit.totalEmployees,
-        totalRequests: unit.totalRequests,
-        totalDays: unit.totalDays,
-        completedAt: completedProposal.completedAt,
-        completedBy: completedProposal.completedBy,
-        completedByName: currentUser.name || currentUser.email,
-        requestIds: unit.requests.map(req => req.id),
-        proposalId: completedProposal.id
-      };
-
-      // Update local state
-      setCompletedProposals(prev => new Set([...prev, proposalKey]));
-      setProposalRecords(prev => new Map(prev.set(proposalKey, completionRecord)));
-
-      toast({
-        title: "Berhasil",
-        description: `Usulan cuti dari ${unit.unitName} telah ditandai sebagai selesai diajukan`,
-        duration: 3000,
-      });
-
-      console.log('✅ Proposal marked as completed:', completedProposal.proposalKey);
-
-    } catch (error) {
-      console.error("Error marking proposal as completed:", error);
-
-      let errorMessage = "Gagal menandai usulan sebagai selesai";
-      if (error.message?.includes('User not authenticated')) {
-        errorMessage = "Anda harus login untuk menandai usulan sebagai selesai";
-      } else if (error.code === '42501') {
-        errorMessage = "Fitur ini akan menggunakan penyimpanan lokal karena ada pembatasan database";
-      } else {
-        errorMessage = `Gagal menandai usulan sebagai selesai: ${safeErrorMessage(error)}`;
-      }
-
-      toast({
-        title: "Error",
-        description: errorMessage,
-        variant: "destructive",
-      });
-    }
-  };
-
-  const handleRestoreProposal = async (unit) => {
-    try {
-      const proposalKey = `${unit.unitName}|${unit.proposalDate}`;
-
-      // Show confirmation dialog
-      const confirmed = window.confirm(
-        `Apakah Anda yakin ingin mengembalikan usulan cuti dari ${unit.unitName} tanggal ${format(new Date(unit.proposalDate), "dd MMMM yyyy", { locale: id })} ke status aktif?`
-      );
-
-      if (!confirmed) return;
-
-      // Restore using simple manager
-      console.log('🔄 Restoring proposal...');
-      // Instead of updating status to 'draft' (which violates the constraint),
-      // we delete the completion record to restore the proposal to active status.
-      const { error } = await supabase
-        .from('leave_proposals')
-        .delete()
-        .eq('proposer_unit', unit.unitName)
-        .eq('proposal_date', unit.proposalDate);
-
-      if (error) throw error;
-
-      // Update local state
-      setCompletedProposals(prev => {
-        const newSet = new Set(prev);
-        newSet.delete(proposalKey);
-        return newSet;
-      });
-
-      setProposalRecords(prev => {
-        const newMap = new Map(prev);
-        newMap.delete(proposalKey);
-        return newMap;
-      });
-
-      toast({
-        title: "Berhasil",
-        description: `Usulan cuti dari ${unit.unitName} telah dikembalikan ke daftar aktif`,
-      });
-
-      console.log('✅ Proposal restored successfully');
-
-    } catch (error) {
-      console.error("Error restoring proposal:", error);
-
-      let errorMessage = "Gagal mengembalikan usulan";
-      if (error.message?.includes('User not authenticated')) {
-        errorMessage = "Anda harus login untuk mengembalikan usulan";
-      } else if (error.code === '42501') {
-        errorMessage = "Anda tidak memiliki izin untuk mengembalikan usulan";
-      } else {
-        errorMessage = `Gagal mengembalikan usulan: ${safeErrorMessage(error)}`;
-      }
-
-      toast({
-        title: "Error",
-        description: errorMessage,
-        variant: "destructive",
-      });
-    }
   };
 
   const handleAddToBatchLetter = async (unit) => {
@@ -1290,12 +1061,6 @@ const BatchLeaveProposals = () => {
   const clearCache = () => {
     try {
       localStorage.removeItem('cachedBatchProposals');
-      localStorage.removeItem('completedBatchProposals');
-      localStorage.removeItem('completedProposals');
-
-      // Reset local state
-      setCompletedProposals(new Set());
-      setProposalRecords(new Map());
 
       toast({
         title: "Cache Dibersihkan",
@@ -1306,22 +1071,13 @@ const BatchLeaveProposals = () => {
     }
   };
 
-  // Migration feature removed since we're using simple completion manager
-
-  // Filter units based on search, selection, and completion status
+  // Filter units based on search and selection
   const filteredUnits = unitProposals.filter(unit => {
     const matchesSearch = searchTerm === "" ||
       unit.unitName.toLowerCase().includes(searchTerm.toLowerCase());
     const matchesSelection = selectedUnit === "all" || unit.unitName === selectedUnit;
 
-    // Check if this proposal is marked as completed
-    const proposalKey = `${unit.unitName}|${unit.proposalDate}`;
-    const isCompleted = completedProposals.has(proposalKey);
-
-    // Show based on completion toggle
-    const showBasedOnCompletion = showCompleted ? isCompleted : !isCompleted;
-
-    return matchesSearch && matchesSelection && showBasedOnCompletion;
+    return matchesSearch && matchesSelection;
   });
 
   // Get unique units for filter dropdown
@@ -1330,27 +1086,13 @@ const BatchLeaveProposals = () => {
   // Reset page when filters or data change
   useEffect(() => {
     setCurrentPage(1);
-  }, [searchTerm, selectedUnit, showCompleted, unitProposals, completedProposals]);
+  }, [searchTerm, selectedUnit, unitProposals]);
 
   // Pagination calculations
   const totalPages = Math.max(1, Math.ceil(filteredUnits.length / itemsPerPage));
   const paginatedUnits = filteredUnits.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage);
 
   useEffect(() => {
-    // Check for localStorage migration data
-    const localData = localStorage.getItem('completedBatchProposals');
-    if (localData) {
-      try {
-        const parsed = JSON.parse(localData);
-        const count = Object.keys(parsed).length;
-        if (count > 0) {
-          console.log(`📱 Found ${count} completed proposals in localStorage - migration available`);
-        }
-      } catch (error) {
-        console.warn('Could not parse localStorage data:', error);
-      }
-    }
-
     // Fetch proposals immediately (templates load via useTemplates hook in parallel)
     const timer = setTimeout(() => {
       fetchBatchProposals();
@@ -1372,54 +1114,23 @@ const BatchLeaveProposals = () => {
           <p className="text-slate-400 mb-1">
             Kelola pengajuan cuti pegawai yang dikelompokkan berdasarkan unit kerja
           </p>
-          {connectionError ? (
-            <div className="space-y-1">
-              <p className="text-red-400 text-sm">
-                ⚠️ Masalah koneksi - Data mungkin tidak terbaru
-              </p>
-              {unitProposals.length > 0 && (
-                <p className="text-yellow-400 text-xs">
-                  📱 Menampilkan data tersimpan dari cache lokal
-                </p>
-              )}
-              <p className="text-gray-500 text-xs">
-                🔧 Tip: Buka console browser (F12) untuk detail error
-              </p>
-            </div>
-          ) : (
-            <p className="text-blue-400 text-sm">
-              💡 Data diambil dari pengajuan cuti yang dibuat melalui menu "Pengajuan Cuti"
-            </p>
-          )}
+          <p className="text-blue-400 text-sm">
+            💡 Data diambil dari pengajuan cuti yang dibuat melalui menu "Pengajuan Cuti"
+          </p>
         </div>
         <div className="flex items-center space-x-3">
-          <ConnectionStatus onRetry={() => fetchBatchProposals(0)} />
-
-          {/* Info about storage method */}
-          <Button
-            variant="ghost"
-            className="text-slate-400 cursor-default"
-            disabled
-          >
-            <Database className="w-4 h-4 mr-2" />
-            Status tersimpan di server (Realtime)
-          </Button>
-
           <Button
             onClick={() => fetchBatchProposals(0)}
             variant="outline"
-            className={`border-slate-600 text-slate-300 hover:text-white ${connectionError ? 'border-red-500 text-red-400' : ''}`}
+            className="border-slate-600 text-slate-300 hover:text-white"
             disabled={isLoading}
           >
             <RefreshCw className={`w-4 h-4 mr-2 ${isLoading ? 'animate-spin' : ''}`} />
-            {connectionError ? 'Coba Lagi' : 'Refresh'}
+            Refresh
           </Button>
         </div>
       </motion.div>
 
-
-      {/* Database Health Check */}
-      <DatabaseHealthChecker onHealthCheck={setDatabaseHealthy} />
 
       {/* Filters */}
       <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.2 }}>
@@ -1458,29 +1169,6 @@ const BatchLeaveProposals = () => {
                   className="bg-slate-700/50 border-slate-600/50 text-white"
                 />
               </div>
-              <div>
-                <Label className="text-slate-300">Status Usulan</Label>
-                <div className="flex items-center space-x-3 mt-2">
-                  <button
-                    onClick={() => setShowCompleted(false)}
-                    className={`px-3 py-2 rounded-lg text-sm transition-colors ${!showCompleted
-                      ? 'bg-blue-600 text-white'
-                      : 'bg-slate-700/50 text-slate-300 hover:bg-slate-700'
-                      }`}
-                  >
-                    Aktif ({unitProposals.filter(unit => !completedProposals.has(`${unit.unitName}|${unit.proposalDate}`)).length})
-                  </button>
-                  <button
-                    onClick={() => setShowCompleted(true)}
-                    className={`px-3 py-2 rounded-lg text-sm transition-colors ${showCompleted
-                      ? 'bg-green-600 text-white'
-                      : 'bg-slate-700/50 text-slate-300 hover:bg-slate-700'
-                      }`}
-                  >
-                    Selesai ({unitProposals.filter(unit => completedProposals.has(`${unit.unitName}|${unit.proposalDate}`)).length})
-                  </button>
-                </div>
-              </div>
             </div>
           </CardContent>
         </Card>
@@ -1491,13 +1179,10 @@ const BatchLeaveProposals = () => {
         <Card className="bg-slate-800/50 border-slate-700/50">
           <CardHeader>
             <CardTitle className="text-white">
-              {showCompleted ? 'Usulan yang Selesai Diajukan' : 'Daftar Usulan per Unit & Tanggal'} ({filteredUnits.length})
+              Daftar Usulan per Unit & Tanggal ({filteredUnits.length})
             </CardTitle>
             <p className="text-slate-400 text-sm">
-              {showCompleted
-                ? 'Usulan cuti yang sudah ditandai sebagai selesai diajukan'
-                : 'Setiap card menampilkan usulan cuti yang dibuat pada tanggal yang sama'
-              }
+              Setiap card menampilkan usulan cuti yang dibuat pada tanggal yang sama
             </p>
           </CardHeader>
           <CardContent>
@@ -1551,7 +1236,7 @@ const BatchLeaveProposals = () => {
                           <div className="flex-1 min-w-0">
                             <h3 className="text-white font-medium truncate">{unit.unitName}</h3>
                             <p className="text-slate-400 text-sm">
-                              Tanggal Usulan: {format(new Date(unit.proposalDate), "dd MMMM yyyy", { locale: id })}
+                              Tanggal Input: {format(new Date(unit.proposalDate), "dd MMMM yyyy", { locale: id })}
                             </p>
                           </div>
                           <Badge variant="secondary" className="flex-shrink-0">{unit.totalRequests} usulan</Badge>
@@ -1587,38 +1272,15 @@ const BatchLeaveProposals = () => {
                             <Eye className="w-4 h-4 mr-1" />
                             Detail
                           </Button>
-                          {!showCompleted && (
-                            <Button
-                              size="sm"
-                              onClick={() => handleAddToBatchLetter(unit)}
-                              className="bg-blue-600 hover:bg-blue-700 text-white"
-                            >
-                              <Plus className="w-4 h-4 mr-1" />
-                              Buat Surat Batch
-                            </Button>
-                          )}
+                          <Button
+                            size="sm"
+                            onClick={() => handleAddToBatchLetter(unit)}
+                            className="bg-blue-600 hover:bg-blue-700 text-white"
+                          >
+                            <Plus className="w-4 h-4 mr-1" />
+                            Buat Surat Batch
+                          </Button>
                         </div>
-                        {showCompleted ? (
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={() => handleRestoreProposal(unit)}
-                            className="bg-yellow-900/20 border-yellow-700/50 text-yellow-400 hover:bg-yellow-900/30 hover:text-yellow-300 w-full"
-                          >
-                            <RefreshCw className="w-4 h-4 mr-1" />
-                            Kembalikan ke Aktif
-                          </Button>
-                        ) : (
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={() => handleMarkAsCompleted(unit)}
-                            className="bg-green-900/20 border-green-700/50 text-green-400 hover:bg-green-900/30 hover:text-green-300 w-full"
-                          >
-                            <CheckCircle className="w-4 h-4 mr-1" />
-                            Selesai di Ajukan
-                          </Button>
-                        )}
                       </div>
                     </div>
                   </div>
@@ -1653,7 +1315,7 @@ const BatchLeaveProposals = () => {
               Detail Usulan Cuti - {selectedUnitDetail?.unitName}
             </DialogTitle>
             <DialogDescription className="text-slate-400">
-              Pengajuan cuti yang dibuat pada {selectedUnitDetail?.proposalDate && format(new Date(selectedUnitDetail.proposalDate), "dd MMMM yyyy", { locale: id })}
+              Pengajuan cuti yang diinput pada {selectedUnitDetail?.proposalDate && format(new Date(selectedUnitDetail.proposalDate), "dd MMMM yyyy", { locale: id })}
             </DialogDescription>
           </DialogHeader>
           {selectedUnitDetail && (

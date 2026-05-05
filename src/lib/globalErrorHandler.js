@@ -171,6 +171,17 @@ export class GlobalErrorHandler {
   };
 
   static handleError = (event) => {
+    // Suppress opaque cross-origin "Script error." with no useful details
+    if (
+      (event.message === 'Script error.' || event.message === 'Script error') &&
+      !event.filename &&
+      event.lineno === 0 &&
+      event.colno === 0
+    ) {
+      if (event.preventDefault) event.preventDefault();
+      return false;
+    }
+
     // Comprehensive ResizeObserver error suppression
     const errorMessage = event.message || String(event.error) || '';
     const errorStack = event.error?.stack || '';

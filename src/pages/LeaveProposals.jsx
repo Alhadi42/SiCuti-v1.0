@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { motion } from "framer-motion";
-import { FileText, Plus, List, Clock, CheckCircle, XCircle } from "lucide-react";
+import { FileText, Plus, List } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -148,25 +148,6 @@ const LeaveProposals = () => {
     }
   };
 
-  const getStatusBadge = (status) => {
-    const statusConfig = {
-      pending: { label: "Menunggu", variant: "default", icon: Clock },
-      approved: { label: "Disetujui", variant: "success", icon: CheckCircle },
-      rejected: { label: "Ditolak", variant: "destructive", icon: XCircle },
-      processed: { label: "Diproses", variant: "secondary", icon: FileText },
-    };
-
-    const config = statusConfig[status] || statusConfig.pending;
-    const Icon = config.icon;
-
-    return (
-      <Badge variant={config.variant} className="flex items-center gap-1">
-        <Icon className="w-3 h-3" />
-        {config.label}
-      </Badge>
-    );
-  };
-
   if (showCreateForm) {
     return (
       <div className="p-6">
@@ -226,7 +207,7 @@ const LeaveProposals = () => {
       </motion.div>
 
       {/* Statistics Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
         <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.1 }}>
           <Card className="bg-slate-800/50 border-slate-700/50">
             <CardContent className="p-6">
@@ -237,60 +218,6 @@ const LeaveProposals = () => {
                 <div className="ml-4">
                   <p className="text-slate-400 text-sm">Total Usulan</p>
                   <p className="text-2xl font-bold text-white">{proposals.length}</p>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-        </motion.div>
-
-        <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.2 }}>
-          <Card className="bg-slate-800/50 border-slate-700/50">
-            <CardContent className="p-6">
-              <div className="flex items-center">
-                <div className="w-12 h-12 bg-yellow-500/20 rounded-lg flex items-center justify-center">
-                  <Clock className="w-6 h-6 text-yellow-400" />
-                </div>
-                <div className="ml-4">
-                  <p className="text-slate-400 text-sm">Menunggu</p>
-                  <p className="text-2xl font-bold text-white">
-                    {proposals.filter(p => p.status === 'pending').length}
-                  </p>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-        </motion.div>
-
-        <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.3 }}>
-          <Card className="bg-slate-800/50 border-slate-700/50">
-            <CardContent className="p-6">
-              <div className="flex items-center">
-                <div className="w-12 h-12 bg-green-500/20 rounded-lg flex items-center justify-center">
-                  <CheckCircle className="w-6 h-6 text-green-400" />
-                </div>
-                <div className="ml-4">
-                  <p className="text-slate-400 text-sm">Disetujui</p>
-                  <p className="text-2xl font-bold text-white">
-                    {proposals.filter(p => p.status === 'approved').length}
-                  </p>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-        </motion.div>
-
-        <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.4 }}>
-          <Card className="bg-slate-800/50 border-slate-700/50">
-            <CardContent className="p-6">
-              <div className="flex items-center">
-                <div className="w-12 h-12 bg-red-500/20 rounded-lg flex items-center justify-center">
-                  <XCircle className="w-6 h-6 text-red-400" />
-                </div>
-                <div className="ml-4">
-                  <p className="text-slate-400 text-sm">Ditolak</p>
-                  <p className="text-2xl font-bold text-white">
-                    {proposals.filter(p => p.status === 'rejected').length}
-                  </p>
                 </div>
               </div>
             </CardContent>
