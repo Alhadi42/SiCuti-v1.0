@@ -351,16 +351,17 @@ function DocxSuratKeterangan() {
           console.log("=== UPDATING AUTO-FILL DATA (INDIVIDUAL MODE) ===");
           console.log("Selected employee:", selectedEmployees[0]);
 
-          const letterData = await getLetterData(selectedEmployees[0]);
+          // Generate data dengan support BOTH flat dan indexed variables
+          // menggunakan generateBatchTemplateData yang sudah punya bridge mapping
+          const batchData = await generateBatchTemplateData(selectedEmployees, 5);
 
-          console.log("Generated letter data:", letterData);
+          console.log("Generated auto-fill data (with hierarchical support):", batchData);
           console.log("Key fields check:");
-          console.log("- jabatan:", letterData.jabatan);
-          console.log("- lama_cuti:", letterData.lama_cuti);
-          console.log("- tanggal_cuti:", letterData.tanggal_cuti);
+          console.log("- Flat - nama:", batchData.nama, "nip:", batchData.nip);
+          console.log("- Indexed - nama_1:", batchData.nama_1, "nip_1:", batchData.nip_1);
 
-          setAutoFillData(letterData);
-          console.log("Auto-fill data state updated");
+          setAutoFillData(batchData);
+          console.log("Auto-fill data state updated with both flat and indexed variables");
           console.log("=== END AUTO-FILL DATA UPDATE ===");
         } catch (error) {
           console.error("Error getting letter data:", error);
