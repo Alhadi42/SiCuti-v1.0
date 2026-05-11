@@ -1068,6 +1068,70 @@ function DocxSuratKeterangan() {
       }
     }
 
+    // ===================================================================
+    // BRIDGE MAPPING: Sinkronisasi variabel flat ↔ bertingkat
+    //
+    // Tujuan: template yang menggunakan {nama} (individu) akan tetap
+    // terisi meski pembuatan surat batch; dan template yang menggunakan
+    // {nama_1} (batch) akan tetap terisi meski mode individu.
+    // ===================================================================
+
+    // Daftar nama variabel per-pegawai yang perlu di-bridge
+    // Bridge ini memastikan template yang pakai {nama} atau {nama_1} keduanya berfungsi
+    const EMPLOYEE_VAR_KEYS = [
+      'nama', 'nama_pegawai', 'nip', 'jabatan', 'pangkat_golongan',
+      'departemen', 'unit_kerja', 'jenis_cuti',
+      'tanggal_mulai', 'tanggal_selesai', 'tanggal_mulai_lengkap',
+      'tanggal_selesai_lengkap', 'tanggal_pelaksanaan_cuti', 'tanggal_cuti',
+      'jumlah_hari', 'lama_cuti', 'lamanya_cuti',
+      'alasan', 'alamat_cuti', 'alamat_selama_cuti', 'tempat_alamat_cuti',
+      'tahun_quota', 'cuti_tahun', 'jatah_cuti_tahun',
+      'tanggal_formulir', 'tanggal_formulir_pengajuan', 'formulir_pengajuan_cuti',
+      'periode_cuti', 'durasi_hari_terbilang', 'nomor_surat_referensi',
+      'status_asn', 'nama_atasan', 'nip_atasan', 'jabatan_atasan',
+    ];
+
+    // 1. Dari variabel _1 → isi variabel flat (jika flat belum ada atau kosong)
+    EMPLOYEE_VAR_KEYS.forEach((key) => {
+      const indexedVal = batchData[`${key}_1`];
+      if (indexedVal !== undefined && indexedVal !== null) {
+        if (batchData[key] === undefined || batchData[key] === null || batchData[key] === '') {
+          batchData[key] = indexedVal;
+        }
+      }
+    });
+
+    // 2. Dari variabel flat → isi _1, _2, dst. jika kosong
+    EMPLOYEE_VAR_KEYS.forEach((key) => {
+      const flatVal = batchData[key];
+      if (flatVal !== undefined && flatVal !== null) {
+        // Pastikan _1 selalu terisi
+        if (batchData[`${key}_1`] === undefined || batchData[`${key}_1`] === null || batchData[`${key}_1`] === '') {
+          batchData[`${key}_1`] = flatVal;
+        }
+      }
+    });
+
+    // 3. Untuk mode individu: tambahkan alias variabel bertingkat _1 hingga _5
+    //    agar template dengan {nama_1}, {nip_1} dll. tetap terisi walaupun hanya 1 pegawai
+    if (employees.length === 1) {
+      for (let n = 2; n <= 5; n++) {
+        EMPLOYEE_VAR_KEYS.forEach((key) => {
+          if (batchData[`${key}_${n}`] === undefined) {
+            batchData[`${key}_${n}`] = '';
+          }
+        });
+      }
+    }
+
+    console.log("🔗 Bridge mapping selesai. Contoh variabel:");
+    console.log("  nama:", batchData.nama);
+    console.log("  nip:", batchData.nip);
+    console.log("  jabatan:", batchData.jabatan);
+    console.log("  nama_1:", batchData.nama_1);
+    console.log("  nip_1:", batchData.nip_1);
+    console.log("  jabatan_1:", batchData.jabatan_1);
+
     console.log(`=== BATCH DATA GENERATION COMPLETE ===`);
     console.log(`Total variables created: ${Object.keys(batchData).length}`);
     console.log(
@@ -1540,6 +1604,48 @@ function DocxSuratKeterangan() {
                       </p>
                     </div>
                   )}
+
+                  <div className="p-3 bg-purple-900/30 border border-purple-700/50 rounded-lg">
+                    <div className="flex items-start space-x-2">
+                      <div className="text-sm text-purple-300">
+                        <p className="font-medium mb-1">✓ Support Variabel Berjenjang</p>
+                        <p className="text-xs text-purple-200">
+                          Sistem juga mendukung template batch dengan variabel flat ({"{"}nama{"}"}).
+                          Atau gunakan format berjenjang ({"{"}nama_1{"}"}, {"{"}nama_2{"}"}...) untuk hasil maksimal.
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          )}
+
+          {/* Individual Mode Information */}
+          {mode === "individu" && (
+            <Card className="bg-slate-800 border-slate-700">
+              <CardHeader>
+                <CardTitle className="text-white">
+                  Info Template Individu
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-3">
+                  <div className="p-3 bg-blue-900/30 border border-blue-700/50 rounded-lg">
+                    <div className="text-sm text-blue-300">
+                      <p className="font-medium mb-1">✓ Mendukung Dua Format Variabel</p>
+                      <p className="text-xs text-blue-200 mb-2">
+                        Template individu Anda dapat menggunakan:
+                      </p>
+                      <ul className="space-y-1 text-xs text-blue-200">
+                        <li>• <strong>Flat:</strong> {"{"}nama{"}"}, {"{"}nip{"}"}, {"{"}jabatan{"}"}</li>
+                        <li>• <strong>Berjenjang:</strong> {"{"}nama_1{"}"}, {"{"}nip_1{"}"}, {"{"}jabatan_1{"}"}</li>
+                      </ul>
+                      <p className="text-xs text-blue-200 mt-2">
+                        Sistem secara otomatis akan mengisi kedua format untuk kompatibilitas maksimal.
+                      </p>
+                    </div>
+                  </div>
                 </div>
               </CardContent>
             </Card>
