@@ -332,6 +332,18 @@ const DocxFormFiller = ({
     try {
       setIsGenerating(true);
 
+      // Log data sebelum generate untuk debugging
+      const hierarchicalVars = Object.keys(localFormData).filter(k => /_\d+$/.test(k));
+      console.log("📄 GENERATING DOCX with hierarchical variables:");
+      console.log("  Total variables:", Object.keys(localFormData).length);
+      console.log("  Hierarchical variables found:", hierarchicalVars.length);
+      if (hierarchicalVars.length > 0) {
+        console.log("  Sample hierarchical vars:", hierarchicalVars.slice(0, 5));
+        hierarchicalVars.slice(0, 5).forEach(key => {
+          console.log(`    ${key}:`, localFormData[key]);
+        });
+      }
+
       const docxBlob = await processDocxTemplate(templateData, localFormData);
 
       if (onGenerate) {
@@ -395,6 +407,9 @@ const DocxFormFiller = ({
 
     const { matches, unmatchedVariables } = fieldMatching;
 
+    // Deteksi variabel berjenjang yang terisi
+    const hierarchicalMatches = matches.filter(m => /_\d+$/.test(m.variableName));
+
     return (
       <Card className="mb-6">
         <CardHeader>
@@ -404,10 +419,39 @@ const DocxFormFiller = ({
           </CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
+          {hierarchicalMatches.length > 0 && (
+            <div className="p-3 bg-purple-50 border border-purple-200 rounded-lg">
+              <h4 className="text-sm font-medium text-purple-900 mb-2 flex items-center">
+                <CheckCircle className="w-4 h-4 mr-2 text-purple-600" />
+                ✓ Variabel Berjenjang Terdeteksi & Otomatis Terisi
+              </h4>
+              <p className="text-xs text-purple-800 mb-2">
+                Template Anda menggunakan variabel berjenjang (seperti {"{{"}nama_1{"}}"}).
+                Data sudah otomatis diisi dari pegawai yang dipilih:
+              </p>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+                {hierarchicalMatches.slice(0, 6).map((match, index) => (
+                  <div
+                    key={index}
+                    className="flex items-center text-xs bg-white p-2 rounded border border-purple-100"
+                  >
+                    <CheckCircle className="w-3 h-3 mr-2 text-purple-600" />
+                    <span className="font-mono text-purple-900">{match.variableName}</span>
+                  </div>
+                ))}
+              </div>
+              {hierarchicalMatches.length > 6 && (
+                <p className="text-xs text-purple-700 mt-2">
+                  ...dan {hierarchicalMatches.length - 6} variabel berjenjang lainnya
+                </p>
+              )}
+            </div>
+          )}
+
           {matches.length > 0 && (
             <div>
               <h4 className="text-sm font-medium text-green-700 mb-2">
-                Field yang Berhasil Diisi ({matches.length})
+                Field Lainnya yang Berhasil Diisi ({matches.length})
               </h4>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
                 {matches.map((match, index) => (
